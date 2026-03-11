@@ -1,0 +1,1439 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Caption Animator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --bg: #0c0f14;
+      --panel: rgba(18, 22, 30, 0.82);
+      --line: rgba(255, 255, 255, 0.08);
+      --text: #f3f4f6;
+      --muted: #93a0b3;
+      --ok: #17391d;
+      --err: #5a1717;
+      --info: #19304e;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    .app {
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+
+    .stage {
+      position: relative;
+      min-height: 0;
+      display: grid;
+      place-items: center;
+      padding: 12px;
+    }
+
+    .video-shell {
+      position: relative;
+      width: min(92vw, 1600px);
+      height: min(88vh, 960px);
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: #000;
+      overflow: hidden;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.4);
+    }
+
+    .media-stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .media-frame {
+      position: relative;
+      display: inline-grid;
+      place-items: center;
+      width: fit-content;
+      height: fit-content;
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    .media-frame video {
+      display: none;
+      width: auto;
+      height: auto;
+      max-width: min(92vw, 1600px);
+      max-height: min(88vh, 960px);
+      object-fit: contain;
+      background: #000;
+    }
+
+    .placeholder {
+      color: #6d7887;
+      text-align: center;
+      padding: 30px;
+      max-width: 440px;
+      line-height: 1.5;
+    }
+
+    .helper-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .helper-layer.hidden {
+      display: none !important;
+    }
+
+    .helper-safe-area {
+      position: absolute;
+      inset: 6%;
+      border: 1px dashed rgba(255,255,255,0.12);
+      border-radius: 12px;
+      pointer-events: none;
+    }
+
+
+
+
+
+    .helper-caption {
+      position: absolute;
+      left: 50%;
+      top: 85%;
+      transform: translate(-50%, -50%);
+      transform-origin: center center;
+      width: 82%;
+      min-width: 140px;
+      max-width: 82%;
+      min-height: 48px;
+      text-align: center;
+      white-space: pre-wrap;
+      line-height: 1.15;
+      user-select: none;
+      cursor: grab;
+      pointer-events: auto;
+      padding: 0.06em 0.16em;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .helper-caption.is-dragging {
+      cursor: grabbing;
+    }
+
+    .helper-caption::after {
+      content: "";
+      position: absolute;
+      inset: -10px;
+      border: 1px dashed rgba(255,255,255,0.24);
+      border-radius: 12px;
+      pointer-events: none;
+    }
+
+    .helper-caption-text {
+      display: block;
+      width: 100%;
+      text-align: center;
+      white-space: pre-wrap;
+      line-height: inherit;
+    }
+
+    .helper-handle {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 2px solid #000000;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.25);
+      pointer-events: auto;
+    }
+
+    .helper-handle-tl {
+      top: -18px;
+      left: -18px;
+      cursor: nwse-resize;
+    }
+
+    .helper-handle-br {
+      right: -18px;
+      bottom: -18px;
+      cursor: nwse-resize;
+    }
+
+
+
+
+    .topbar {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      pointer-events: none;
+      z-index: 30;
+    }
+
+    .badge,
+    .actions {
+      pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+    }
+
+    .badge {
+      color: var(--muted);
+      font-size: 13px;
+      max-width: 44vw;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .actions {
+      flex-wrap: wrap;
+    }
+
+    .actions button,
+    .actions a,
+    .actions label,
+    .actions select {
+      appearance: none;
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #fff;
+      color: #000;
+      font-size: 13px;
+      font-weight: bold;
+      text-decoration: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+    }
+
+    .actions label,
+    .actions select.secondary,
+    .actions button.secondary,
+    .actions a.secondary {
+      background: #2a3140;
+      color: #fff;
+    }
+
+    .actions input[type="file"] {
+      display: none;
+    }
+
+    .status {
+      position: absolute;
+      left: 16px;
+      bottom: 16px;
+      max-width: min(520px, calc(100vw - 32px));
+      display: none;
+      padding: 12px 14px;
+      border-radius: 14px;
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--line);
+      font-size: 14px;
+      line-height: 1.4;
+      background: var(--panel);
+      z-index: 30;
+    }
+
+    .status.show { display: block; }
+    .status.info { background: rgba(25, 48, 78, 0.85); }
+    .status.ok { background: rgba(23, 57, 29, 0.85); }
+    .status.err { background: rgba(90, 23, 23, 0.9); }
+
+    .hint {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--line);
+      font-size: 12px;
+      line-height: 1.4;
+      background: var(--panel);
+      color: var(--muted);
+      max-width: 420px;
+      text-align: right;
+      z-index: 30;
+    }
+
+    .lil-gui.root {
+      --background-color: rgba(20, 24, 32, 0.92);
+      --widget-color: rgba(255, 255, 255, 0.08);
+      --hover-color: rgba(255, 255, 255, 0.12);
+      --focus-color: rgba(255, 255, 255, 0.15);
+      --text-color: #f3f4f6;
+      --title-background-color: rgba(255, 255, 255, 0.05);
+      --title-text-color: #ffffff;
+      --number-color: #9fd3ff;
+      --string-color: #d6f5b0;
+      position: fixed;
+      top: 72px;
+      right: 16px;
+      max-height: calc(100vh - 88px);
+      overflow: auto;
+      z-index: 40;
+    }
+
+    @media (max-width: 900px) {
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .hint {
+        display: none;
+      }
+
+      .lil-gui.root {
+        top: auto;
+        right: 8px;
+        bottom: 8px;
+        max-height: 58vh;
+      }
+
+      .badge {
+        max-width: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="stage">
+      <div class="topbar">
+        <div class="badge" id="selectionMeta">No files selected.</div>
+
+        <div class="actions">
+          <label>
+            Video
+            <input type="file" id="video" accept=".mp4,.mov,.m4v">
+          </label>
+
+          <label>
+            SRT
+            <input type="file" id="srt" accept=".srt,.vtt">            
+          </label>
+
+          <select id="presetSelect" class="secondary" title="Choose preset">
+            <option value="">Preset…</option>
+          </select>
+
+          <button id="savePresetBtn" class="secondary" type="button">Save</button>
+          <button id="saveAsPresetBtn" class="secondary" type="button">Save As</button>
+          <button id="deletePresetBtn" class="secondary" type="button">Delete preset</button>
+          <button id="exportPresetBtn" class="secondary" type="button">Export preset</button>
+
+          <label class="secondary">
+            Import preset
+            <input type="file" id="presetImportInput" accept=".json,application/json">
+          </label>
+
+          <button id="previewBtn" type="button">Render preview</button>
+          <button id="renderFullBtn" class="secondary" type="button">Render full</button>
+          
+          <button id="resetBtn" class="secondary" type="button">Reset</button>
+
+          <a id="openPreview" href="#" target="_blank" rel="noopener" style="display:none;">Open preview</a>
+          <a id="openAss" href="#" target="_blank" rel="noopener" class="secondary" style="display:none;">Open ASS</a>
+        </div>
+      </div>
+
+      <div class="video-shell" id="videoShell">
+        <div class="media-stage">
+          <div class="media-frame" id="mediaFrame">
+            <div id="placeholder" class="placeholder">
+              Choose a video and SRT, drag the helper text on the real video area, then render the preview.
+            </div>
+
+            <video id="previewVideo" controls playsinline></video>
+
+            <div class="helper-layer" id="helperLayer" style="display:none;">
+              <div class="helper-safe-area"></div>
+
+              <div class="helper-caption" id="helperCaption">
+                <div class="helper-handle helper-handle-tl" id="helperHandleTL"></div>
+                <span id="helperCaptionText" class="helper-caption-text">Preview caption will appear here</span>
+                <div class="helper-handle helper-handle-br" id="helperHandleBR"></div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="status" class="status"></div>
+
+      <div class="hint">
+        H = toggle helpers.<br>
+        Helper font is scaled to the displayed video size so it matches the rendered preview more closely.
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.20/+esm';
+
+    const videoInput = document.getElementById('video');
+    const srtInput = document.getElementById('srt');
+    const previewBtn = document.getElementById('previewBtn');
+    const renderFullBtn = document.getElementById('renderFullBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const previewVideo = document.getElementById('previewVideo');
+    const placeholder = document.getElementById('placeholder');
+    const selectionMeta = document.getElementById('selectionMeta');
+    const statusEl = document.getElementById('status');
+    const openPreview = document.getElementById('openPreview');
+    const openAss = document.getElementById('openAss');
+    const videoShell = document.getElementById('videoShell');
+    const mediaFrame = document.getElementById('mediaFrame');
+    const helperLayer = document.getElementById('helperLayer');
+    const helperCaption = document.getElementById('helperCaption');
+    const helperCaptionText = document.getElementById('helperCaptionText');
+    const helperHandleTL = document.getElementById('helperHandleTL');
+    const helperHandleBR = document.getElementById('helperHandleBR');
+    const presetSelect = document.getElementById('presetSelect');
+    const savePresetBtn = document.getElementById('savePresetBtn');
+    const saveAsPresetBtn = document.getElementById('saveAsPresetBtn');
+    const deletePresetBtn = document.getElementById('deletePresetBtn');
+    const exportPresetBtn = document.getElementById('exportPresetBtn');
+    const presetImportInput = document.getElementById('presetImportInput');
+
+    const PRESET_DB_NAME = 'captionAnimatorPresetsDB';
+    const PRESET_STORE_NAME = 'presets';
+    const PRESET_LOCALSTORAGE_KEY = 'captionAnimatorPresetsMirror';
+
+    let pollTimer = null;
+    let sourceObjectUrl = null;
+    let srtPreviewText = 'Preview caption will appear here';
+    let dragState = null;
+    let resizeState = null;
+    let presetDb = null;
+    let presetsCache = {};
+    let helpersVisible = true;
+
+
+
+
+    const defaultControls = {
+      font_name: 'Arial',
+      font_size: 24,
+      helper_font_scale: 0.86,
+      bold: false,
+      italic: false,
+      primary_colour: '#ffffff',
+      active_word_colour: '#ff0000',
+      active_word_lead_ms: 80,      
+      outline_colour: '#000000',
+      shadow_colour: '#000000',
+      background_colour: '#000000',
+      use_background: false,
+      background_alpha: 0.45,
+      outline: 2,
+      shadow: 0,
+      blur: 0.8,
+      alignment: 2,
+      margin_v: 60,
+      margin_h: 40,
+      anchor_x: 0.5,
+      anchor_y: 0.9,
+      offset_x: 0,
+      offset_y: 0,
+      animation_type: 'fade',
+      intro_ms: 180,
+      outro_ms: 120,
+      start_scale: 100,
+      end_scale: 100,
+      start_alpha: '99',
+      mid_alpha: '44',
+      end_alpha: '66',
+      in_offset_x: 0,
+      in_offset_y: 18,
+      out_offset_x: 0,
+      out_offset_y: 0,
+      overshoot_amount: 8,
+      overshoot_ms: 90,
+      settle_ms: 90,
+      rotation_z: 0,
+      letter_spacing: 0,
+      out_mode: 'fade'
+    };
+
+
+    const controls = { ...defaultControls };
+
+
+    /* Show status panel with current state or error. */
+    function showStatus(kind, message) {
+      statusEl.className = `status show ${kind}`;
+      statusEl.innerHTML = message;
+    }
+
+    /* Hide status panel. */
+    function clearStatus() {
+      statusEl.className = 'status';
+      statusEl.innerHTML = '';
+    }
+
+    /* Put dropped file into a hidden file input. */
+    function setFileInput(input, file) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+    }
+
+    /* Refresh top metadata with selected file names. */
+    function updateMeta() {
+      const v = videoInput.files[0];
+      const s = srtInput.files[0];
+
+      if (!v && !s) {
+        selectionMeta.textContent = 'No files selected.';
+        return;
+      }
+
+      selectionMeta.innerHTML =
+    `<strong>Video:</strong> ${v ? v.name : '—'} &nbsp; · &nbsp; <strong>SRT:</strong> ${s ? s.name : '—'}`;
+  }
+
+    /* Convert ASS-size font into displayed-video CSS size. */
+  function getPreviewScaleFactor() {
+    if (!previewVideo.videoWidth || !previewVideo.videoHeight) return 1;
+
+    const rect = previewVideo.getBoundingClientRect();
+    if (!rect.width || !rect.height) return 1;
+
+    const scaleX = rect.width / previewVideo.videoWidth;
+    const scaleY = rect.height / previewVideo.videoHeight;
+    return Math.min(scaleX, scaleY);
+  }
+
+    /* Force helper overlay to exactly match the displayed video rectangle. */
+  function syncOverlayToVideo() {
+    if (previewVideo.style.display === 'none') return;
+
+    const videoRect = previewVideo.getBoundingClientRect();
+    if (!videoRect.width || !videoRect.height) return;
+
+    mediaFrame.style.width = `${videoRect.width}px`;
+    mediaFrame.style.height = `${videoRect.height}px`;
+
+    helperLayer.style.left = '0px';
+    helperLayer.style.top = '0px';
+    helperLayer.style.width = '100%';
+    helperLayer.style.height = '100%';
+  }
+
+    /* Show or hide helper overlay. */
+  function applyHelpersVisibility() {
+    if (helpersVisible && previewVideo.style.display !== 'none') {
+      helperLayer.classList.remove('hidden');
+      helperLayer.style.display = 'block';
+    } else {
+      helperLayer.classList.add('hidden');
+    }
+  }
+
+
+
+
+
+/* Repaint helper so it matches rendered width/scale/anchor more closely. */
+  function applyHelperPreview() {
+    const scale = getPreviewScaleFactor();
+    const rect = helperLayer.getBoundingClientRect();
+    const displayedWidth = rect.width || 0;
+
+    const renderedBoxWidth = displayedWidth
+    ? Math.max(120, displayedWidth - (controls.margin_h * scale * 2))
+    : 320;
+
+    const helperFontSize = Math.max(8, controls.font_size * scale * controls.helper_font_scale);
+    const helperTranslate = getHelperTranslateForAlignment(controls.alignment);
+
+    helperCaptionText.textContent = srtPreviewText;
+    helperCaption.style.fontFamily = controls.font_name;
+    helperCaption.style.fontSize = `${helperFontSize}px`;
+    helperCaption.style.fontWeight = controls.bold ? '700' : '400';
+    helperCaption.style.fontStyle = controls.italic ? 'italic' : 'normal';
+    helperCaption.style.color = controls.primary_colour;
+    helperCaption.style.textAlign = 'center';
+    helperCaption.style.justifyContent = 'center';
+    helperCaption.style.alignItems = 'center';
+    helperCaption.style.width = `${renderedBoxWidth}px`;
+    helperCaption.style.maxWidth = `${renderedBoxWidth}px`;
+    helperCaption.style.minHeight = '0px';
+    helperCaption.style.backgroundColor = controls.use_background
+    ? `rgba(${parseInt(controls.background_colour.slice(1, 3), 16)}, ${parseInt(controls.background_colour.slice(3, 5), 16)}, ${parseInt(controls.background_colour.slice(5, 7), 16)}, ${controls.background_alpha})`
+    : 'transparent';
+    helperCaption.style.padding = controls.use_background
+    ? `${0.18 * scale}em ${0.35 * scale}em`
+    : `${0.06 * scale}em ${0.16 * scale}em`;
+    helperCaption.style.letterSpacing = `${controls.letter_spacing * scale}px`;
+    helperCaption.style.textShadow =
+    `${controls.outline * scale}px 0 ${controls.outline_colour},
+     ${-controls.outline * scale}px 0 ${controls.outline_colour},
+     0 ${controls.outline * scale}px ${controls.outline_colour},
+     0 ${-controls.outline * scale}px ${controls.outline_colour},
+    ${controls.shadow * scale}px ${controls.shadow * scale}px ${controls.shadow_colour}`;
+    helperCaption.style.left = `${controls.anchor_x * 100}%`;
+    helperCaption.style.top = `${controls.anchor_y * 100}%`;
+    helperCaption.style.transform =
+  `translate(${helperTranslate}) translate(${controls.offset_x * scale}px, ${controls.offset_y * scale}px) rotate(${-controls.rotation_z}deg) scale(${controls.end_scale / 100})`;
+
+  syncOverlayToVideo();
+  applyHelpersVisibility();
+}
+
+
+
+/* Match helper anchor behavior to ASS alignment anchors. */
+function getHelperTranslateForAlignment(alignment) {
+  const a = Number(alignment);
+
+  if (a === 1) return '-0%, -100%';
+  if (a === 2) return '-50%, -100%';
+  if (a === 3) return '-100%, -100%';
+
+  if (a === 4) return '-0%, -50%';
+  if (a === 5) return '-50%, -50%';
+  if (a === 6) return '-100%, -50%';
+
+  if (a === 7) return '-0%, -0%';
+  if (a === 8) return '-50%, -0%';
+  if (a === 9) return '-100%, -0%';
+
+  return '-50%, -100%';
+}
+
+
+
+
+/* Resize helper box around center; width maps directly to render width via margin_h. */
+function updateResizeFromHandle(clientX, clientY) {
+  if (!resizeState) return;
+
+  const scale = getPreviewScaleFactor();
+  const rect = helperLayer.getBoundingClientRect();
+  if (!rect.width || !scale) return;
+
+  const dx = clientX - resizeState.startX;
+  const widthDelta = resizeState.corner === 'br' ? dx : -dx;
+
+  const newDisplayedWidth = Math.max(120, resizeState.startDisplayedWidth + widthDelta);
+  const newDisplayedMargin = Math.max(0, (rect.width - newDisplayedWidth) / 2);
+
+  controls.margin_h = Math.round(newDisplayedMargin / scale);
+
+  refreshGui();
+  applyHelperPreview();
+}
+
+
+
+
+
+helperHandleTL.addEventListener('pointerdown', event => {
+  event.stopPropagation();
+  const scale = getPreviewScaleFactor();
+  const rect = helperLayer.getBoundingClientRect();
+
+  resizeState = {
+    corner: 'tl',
+    startX: event.clientX,
+    startY: event.clientY,
+    startDisplayedWidth: Math.max(120, rect.width - (controls.margin_h * scale * 2))
+  };
+
+  helperHandleTL.setPointerCapture(event.pointerId);
+});
+
+helperHandleBR.addEventListener('pointerdown', event => {
+  event.stopPropagation();
+  const scale = getPreviewScaleFactor();
+  const rect = helperLayer.getBoundingClientRect();
+
+  resizeState = {
+    corner: 'br',
+    startX: event.clientX,
+    startY: event.clientY,
+    startDisplayedWidth: Math.max(120, rect.width - (controls.margin_h * scale * 2))
+  };
+
+  helperHandleBR.setPointerCapture(event.pointerId);
+});
+
+
+
+
+
+
+
+document.addEventListener('pointermove', event => {
+  if (!resizeState) return;
+  updateResizeFromHandle(event.clientX, event.clientY);
+});
+
+document.addEventListener('pointerup', () => {
+  resizeState = null;
+});
+
+document.addEventListener('pointercancel', () => {
+  resizeState = null;
+});
+
+    /* Append current control values to render request. */
+function collectSettings(formData) {
+  Object.entries(controls).forEach(([key, value]) => {
+    formData.append(key, String(value));
+  });
+}
+
+    /* Refresh all lil-gui controller values from current controls object. */
+function refreshGui() {
+  gui.controllersRecursive().forEach(c => c.updateDisplay());
+}
+
+    /* Build a serializable preset object from current controls. */
+function exportCurrentPresetObject(name = 'Unnamed Preset') {
+  return {
+    name,
+    version: 1,
+    controls: { ...controls }
+  };
+}
+
+    /* Load preset controls into UI and repaint helper caption. */
+function applyPresetObject(presetObject) {
+  if (!presetObject || !presetObject.controls) return;
+  Object.assign(controls, defaultControls, presetObject.controls);
+  refreshGui();
+  applyHelperPreview();
+}
+
+    /* Mirror preset cache into localStorage. */
+function syncLocalStorageMirror() {
+  localStorage.setItem(PRESET_LOCALSTORAGE_KEY, JSON.stringify(presetsCache));
+}
+
+    /* Rebuild preset dropdown from current preset cache. */
+function renderPresetSelect() {
+  const current = presetSelect.value;
+  presetSelect.innerHTML = '<option value="">Preset…</option>';
+  Object.keys(presetsCache).sort().forEach(name => {
+    const option = document.createElement('option');
+    option.value = name;
+    option.textContent = name;
+    presetSelect.appendChild(option);
+  });
+  if (current && presetsCache[current]) {
+    presetSelect.value = current;
+  }
+}
+
+    /* Open IndexedDB store for saved presets. */
+function openPresetDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(PRESET_DB_NAME, 1);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(PRESET_STORE_NAME)) {
+        db.createObjectStore(PRESET_STORE_NAME, { keyPath: 'name' });
+      }
+    };
+
+    request.onsuccess = () => {
+      presetDb = request.result;
+      resolve(presetDb);
+    };
+
+    request.onerror = () => {
+      reject(request.error);
+    };
+  });
+}
+
+    /* Read every preset from IndexedDB. */
+function getAllPresetsFromDb() {
+  return new Promise((resolve, reject) => {
+    const tx = presetDb.transaction(PRESET_STORE_NAME, 'readonly');
+    const store = tx.objectStore(PRESET_STORE_NAME);
+    const request = store.getAll();
+
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+    /* Save or overwrite one preset in IndexedDB. */
+function putPresetToDb(presetObject) {
+  return new Promise((resolve, reject) => {
+    const tx = presetDb.transaction(PRESET_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(PRESET_STORE_NAME);
+    const request = store.put(presetObject);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+    /* Delete one preset from IndexedDB. */
+function deletePresetFromDb(name) {
+  return new Promise((resolve, reject) => {
+    const tx = presetDb.transaction(PRESET_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(PRESET_STORE_NAME);
+    const request = store.delete(name);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+    /* Load presets from IndexedDB, fallback to localStorage mirror. */
+async function loadPresets() {
+  try {
+    await openPresetDb();
+    const items = await getAllPresetsFromDb();
+    presetsCache = {};
+    items.forEach(item => {
+      presetsCache[item.name] = item;
+    });
+    syncLocalStorageMirror();
+    renderPresetSelect();
+  } catch {
+    const raw = localStorage.getItem(PRESET_LOCALSTORAGE_KEY);
+    presetsCache = raw ? JSON.parse(raw) : {};
+    renderPresetSelect();
+  }
+}
+
+
+
+
+
+
+    /* Save current controls as a named preset. */
+/* Save current controls into the selected preset, or create one if none is selected. */
+async function savePreset() {
+  let name = presetSelect.value;
+
+  if (!name) {
+    name = prompt('Preset name');
+    if (!name) return;
+    name = name.trim();
+  }
+
+  const presetObject = exportCurrentPresetObject(name);
+  presetsCache[presetObject.name] = presetObject;
+
+  try {
+    if (presetDb) {
+      await putPresetToDb(presetObject);
+    }
+  } catch {}
+
+  syncLocalStorageMirror();
+  renderPresetSelect();
+  presetSelect.value = presetObject.name;
+  showStatus('ok', `Preset saved: <strong>${presetObject.name}</strong>`);
+}
+
+
+/* Save current controls as a new preset name. */
+async function savePresetAs() {
+  let name = prompt('New preset name');
+  if (!name) return;
+
+  name = name.trim();
+  if (!name) return;
+
+  const presetObject = exportCurrentPresetObject(name);
+  presetsCache[presetObject.name] = presetObject;
+
+  try {
+    if (presetDb) {
+      await putPresetToDb(presetObject);
+    }
+  } catch {}
+
+  syncLocalStorageMirror();
+  renderPresetSelect();
+  presetSelect.value = presetObject.name;
+  showStatus('ok', `Preset saved as: <strong>${presetObject.name}</strong>`);
+}
+
+
+
+
+    /* Delete selected preset from storage. */
+async function deletePreset() {
+  const name = presetSelect.value;
+  if (!name || !presetsCache[name]) {
+    showStatus('err', 'Choose a preset to delete.');
+    return;
+  }
+
+  delete presetsCache[name];
+
+  try {
+    if (presetDb) {
+      await deletePresetFromDb(name);
+    }
+  } catch {}
+
+  syncLocalStorageMirror();
+  renderPresetSelect();
+  showStatus('ok', `Preset deleted: <strong>${name}</strong>`);
+}
+
+    /* Export selected or current preset as JSON file. */
+function exportPreset() {
+  const name = presetSelect.value || 'caption-preset';
+  const presetObject = presetsCache[name] || exportCurrentPresetObject(name);
+  const blob = new Blob([JSON.stringify(presetObject, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${name.replace(/[^\w.-]+/g, '_')}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+    /* Import preset JSON file into IndexedDB and local cache. */
+async function importPreset(file) {
+  try {
+    const raw = await file.text();
+    const presetObject = JSON.parse(raw);
+    if (!presetObject || !presetObject.name || !presetObject.controls) {
+      throw new Error('Invalid preset JSON.');
+    }
+
+    presetsCache[presetObject.name] = presetObject;
+
+    try {
+      if (presetDb) {
+        await putPresetToDb(presetObject);
+      }
+    } catch {}
+
+    syncLocalStorageMirror();
+    renderPresetSelect();
+    presetSelect.value = presetObject.name;
+    applyPresetObject(presetObject);
+    showStatus('ok', `Preset imported: <strong>${presetObject.name}</strong>`);
+  } catch (error) {
+    showStatus('err', error.message || 'Preset import failed.');
+  }
+}
+
+
+
+
+
+/* Reset UI, preview and controls to defaults. */
+function resetUI() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+
+  if (sourceObjectUrl) {
+    URL.revokeObjectURL(sourceObjectUrl);
+    sourceObjectUrl = null;
+  }
+
+  videoInput.value = '';
+  srtInput.value = '';
+  presetImportInput.value = '';
+  clearStatus();
+
+  previewBtn.disabled = false;
+  renderFullBtn.disabled = false;
+  previewBtn.textContent = 'Render preview';
+  renderFullBtn.textContent = 'Render full';
+
+  previewVideo.pause();
+  previewVideo.removeAttribute('src');
+  previewVideo.load();
+  previewVideo.style.display = 'none';
+  placeholder.style.display = 'block';
+  helperLayer.style.display = 'none';
+
+  openPreview.style.display = 'none';
+  openAss.style.display = 'none';
+  openPreview.href = '#';
+  openAss.href = '#';
+
+  srtPreviewText = 'Preview caption will appear here';
+  helpersVisible = true;
+  resizeState = null;
+
+  Object.assign(controls, defaultControls);
+
+  refreshGui();
+  updateMeta();
+  applyHelperPreview();
+}
+
+
+
+/* Poll backend render status until preview/full render is ready or failed. */
+async function startPolling(jobId) {
+  if (pollTimer) clearInterval(pollTimer);
+
+  pollTimer = setInterval(async () => {
+    try {
+      const response = await fetch(`/api/status/${jobId}`);
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || 'Status failed.');
+      }
+
+      if (data.status === 'queued' || data.status === 'preparing' || data.status === 'rendering') {
+        showStatus('info', data.message);
+        return;
+      }
+
+      if (data.status === 'done') {
+        clearInterval(pollTimer);
+        pollTimer = null;
+
+        previewVideo.src = `${data.preview_url}?t=${Date.now()}`;
+        previewVideo.style.display = 'block';
+        placeholder.style.display = 'none';
+        helperLayer.style.display = 'block';
+
+        openPreview.href = data.preview_url;
+        openAss.href = data.ass_url || '#';
+        openPreview.style.display = 'inline-flex';
+        openAss.style.display = data.ass_url ? 'inline-flex' : 'none';
+
+        previewBtn.disabled = false;
+        renderFullBtn.disabled = false;
+        previewBtn.textContent = 'Render preview';
+        renderFullBtn.textContent = 'Render full';
+
+        showStatus('ok', 'Render ready.');
+
+        requestAnimationFrame(() => {
+          syncOverlayToVideo();
+          applyHelperPreview();
+        });
+
+        return;
+      }
+
+      if (data.status === 'error') {
+        clearInterval(pollTimer);
+        pollTimer = null;
+
+        previewBtn.disabled = false;
+        renderFullBtn.disabled = false;
+        previewBtn.textContent = 'Render preview';
+        renderFullBtn.textContent = 'Render full';
+
+        showStatus('err', data.message || 'Render failed.');
+      }
+    } catch (err) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+
+      previewBtn.disabled = false;
+      renderFullBtn.disabled = false;
+      previewBtn.textContent = 'Render preview';
+      renderFullBtn.textContent = 'Render full';
+
+      showStatus('err', err.message || 'Polling failed.');
+    }
+  }, 1000);
+}
+
+
+
+/* Read preview text from SRT or VTT and show it in helper caption. */
+async function readSrtPreview(file) {
+  try {
+    const text = await file.text();
+
+    if (/\.vtt$/i.test(file.name)) {
+      const cleaned = text
+      .replace(/<\d{2}:\d{2}:\d{2}\.\d{3}>/g, '')
+      .replace(/<\/?c[^>]*>/g, '')
+      .replace(/<[^>]+>/g, '')
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(line => line && !/^WEBVTT/.test(line) && !/^Kind:/.test(line) && !/^Language:/.test(line) && !/^\d{2}:\d{2}:\d{2}\.\d{3}\s+-->/.test(line))
+      .slice(0, 2)
+      .join(' ');
+      srtPreviewText = cleaned || 'Preview caption will appear here';
+    } else {
+      const lines = text
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(line => line && !/^\d+$/.test(line) && !/^\d{2}:\d{2}:\d{2},\d{3}\s+-->/.test(line));
+      srtPreviewText = lines.slice(0, 2).join(' ') || 'Preview caption will appear here';
+    }
+
+    applyHelperPreview();
+  } catch {
+    srtPreviewText = 'Preview caption will appear here';
+    applyHelperPreview();
+  }
+}
+
+    /* Load source video into preview player before rendering backend preview. */
+async function loadSourceVideoPreview(file) {
+  if (sourceObjectUrl) {
+    URL.revokeObjectURL(sourceObjectUrl);
+  }
+
+  sourceObjectUrl = URL.createObjectURL(file);
+  previewVideo.src = sourceObjectUrl;
+  previewVideo.style.display = 'block';
+  placeholder.style.display = 'none';
+  helperLayer.style.display = 'block';
+  mediaFrame.style.width = '';
+  mediaFrame.style.height = '';
+  previewVideo.load();
+}
+
+
+/* Start preview or full render using current files and controls. */
+async function renderVideo(mode) {
+  clearStatus();
+
+  const video = videoInput.files[0];
+  const srt = srtInput.files[0];
+
+  if (!video || !srt) {
+    showStatus('err', 'Choose both video and SRT.');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('video', video);
+  formData.append('srt', srt);
+  formData.append('mode', mode);
+  collectSettings(formData);
+
+  previewBtn.disabled = true;
+  renderFullBtn.disabled = true;
+  previewBtn.textContent = mode === 'preview' ? 'Rendering...' : 'Render preview';
+  renderFullBtn.textContent = mode === 'full' ? 'Rendering...' : 'Render full';
+  openPreview.style.display = 'none';
+  openAss.style.display = 'none';
+  showStatus('info', mode === 'preview' ? 'Starting preview render...' : 'Starting full render...');
+
+  try {
+    const response = await fetch('/api/preview', {
+      method: 'POST',
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(data.error || `Could not start ${mode} render.`);
+    }
+
+    startPolling(data.job_id);
+  } catch (err) {
+    previewBtn.disabled = false;
+    renderFullBtn.disabled = false;
+    previewBtn.textContent = 'Render preview';
+    renderFullBtn.textContent = 'Render full';
+    showStatus('err', err.message || 'Request failed.');
+  }
+}
+
+
+/* Start preview render request using current files and controls. */
+async function renderPreview() {
+  await renderVideo('preview');
+}
+
+
+
+
+
+
+    /* Convert drag position inside helper layer into normalized anchor coordinates. */
+/* Drag helper inside visible video bounds and keep it from escaping. */
+function updateFromDrag(clientX, clientY) {
+  const rect = helperLayer.getBoundingClientRect();
+  const boxRect = helperCaption.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+
+  const halfW = Math.min(boxRect.width / 2, rect.width / 2);
+  const halfH = Math.min(boxRect.height / 2, rect.height / 2);
+
+  const clampedX = Math.max(rect.left + halfW, Math.min(rect.right - halfW, clientX));
+  const clampedY = Math.max(rect.top + halfH, Math.min(rect.bottom - halfH, clientY));
+
+  controls.anchor_x = Number(((clampedX - rect.left) / rect.width).toFixed(4));
+  controls.anchor_y = Number(((clampedY - rect.top) / rect.height).toFixed(4));
+  controls.offset_x = 0;
+  controls.offset_y = 0;
+
+  refreshGui();
+  applyHelperPreview();
+}
+
+helperCaption.addEventListener('pointerdown', event => {
+  dragState = true;
+  helperCaption.classList.add('is-dragging');
+  helperCaption.setPointerCapture(event.pointerId);
+});
+
+helperCaption.addEventListener('pointermove', event => {
+  if (!dragState) return;
+  updateFromDrag(event.clientX, event.clientY);
+});
+
+helperCaption.addEventListener('pointerup', event => {
+  dragState = null;
+  helperCaption.classList.remove('is-dragging');
+  helperCaption.releasePointerCapture(event.pointerId);
+});
+
+helperCaption.addEventListener('pointercancel', () => {
+  dragState = null;
+  helperCaption.classList.remove('is-dragging');
+});
+
+const gui = new GUI({ title: 'Caption Controls' });
+
+const typeFolder = gui.addFolder('Typography');
+typeFolder.add(controls, 'font_name', [
+  'Arial',
+  'Helvetica',
+  'Verdana',
+  'Trebuchet MS',
+  'Georgia',
+  'Times New Roman',
+  'Courier New',
+  'Avenir Next',
+  'SF Pro Display',
+  'Futura',
+  'Impact'
+]).onChange(applyHelperPreview);
+
+
+typeFolder.add(controls, 'font_size', 8, 96, 1).onChange(applyHelperPreview);
+typeFolder.add(controls, 'helper_font_scale', 0.6, 1.2, 0.01).name('helper font match').onChange(applyHelperPreview);
+typeFolder.addColor(controls, 'primary_colour').name('text').onChange(applyHelperPreview);
+
+typeFolder.addColor(controls, 'active_word_colour').name('active word').onChange(applyHelperPreview);
+typeFolder.add(controls, 'active_word_lead_ms', 0, 200, 1).name('active lead ms');
+
+typeFolder.add(controls, 'use_background').name('background').onChange(applyHelperPreview);
+typeFolder.addColor(controls, 'background_colour').name('bg color').onChange(applyHelperPreview);
+typeFolder.add(controls, 'background_alpha', 0, 1, 0.01).name('bg alpha').onChange(applyHelperPreview);
+
+
+typeFolder.addColor(controls, 'outline_colour').name('outline').onChange(applyHelperPreview);
+typeFolder.addColor(controls, 'shadow_colour').name('shadow color').onChange(applyHelperPreview);
+typeFolder.add(controls, 'outline', 0, 12, 0.5).onChange(applyHelperPreview);
+typeFolder.add(controls, 'shadow', 0, 12, 0.5).onChange(applyHelperPreview);
+typeFolder.add(controls, 'blur', 0, 8, 0.1);
+typeFolder.add(controls, 'bold').onChange(applyHelperPreview);
+typeFolder.add(controls, 'italic').onChange(applyHelperPreview);
+typeFolder.add(controls, 'letter_spacing', -10, 30, 0.1).onChange(applyHelperPreview);
+typeFolder.open();
+
+const placeFolder = gui.addFolder('Placement');
+placeFolder.add(controls, 'alignment', {
+  'Bottom Left': 1,
+  'Bottom Center': 2,
+  'Bottom Right': 3,
+  'Top Left': 7,
+  'Top Center': 8,
+  'Top Right': 9
+}).onChange(applyHelperPreview);
+placeFolder.add(controls, 'anchor_x', 0, 1, 0.001).onChange(applyHelperPreview);
+placeFolder.add(controls, 'anchor_y', 0, 1, 0.001).onChange(applyHelperPreview);
+placeFolder.add(controls, 'margin_v', 0, 240, 1);
+placeFolder.add(controls, 'margin_h', 0, 240, 1).onChange(applyHelperPreview);
+placeFolder.add(controls, 'offset_x', -600, 600, 1).onChange(applyHelperPreview);
+placeFolder.add(controls, 'offset_y', -600, 600, 1).onChange(applyHelperPreview);
+placeFolder.add(controls, 'rotation_z', -45, 45, 0.1).onChange(applyHelperPreview);
+
+
+const animFolder = gui.addFolder('Animation');
+animFolder.add(controls, 'animation_type', {
+  'Fade line': 'fade',
+  'Slide line': 'slide',
+  'Pop line': 'pop',
+  'Reveal words': 'words',
+  'Reveal letters': 'letters',
+  'None': 'none'
+});
+animFolder.add(controls, 'intro_ms', 0, 1200, 1);
+animFolder.add(controls, 'outro_ms', 0, 1200, 1);
+animFolder.add(controls, 'start_scale', 50, 220, 1);
+animFolder.add(controls, 'end_scale', 50, 220, 1).onChange(applyHelperPreview);
+animFolder.add(controls, 'start_alpha', ['FF', 'DD', 'BB', '99', '66', '33', '00']);
+animFolder.add(controls, 'mid_alpha', ['FF', 'DD', 'BB', '99', '66', '44', '22', '00']);
+animFolder.add(controls, 'end_alpha', ['FF', 'DD', 'BB', '99', '66', '33', '00']);
+animFolder.add(controls, 'in_offset_x', -800, 800, 1);
+animFolder.add(controls, 'in_offset_y', -800, 800, 1);
+animFolder.add(controls, 'out_mode', { 'Fade': 'fade', 'Move out': 'move' });
+animFolder.add(controls, 'out_offset_x', -800, 800, 1);
+animFolder.add(controls, 'out_offset_y', -800, 800, 1);
+animFolder.add(controls, 'overshoot_amount', 0, 80, 1);
+animFolder.add(controls, 'overshoot_ms', 0, 500, 1);
+animFolder.add(controls, 'settle_ms', 0, 500, 1);
+
+gui.add({ render: renderPreview }, 'render').name('Render Preview');
+gui.add({ reset: resetUI }, 'reset').name('Reset');
+
+presetSelect.addEventListener('change', () => {
+  const name = presetSelect.value;
+  if (name && presetsCache[name]) {
+    applyPresetObject(presetsCache[name]);
+    showStatus('ok', `Preset loaded: <strong>${name}</strong>`);
+  }
+});
+
+savePresetBtn.addEventListener('click', savePreset);
+saveAsPresetBtn.addEventListener('click', savePresetAs);
+
+deletePresetBtn.addEventListener('click', deletePreset);
+exportPresetBtn.addEventListener('click', exportPreset);
+
+presetImportInput.addEventListener('change', async () => {
+  const file = presetImportInput.files[0];
+  if (file) {
+    await importPreset(file);
+  }
+  presetImportInput.value = '';
+});
+
+['dragenter', 'dragover'].forEach(name => {
+  document.body.addEventListener(name, event => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+});
+
+['dragleave', 'drop'].forEach(name => {
+  document.body.addEventListener(name, event => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+});
+
+document.body.addEventListener('drop', async event => {
+  const files = [...event.dataTransfer.files];
+  const videoFile = files.find(file => /\.(mp4|mov|m4v)$/i.test(file.name));
+
+  const srtFile = files.find(file => /\.(srt|vtt)$/i.test(file.name));
+
+  if (videoFile) {
+    setFileInput(videoInput, videoFile);
+    await loadSourceVideoPreview(videoFile);
+  }
+
+  if (srtFile) {
+    setFileInput(srtInput, srtFile);
+    await readSrtPreview(srtFile);
+  }
+
+  updateMeta();
+});
+
+videoInput.addEventListener('change', async () => {
+  updateMeta();
+  const file = videoInput.files[0];
+  if (file) {
+    await loadSourceVideoPreview(file);
+  }
+});
+
+srtInput.addEventListener('change', async () => {
+  updateMeta();
+  const file = srtInput.files[0];
+  if (file) {
+    await readSrtPreview(file);
+  }
+});
+
+previewVideo.addEventListener('loadedmetadata', () => {
+  requestAnimationFrame(() => {
+    syncOverlayToVideo();
+    helperLayer.style.display = 'block';
+    applyHelperPreview();
+  });
+});
+
+previewVideo.addEventListener('loadeddata', () => {
+  requestAnimationFrame(() => {
+    syncOverlayToVideo();
+    applyHelperPreview();
+  });
+});
+
+window.addEventListener('resize', () => {
+  requestAnimationFrame(() => {
+    syncOverlayToVideo();
+    applyHelperPreview();
+  });
+});
+
+document.addEventListener('keydown', event => {
+  if (event.target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)) return;
+
+  if (event.key.toLowerCase() === 'h') {
+    helpersVisible = !helpersVisible;
+    applyHelpersVisibility();
+  }
+});
+
+previewBtn.addEventListener('click', renderPreview);
+renderFullBtn.addEventListener('click', () => renderVideo('full'));
+resetBtn.addEventListener('click', resetUI);
+
+await loadPresets();
+updateMeta();
+applyHelperPreview();
+</script>
+</body>
+</html>
