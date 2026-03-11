@@ -1,6 +1,9 @@
 REPLACE: `README.md`
 
-# srt-ass-caption-animator
+# caption-animator
+
+Produced for this small feature animation yesterday - a tool built in minutes, just an idea:
+https://youtu.be/WMzr-QDAxkE?si=oamCYI09iHzF8elE
 
 Captions Animator — a browser UI plus Flask backend for creating **animated burned-in captions** on video.
 
