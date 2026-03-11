@@ -597,10 +597,11 @@ def index():
 
 
 
-
 @app.route("/api/preview", methods=["POST"])
 def api_preview():
     try:
+        import hashlib
+
         video = request.files.get("video")
         srt = request.files.get("srt")
 
@@ -618,8 +619,17 @@ def api_preview():
 
         job_id = str(uuid.uuid4())[:8]
 
-        video_name = f"{job_id}_{secure_filename(video.filename)}"
-        srt_name = f"{job_id}_{secure_filename(srt.filename)}"
+        video_bytes = video.read()
+        srt_bytes = srt.read()
+
+        video_hash = hashlib.sha1(video_bytes).hexdigest()[:16]
+        srt_hash = hashlib.sha1(srt_bytes).hexdigest()[:16]
+
+        video_ext = os.path.splitext(secure_filename(video.filename))[1].lower() or ".mp4"
+        srt_ext = os.path.splitext(secure_filename(srt.filename))[1].lower() or ".srt"
+
+        video_name = f"src_{video_hash}{video_ext}"
+        srt_name = f"src_{srt_hash}{srt_ext}"
         ass_name = f"{job_id}.ass"
         output_name = f"{job_id}_{'preview' if mode == 'preview' else 'full'}.mp4"
 
@@ -628,8 +638,13 @@ def api_preview():
         ass_path = os.path.join(OUTPUT_DIR, ass_name)
         output_path = os.path.join(OUTPUT_DIR, output_name)
 
-        video.save(video_path)
-        srt.save(srt_path)
+        if not os.path.exists(video_path):
+            with open(video_path, "wb") as f:
+                f.write(video_bytes)
+
+        if not os.path.exists(srt_path):
+            with open(srt_path, "wb") as f:
+                f.write(srt_bytes)
 
         settings = {
             "font_name": request.form.get("font_name", "Arial"),
@@ -690,8 +705,6 @@ def api_preview():
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)}), 500
 
-
-
 @app.route("/api/status/<job_id>")
 def api_status(job_id):
     job = JOBS.get(job_id)
@@ -714,4 +727,4 @@ def serve_output(filename):
 
 if __name__ == "__main__":
     ensure_dirs()
-    app.run(host="127.0.0.1", port=5151, debug=True, threaded=True)
+    app.run(host="127.0.0.1", port=5151, debug=False, threaded=False, use_reloader=False)
