@@ -338,39 +338,41 @@
       <div class="topbar">
         <div class="badge" id="selectionMeta">No files selected.</div>
 
-        <div class="actions">
-          <label>
-            Video
-            <input type="file" id="video" accept=".mp4,.mov,.m4v">
-          </label>
 
-          <label>
-            SRT
-            <input type="file" id="srt" accept=".srt,.vtt">            
-          </label>
+        <!-- Keep only backend bridge elements required by the current JavaScript while moving visible controls to lil-gui. -->
+        <div class="backend-bridge" hidden aria-hidden="true">
+          <!-- Backend file input used by lil-gui video actions and drag/drop import. -->
+          <input type="file" id="video" accept=".mp4,.mov,.m4v">
 
-          <select id="presetSelect" class="secondary" title="Choose preset">
+          <!-- Backend file input used by lil-gui subtitle actions and drag/drop import. -->
+          <input type="file" id="srt" accept=".srt,.vtt">
+
+          <!-- Backend preset selector used by preset storage and lil-gui preset sync. -->
+          <select id="presetSelect" title="Choose preset">
             <option value="">Preset…</option>
           </select>
 
-          <button id="savePresetBtn" class="secondary" type="button">Save</button>
-          <button id="saveAsPresetBtn" class="secondary" type="button">Save As</button>
-          <button id="deletePresetBtn" class="secondary" type="button">Delete preset</button>
-          <button id="exportPresetBtn" class="secondary" type="button">Export preset</button>
+          <!-- Backend preset action buttons preserved for existing event bindings. -->
+          <button id="savePresetBtn" type="button">Save</button>
+          <button id="saveAsPresetBtn" type="button">Save As</button>
+          <button id="deletePresetBtn" type="button">Delete preset</button>
+          <button id="exportPresetBtn" type="button">Export preset</button>
 
-          <label class="secondary">
-            Import preset
-            <input type="file" id="presetImportInput" accept=".json,application/json">
-          </label>
+          <!-- Backend preset import input preserved for existing import flow. -->
+          <input type="file" id="presetImportInput" accept=".json,application/json">
 
+          <!-- Backend render/reset buttons preserved for existing event bindings. -->
           <button id="previewBtn" type="button">Render preview</button>
-          <button id="renderFullBtn" class="secondary" type="button">Render full</button>
-          
-          <button id="resetBtn" class="secondary" type="button">Reset</button>
+          <button id="renderFullBtn" type="button">Render full</button>
+          <button id="resetBtn" type="button">Reset</button>
 
+          <!-- Backend result links preserved for existing render result flow. -->
           <a id="openPreview" href="#" target="_blank" rel="noopener" style="display:none;">Open preview</a>
-          <a id="openAss" href="#" target="_blank" rel="noopener" class="secondary" style="display:none;">Open ASS</a>
+          <a id="openAss" href="#" target="_blank" rel="noopener" style="display:none;">Open ASS</a>
         </div>
+
+
+
       </div>
 
       <div class="video-shell" id="videoShell">
@@ -437,19 +439,35 @@
     const PRESET_STORE_NAME = 'presets';
     const PRESET_LOCALSTORAGE_KEY = 'captionAnimatorPresetsMirror';
 
+    /* Persist the last loaded source video in browser storage so it can be reused without re-uploading. */
+    const VIDEO_CACHE_DB_NAME = 'captionAnimatorSourceVideoDB';
+    const VIDEO_CACHE_STORE_NAME = 'videos';
+    const VIDEO_CACHE_KEY = 'lastVideo';
+    const VIDEO_CACHE_META_KEY = 'captionAnimatorLastVideoMeta';
+
     let pollTimer = null;
     let sourceObjectUrl = null;
     let srtPreviewText = 'Preview caption will appear here';
+
+/* Store parsed subtitle cues for native in-browser preview playback. */
+    let subtitleCues = [];
+
+/* Track whether the local preview should follow subtitle timing on the source video. */
+    let nativeCaptionPreviewEnabled = true;
+
     let dragState = null;
     let resizeState = null;
     let presetDb = null;
     let presetsCache = {};
     let helpersVisible = true;
+/* Keep metadata for the last cached source video available across reloads. */
+    let cachedVideoMeta = readCachedVideoMetaFromStorage();
 
 
 
-
+/* Define the complete default editor state used by lil-gui, reset flows, and render requests. */
     const defaultControls = {
+  /* Typography controls. */
       font_name: 'Arial',
       font_size: 24,
       helper_font_scale: 0.86,
@@ -457,7 +475,7 @@
       italic: false,
       primary_colour: '#ffffff',
       active_word_colour: '#ff0000',
-      active_word_lead_ms: 80,      
+      active_word_lead_ms: 80,
       outline_colour: '#000000',
       shadow_colour: '#000000',
       background_colour: '#000000',
@@ -466,6 +484,8 @@
       outline: 2,
       shadow: 0,
       blur: 0.8,
+
+  /* Placement controls. */
       alignment: 2,
       margin_v: 60,
       margin_h: 40,
@@ -473,6 +493,10 @@
       anchor_y: 0.9,
       offset_x: 0,
       offset_y: 0,
+      rotation_z: 0,
+      letter_spacing: 0,
+
+  /* Animation controls. */
       animation_type: 'fade',
       intro_ms: 180,
       outro_ms: 120,
@@ -488,9 +512,11 @@
       overshoot_amount: 8,
       overshoot_ms: 90,
       settle_ms: 90,
-      rotation_z: 0,
-      letter_spacing: 0,
-      out_mode: 'fade'
+      out_mode: 'fade',
+
+  /* Preview controls. */
+      preview_start: 0,
+      preview_duration: 8
     };
 
 
@@ -516,18 +542,168 @@
       input.files = dt.files;
     }
 
+/* Read cached source-video metadata from localStorage for quick UI restore. */
+    function readCachedVideoMetaFromStorage() {
+      try {
+        const raw = localStorage.getItem(VIDEO_CACHE_META_KEY);
+        if (!raw) {
+          return null;
+        }
+
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') {
+          return null;
+        }
+
+        return {
+          name: String(parsed.name || ''),
+          type: String(parsed.type || 'video/mp4'),
+          size: Number(parsed.size || 0),
+          lastModified: Number(parsed.lastModified || Date.now()),
+          savedAt: Number(parsed.savedAt || Date.now())
+        };
+      } catch {
+        return null;
+      }
+    }
+
+/* Persist cached source-video metadata for fast reload and UI display. */
+    function writeCachedVideoMetaToStorage(meta) {
+  /* Vulnerable block: persist only the small metadata object, never arbitrary DOM state or HTML. */
+      localStorage.setItem(VIDEO_CACHE_META_KEY, JSON.stringify({
+        name: String(meta.name || ''),
+        type: String(meta.type || 'video/mp4'),
+        size: Number(meta.size || 0),
+        lastModified: Number(meta.lastModified || Date.now()),
+        savedAt: Number(meta.savedAt || Date.now())
+      }));
+    }
+
+/* Open the IndexedDB database used for source-video caching. */
+    function openVideoCacheDb() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(VIDEO_CACHE_DB_NAME, 1);
+
+        request.onupgradeneeded = () => {
+          const db = request.result;
+
+          if (!db.objectStoreNames.contains(VIDEO_CACHE_STORE_NAME)) {
+            db.createObjectStore(VIDEO_CACHE_STORE_NAME, { keyPath: 'id' });
+          }
+        };
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error || new Error('Could not open video cache database.'));
+      });
+    }
+
+/* Save the current source video into IndexedDB for reuse after reload. */
+    async function saveCachedSourceVideo(file) {
+      if (!(file instanceof Blob)) {
+        return;
+      }
+
+      const db = await openVideoCacheDb();
+
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(VIDEO_CACHE_STORE_NAME, 'readwrite');
+        const store = tx.objectStore(VIDEO_CACHE_STORE_NAME);
+
+    /* Vulnerable block: store a single known cache record under a fixed key to avoid unbounded growth. */
+        store.put({
+          id: VIDEO_CACHE_KEY,
+          blob: file,
+          name: file.name || 'cached-video.mp4',
+          type: file.type || 'video/mp4',
+          size: Number(file.size || 0),
+          lastModified: Number(file.lastModified || Date.now()),
+          savedAt: Date.now()
+        });
+
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error || new Error('Could not save cached video.'));
+        tx.onabort = () => reject(tx.error || new Error('Could not save cached video.'));
+      });
+
+      cachedVideoMeta = {
+        name: file.name || 'cached-video.mp4',
+        type: file.type || 'video/mp4',
+        size: Number(file.size || 0),
+        lastModified: Number(file.lastModified || Date.now()),
+        savedAt: Date.now()
+      };
+
+      writeCachedVideoMetaToStorage(cachedVideoMeta);
+    }
+
+/* Load the cached source video back from IndexedDB as a File for preview and rendering. */
+    async function getCachedSourceVideoFile() {
+      const db = await openVideoCacheDb();
+
+      const record = await new Promise((resolve, reject) => {
+        const tx = db.transaction(VIDEO_CACHE_STORE_NAME, 'readonly');
+        const store = tx.objectStore(VIDEO_CACHE_STORE_NAME);
+        const request = store.get(VIDEO_CACHE_KEY);
+
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error || new Error('Could not read cached video.'));
+      });
+
+      if (!record || !(record.blob instanceof Blob)) {
+        return null;
+      }
+
+      return new File(
+        [record.blob],
+        record.name || cachedVideoMeta?.name || 'cached-video.mp4',
+        {
+          type: record.type || cachedVideoMeta?.type || 'video/mp4',
+          lastModified: Number(record.lastModified || cachedVideoMeta?.lastModified || Date.now())
+        }
+        );
+    }
+
+/* Determine whether a reusable cached source video is available in the browser. */
+    async function hasCachedSourceVideo() {
+      try {
+        const file = await getCachedSourceVideoFile();
+        return !!file;
+      } catch {
+        return false;
+      }
+    }
+
+/* Load the cached source video into the hidden input and preview player. */
+    async function reuseCachedSourceVideo() {
+      const file = await getCachedSourceVideoFile();
+
+      if (!file) {
+        throw new Error('No cached video is available yet.');
+      }
+
+      setFileInput(videoInput, file);
+      await loadSourceVideoPreview(file);
+      updateMeta();
+      refreshGui();
+      return file;
+    }
+
+
+
     /* Refresh top metadata with selected file names. */
+/* Refresh top metadata with selected file names or the last cached source video. */
     function updateMeta() {
       const v = videoInput.files[0];
       const s = srtInput.files[0];
+      const cachedLabel = !v && cachedVideoMeta?.name ? `${cachedVideoMeta.name} (cached)` : null;
 
-      if (!v && !s) {
+      if (!v && !s && !cachedLabel) {
         selectionMeta.textContent = 'No files selected.';
         return;
       }
 
       selectionMeta.innerHTML =
-    `<strong>Video:</strong> ${v ? v.name : '—'} &nbsp; · &nbsp; <strong>SRT:</strong> ${s ? s.name : '—'}`;
+    `<strong>Video:</strong> ${v ? v.name : (cachedLabel || '—')} &nbsp; · &nbsp; <strong>SRT:</strong> ${s ? s.name : '—'}`;
   }
 
     /* Convert ASS-size font into displayed-video CSS size. */
@@ -751,17 +927,33 @@ function syncLocalStorageMirror() {
 }
 
     /* Rebuild preset dropdown from current preset cache. */
+/* Rebuild preset dropdown from current preset cache and sync the lil-gui preset selector. */
 function renderPresetSelect() {
   const current = presetSelect.value;
   presetSelect.innerHTML = '<option value="">Preset…</option>';
+
   Object.keys(presetsCache).sort().forEach(name => {
     const option = document.createElement('option');
     option.value = name;
     option.textContent = name;
     presetSelect.appendChild(option);
   });
+
   if (current && presetsCache[current]) {
     presetSelect.value = current;
+  }
+
+  /* Sync the lil-gui preset controller with the hidden DOM select backend. */
+  if (presetController) {
+    const presetOptions = { 'Preset…': '' };
+
+    Object.keys(presetsCache).sort().forEach(name => {
+      presetOptions[name] = name;
+    });
+
+    /* Vulnerable block: rebuild options only through known preset names from local cache. */
+    presetController.options(presetOptions);
+    presetController.updateDisplay();
   }
 }
 
@@ -967,7 +1159,9 @@ async function importPreset(file) {
 
 
 
-/* Reset UI, preview and controls to defaults. */
+
+
+/* Reset UI, preview and controls to defaults while keeping the cached source video available. */
 function resetUI() {
   if (pollTimer) {
     clearInterval(pollTimer);
@@ -1011,6 +1205,11 @@ function resetUI() {
   updateMeta();
   applyHelperPreview();
 }
+
+
+
+
+
 
 
 
@@ -1089,41 +1288,189 @@ async function startPolling(jobId) {
 
 
 /* Read preview text from SRT or VTT and show it in helper caption. */
+/* Parse subtitle cues from SRT or VTT and prepare native in-browser caption preview. */
 async function readSrtPreview(file) {
   try {
     const text = await file.text();
+    subtitleCues = parseSubtitleCues(text, file.name);
 
-    if (/\.vtt$/i.test(file.name)) {
-      const cleaned = text
-      .replace(/<\d{2}:\d{2}:\d{2}\.\d{3}>/g, '')
-      .replace(/<\/?c[^>]*>/g, '')
-      .replace(/<[^>]+>/g, '')
-      .split(/\r?\n/)
-      .map(line => line.trim())
-      .filter(line => line && !/^WEBVTT/.test(line) && !/^Kind:/.test(line) && !/^Language:/.test(line) && !/^\d{2}:\d{2}:\d{2}\.\d{3}\s+-->/.test(line))
-      .slice(0, 2)
-      .join(' ');
-      srtPreviewText = cleaned || 'Preview caption will appear here';
-    } else {
-      const lines = text
-      .split(/\r?\n/)
-      .map(line => line.trim())
-      .filter(line => line && !/^\d+$/.test(line) && !/^\d{2}:\d{2}:\d{2},\d{3}\s+-->/.test(line));
-      srtPreviewText = lines.slice(0, 2).join(' ') || 'Preview caption will appear here';
-    }
-
+    srtPreviewText = subtitleCues[0]?.text || 'Preview caption will appear here';
+    syncNativeCaptionPreview();
     applyHelperPreview();
   } catch {
+    subtitleCues = [];
     srtPreviewText = 'Preview caption will appear here';
+    syncNativeCaptionPreview();
     applyHelperPreview();
   }
 }
 
-    /* Load source video into preview player before rendering backend preview. */
+
+/* Convert SRT or VTT time text into milliseconds for native preview playback. */
+function parseCueTimeToMs(value) {
+  const normalized = String(value).trim().replace(',', '.');
+  const match = normalized.match(/^(?:(\d+):)?(\d{2}):(\d{2})\.(\d{3})$/);
+
+  if (!match) {
+    return 0;
+  }
+
+  const hours = Number(match[1] || 0);
+  const minutes = Number(match[2] || 0);
+  const seconds = Number(match[3] || 0);
+  const milliseconds = Number(match[4] || 0);
+
+  return (((hours * 60) + minutes) * 60 + seconds) * 1000 + milliseconds;
+}
+
+/* Normalize subtitle text by removing lightweight markup used in VTT and preserving line breaks. */
+function normalizeCueText(text) {
+  return String(text || '')
+  .replace(/<\d{2}:\d{2}:\d{2}\.\d{3}>/g, '')
+  .replace(/<\/?c[^>]*>/g, '')
+  .replace(/<\/?v[^>]*>/g, '')
+  .replace(/<\/?i>/g, '')
+  .replace(/<\/?b>/g, '')
+  .replace(/<\/?u>/g, '')
+  .replace(/<[^>]+>/g, '')
+  .replace(/\r/g, '')
+  .split('\n')
+  .map(line => line.trim())
+  .filter(Boolean)
+  .join('\n')
+  .trim();
+}
+
+/* Parse SRT subtitle text into timed cues for local native preview playback. */
+function parseSrtCues(text) {
+  const normalized = String(text || '').replace(/\r/g, '').trim();
+  if (!normalized) {
+    return [];
+  }
+
+  return normalized
+  .split(/\n{2,}/)
+  .map(block => block.trim())
+  .filter(Boolean)
+  .map(block => {
+    const lines = block.split('\n');
+    const timingLineIndex = lines.findIndex(line => line.includes('-->'));
+
+    if (timingLineIndex === -1) {
+      return null;
+    }
+
+    const timingLine = lines[timingLineIndex];
+    const match = timingLine.match(/(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})/);
+
+    if (!match) {
+      return null;
+    }
+
+    const textLines = lines.slice(timingLineIndex + 1);
+    const cueText = normalizeCueText(textLines.join('\n'));
+
+    if (!cueText) {
+      return null;
+    }
+
+    return {
+      start: parseCueTimeToMs(match[1]),
+      end: parseCueTimeToMs(match[2]),
+      text: cueText
+    };
+  })
+  .filter(cue => cue && cue.end > cue.start);
+}
+
+/* Parse VTT subtitle text into timed cues for local native preview playback. */
+function parseVttCues(text) {
+  const normalized = String(text || '').replace(/\r/g, '').trim();
+  if (!normalized) {
+    return [];
+  }
+
+  return normalized
+  .split(/\n{2,}/)
+  .map(block => block.trim())
+  .filter(Boolean)
+  .map(block => {
+    const lines = block.split('\n').filter(Boolean);
+
+    if (!lines.length) {
+      return null;
+    }
+
+    if (/^WEBVTT/i.test(lines[0]) || /^NOTE\b/i.test(lines[0]) || /^STYLE\b/i.test(lines[0]) || /^REGION\b/i.test(lines[0])) {
+      return null;
+    }
+
+    const timingLineIndex = lines.findIndex(line => line.includes('-->'));
+
+    if (timingLineIndex === -1) {
+      return null;
+    }
+
+    const timingLine = lines[timingLineIndex];
+    const match = timingLine.match(/(\d{2}:\d{2}:\d{2}\.\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}\.\d{3})/);
+
+    if (!match) {
+      return null;
+    }
+
+    const textLines = lines.slice(timingLineIndex + 1);
+    const cueText = normalizeCueText(textLines.join('\n'));
+
+    if (!cueText) {
+      return null;
+    }
+
+    return {
+      start: parseCueTimeToMs(match[1]),
+      end: parseCueTimeToMs(match[2]),
+      text: cueText
+    };
+  })
+  .filter(cue => cue && cue.end > cue.start);
+}
+
+/* Parse subtitle cues from the uploaded subtitle file for local live preview playback. */
+function parseSubtitleCues(text, filename) {
+  if (/\.vtt$/i.test(filename)) {
+    return parseVttCues(text);
+  }
+
+  return parseSrtCues(text);
+}
+
+/* Find the active subtitle cue for the current local video playback time. */
+function getActiveSubtitleCue(currentMs) {
+  return subtitleCues.find(cue => currentMs >= cue.start && currentMs < cue.end) || null;
+}
+
+/* Update the helper caption text so the local player shows timed native subtitle preview. */
+function syncNativeCaptionPreview() {
+  if (!nativeCaptionPreviewEnabled || !subtitleCues.length || previewVideo.style.display === 'none') {
+    helperCaptionText.textContent = srtPreviewText;
+    return;
+  }
+
+  const currentMs = Math.max(0, Math.floor((previewVideo.currentTime || 0) * 1000));
+  const activeCue = getActiveSubtitleCue(currentMs);
+
+  helperCaptionText.textContent = activeCue ? activeCue.text : '';
+}
+
+
+
+
+/* Load source video into preview player and persist it in IndexedDB for reuse after reload. */
 async function loadSourceVideoPreview(file) {
   if (sourceObjectUrl) {
     URL.revokeObjectURL(sourceObjectUrl);
   }
+
+  await saveCachedSourceVideo(file);
 
   sourceObjectUrl = URL.createObjectURL(file);
   previewVideo.src = sourceObjectUrl;
@@ -1133,24 +1480,39 @@ async function loadSourceVideoPreview(file) {
   mediaFrame.style.width = '';
   mediaFrame.style.height = '';
   previewVideo.load();
+
+  updateMeta();
 }
 
 
-/* Start preview or full render using current files and controls. */
+
+
+
+
+
+/* Start preview or full render using the selected source video or the cached one from IndexedDB. */
 async function renderVideo(mode) {
   clearStatus();
 
-  const video = videoInput.files[0];
+  let video = videoInput.files[0];
   const srt = srtInput.files[0];
 
+  if (!video) {
+    try {
+      video = await getCachedSourceVideoFile();
+    } catch {
+      video = null;
+    }
+  }
+
   if (!video || !srt) {
-    showStatus('err', 'Choose both video and SRT.');
+    showStatus('err', 'Choose subtitle and either load a new video or reuse the cached one.');
     return;
   }
 
   const formData = new FormData();
-  formData.append('video', video);
-  formData.append('srt', srt);
+  formData.append('video', video, video.name);
+  formData.append('srt', srt, srt.name);
   formData.append('mode', mode);
   collectSettings(formData);
 
@@ -1183,6 +1545,11 @@ async function renderVideo(mode) {
     showStatus('err', err.message || 'Request failed.');
   }
 }
+
+
+
+
+
 
 
 /* Start preview render request using current files and controls. */
@@ -1239,7 +1606,243 @@ helperCaption.addEventListener('pointercancel', () => {
   helperCaption.classList.remove('is-dragging');
 });
 
+
+/* Restore required control keys before lil-gui binds to them so missing saved-state fields do not crash the UI. */
+Object.assign(controls, {
+  /* Typography fallback controls required by lil-gui bindings. */
+  bold: typeof controls.bold === 'boolean' ? controls.bold : false,
+  italic: typeof controls.italic === 'boolean' ? controls.italic : false,
+  letter_spacing: Number.isFinite(Number(controls.letter_spacing)) ? Number(controls.letter_spacing) : 0,
+
+  /* Preview fallback controls required by the Preview lil-gui folder. */
+  preview_start: Number.isFinite(Number(controls.preview_start)) ? Math.max(0, Number(controls.preview_start)) : 0,
+  preview_duration: Number.isFinite(Number(controls.preview_duration)) ? Math.max(1, Number(controls.preview_duration)) : 8
+});
+
+
+/* Build the lil-gui control surface and move legacy action controls into a closed Actions folder. */
 const gui = new GUI({ title: 'Caption Controls' });
+
+
+
+
+/* Add source-video actions to lil-gui, including reuse of the last cached video from IndexedDB. */
+const sourceVideoFolder = gui.addFolder('Source Video');
+
+sourceVideoFolder.add({
+  async reuse_last_video() {
+    try {
+      const file = await reuseCachedSourceVideo();
+      showStatus('ok', `Using cached video: <strong>${file.name}</strong>`);
+    } catch (error) {
+      showStatus('err', error.message || 'Could not reuse cached video.');
+    }
+  }
+}, 'reuse_last_video').name('Reuse last video');
+
+sourceVideoFolder.close();
+
+
+
+/* Keep a shared reference so preset dropdown updates can also refresh lil-gui options. */
+let presetController = null;
+
+
+
+
+/* Expose backend bridge actions through lil-gui while safely handling missing DOM nodes. */
+const actionState = {
+  /* Return the selected video filename for lil-gui display. */
+  get video_file() {
+    return videoInput?.files?.[0]?.name || 'No video selected';
+  },
+
+  /* Return the selected subtitle filename for lil-gui display. */
+  get subtitle_file() {
+    return srtInput?.files?.[0]?.name || 'No subtitle selected';
+  },
+
+  /* Mirror the backend preset selector value into lil-gui. */
+  get preset_name() {
+    return presetSelect?.value || '';
+  },
+
+  /* Push lil-gui preset selection back into the backend preset selector. */
+  set preset_name(value) {
+    if (presetSelect) {
+      presetSelect.value = value || '';
+    }
+  },
+
+  /* Return render state text for lil-gui display. */
+  get render_status() {
+    const text = statusEl?.textContent?.trim() || '';
+    return text || 'Idle';
+  },
+
+  /* Return preview link readiness for lil-gui display. */
+  get preview_ready() {
+    return openPreview && openPreview.style.display !== 'none' && openPreview.href && openPreview.href !== '#'
+    ? 'Ready'
+    : 'Not ready';
+  },
+
+  /* Return ASS link readiness for lil-gui display. */
+  get ass_ready() {
+    return openAss && openAss.style.display !== 'none' && openAss.href && openAss.href !== '#'
+    ? 'Ready'
+    : 'Not ready';
+  },
+
+  /* Trigger the backend video file input from lil-gui. */
+  choose_video() {
+    /* Vulnerable block: file picker must only open from a direct user interaction. */
+    if (videoInput) {
+      videoInput.click();
+    }
+  },
+
+  /* Trigger the backend subtitle file input from lil-gui. */
+  choose_subtitle() {
+    /* Vulnerable block: file picker must only open from a direct user interaction. */
+    if (srtInput) {
+      srtInput.click();
+    }
+  },
+
+  /* Load the currently selected preset from the backend selector. */
+  load_preset() {
+    const name = presetSelect?.value || '';
+
+    if (!name || !presetsCache[name]) {
+      showStatus('err', 'Choose a preset to load.');
+      refreshGui();
+      return;
+    }
+
+    applyPresetObject(presetsCache[name]);
+    showStatus('ok', `Preset loaded: <strong>${name}</strong>`);
+    refreshGui();
+  },
+
+  /* Save current controls into the selected preset or prompt for a new name. */
+  async save_preset() {
+    await savePreset();
+    refreshGui();
+  },
+
+  /* Save current controls as a new preset. */
+  async save_as_preset() {
+    await savePresetAs();
+    refreshGui();
+  },
+
+  /* Delete the selected preset. */
+  async delete_preset() {
+    await deletePreset();
+    refreshGui();
+  },
+
+  /* Export the current or selected preset to JSON. */
+  export_preset() {
+    exportPreset();
+    refreshGui();
+  },
+
+  /* Trigger the backend preset import input from lil-gui. */
+  import_preset() {
+    /* Vulnerable block: file picker must only open from a direct user interaction. */
+    if (presetImportInput) {
+      presetImportInput.click();
+    }
+  },
+
+  /* Start preview rendering from the current Preview folder settings. */
+  async render_preview() {
+    await renderVideo('preview');
+    refreshGui();
+  },
+
+  /* Start full rendering. */
+  async render_full() {
+    await renderVideo('full');
+    refreshGui();
+  },
+
+  /* Open the preview asset when available. */
+  open_preview() {
+    /* Vulnerable block: open only validated non-placeholder links. */
+    if (!openPreview || !openPreview.href || openPreview.href === '#') {
+      showStatus('err', 'Preview is not ready yet.');
+      refreshGui();
+      return;
+    }
+
+    window.open(openPreview.href, '_blank', 'noopener');
+  },
+
+  /* Open the ASS asset when available. */
+  open_ass() {
+    /* Vulnerable block: open only validated non-placeholder links. */
+    if (!openAss || !openAss.href || openAss.href === '#') {
+      showStatus('err', 'ASS file is not ready yet.');
+      refreshGui();
+      return;
+    }
+
+    window.open(openAss.href, '_blank', 'noopener');
+  },
+
+  /* Reset the full UI state. */
+  reset_all() {
+    resetUI();
+    refreshGui();
+  }
+};
+
+
+
+
+
+
+
+
+/* Refresh lil-gui when backend bridge state changes outside lil-gui callbacks. */
+function bindActionGuiObservers() {
+  const observer = new MutationObserver(() => {
+    refreshGui();
+  });
+
+  [statusEl, openPreview, openAss, previewBtn, renderFullBtn]
+  .filter(Boolean)
+  .forEach(element => {
+    observer.observe(element, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+      attributeFilter: ['style', 'href', 'class', 'disabled']
+    });
+  });
+
+  if (videoInput) {
+    videoInput.addEventListener('change', () => refreshGui());
+  }
+
+  if (srtInput) {
+    srtInput.addEventListener('change', () => refreshGui());
+  }
+
+  if (presetSelect) {
+    presetSelect.addEventListener('change', () => refreshGui());
+  }
+
+  if (presetImportInput) {
+    presetImportInput.addEventListener('change', () => refreshGui());
+  }
+}
+
+
+
 
 const typeFolder = gui.addFolder('Typography');
 typeFolder.add(controls, 'font_name', [
@@ -1256,19 +1859,14 @@ typeFolder.add(controls, 'font_name', [
   'Impact'
 ]).onChange(applyHelperPreview);
 
-
 typeFolder.add(controls, 'font_size', 8, 96, 1).onChange(applyHelperPreview);
 typeFolder.add(controls, 'helper_font_scale', 0.6, 1.2, 0.01).name('helper font match').onChange(applyHelperPreview);
 typeFolder.addColor(controls, 'primary_colour').name('text').onChange(applyHelperPreview);
-
 typeFolder.addColor(controls, 'active_word_colour').name('active word').onChange(applyHelperPreview);
 typeFolder.add(controls, 'active_word_lead_ms', 0, 200, 1).name('active lead ms');
-
 typeFolder.add(controls, 'use_background').name('background').onChange(applyHelperPreview);
 typeFolder.addColor(controls, 'background_colour').name('bg color').onChange(applyHelperPreview);
 typeFolder.add(controls, 'background_alpha', 0, 1, 0.01).name('bg alpha').onChange(applyHelperPreview);
-
-
 typeFolder.addColor(controls, 'outline_colour').name('outline').onChange(applyHelperPreview);
 typeFolder.addColor(controls, 'shadow_colour').name('shadow color').onChange(applyHelperPreview);
 typeFolder.add(controls, 'outline', 0, 12, 0.5).onChange(applyHelperPreview);
@@ -1294,8 +1892,8 @@ placeFolder.add(controls, 'margin_v', 0, 240, 1);
 placeFolder.add(controls, 'margin_h', 0, 240, 1).onChange(applyHelperPreview);
 placeFolder.add(controls, 'offset_x', -600, 600, 1).onChange(applyHelperPreview);
 placeFolder.add(controls, 'offset_y', -600, 600, 1).onChange(applyHelperPreview);
-placeFolder.add(controls, 'rotation_z', -45, 45, 0.1).onChange(applyHelperPreview);
-
+placeFolder.add(controls, 'rotation_z', -90, 90, 0.1).onChange(applyHelperPreview);
+placeFolder.close();
 
 const animFolder = gui.addFolder('Animation');
 animFolder.add(controls, 'animation_type', {
@@ -1321,9 +1919,112 @@ animFolder.add(controls, 'out_offset_y', -800, 800, 1);
 animFolder.add(controls, 'overshoot_amount', 0, 80, 1);
 animFolder.add(controls, 'overshoot_ms', 0, 500, 1);
 animFolder.add(controls, 'settle_ms', 0, 500, 1);
+animFolder.close()
 
-gui.add({ render: renderPreview }, 'render').name('Render Preview');
-gui.add({ reset: resetUI }, 'reset').name('Reset');
+
+
+/* Group preview-specific controls in a dedicated lil-gui folder for local and backend preview flow. */
+const previewFolder = gui.addFolder('Preview');
+
+/* Control the local/backend preview start time in seconds. */
+previewFolder.add(controls, 'preview_start', 0, 3600, 0.5).name('Start (s)').onChange(value => {
+  /* Vulnerable block: clamp seek target to valid media duration before applying it to the local player. */
+  const numericValue = Math.max(0, Number(value) || 0);
+
+  if (previewVideo.readyState >= 1) {
+    const maxTime = Number.isFinite(previewVideo.duration) ? previewVideo.duration : numericValue;
+    previewVideo.currentTime = Math.min(numericValue, maxTime);
+    syncNativeCaptionPreview();
+  }
+});
+
+/* Control the backend preview render length in seconds. */
+previewFolder.add(controls, 'preview_duration', 1, 60, 0.5).name('Duration (s)');
+
+/* Toggle local native subtitle playback over the source video. */
+previewFolder.add({ native_preview: nativeCaptionPreviewEnabled }, 'native_preview').name('Live captions').onChange(value => {
+  nativeCaptionPreviewEnabled = Boolean(value);
+  syncNativeCaptionPreview();
+  applyHelperPreview();
+});
+
+/* Seek the local player to the configured preview start. */
+previewFolder.add({
+  seek_preview_start() {
+    const safeStart = Math.max(0, Number(controls.preview_start) || 0);
+
+    if (previewVideo.readyState >= 1) {
+      const maxTime = Number.isFinite(previewVideo.duration) ? previewVideo.duration : safeStart;
+      previewVideo.currentTime = Math.min(safeStart, maxTime);
+      syncNativeCaptionPreview();
+    }
+  }
+}, 'seek_preview_start').name('Seek local');
+
+/* Render backend preview using the configured preview window. */
+previewFolder.add({
+  render_preview() {
+    return renderVideo('preview');
+  }
+}, 'render_preview').name('Render preview');
+
+previewFolder.close();
+
+
+
+
+/* Group all former HTML action controls into a dedicated lil-gui folder and keep it closed by default. */
+const actionsFolder = gui.addFolder('Actions');
+
+actionsFolder.add(actionState, 'choose_video').name('Choose video');
+actionsFolder.add(actionState, 'choose_subtitle').name('Choose subtitle');
+
+const videoFileController = actionsFolder.add(actionState, 'video_file').name('Video').listen();
+if (typeof videoFileController.disable === 'function') {
+  videoFileController.disable();
+}
+
+const subtitleFileController = actionsFolder.add(actionState, 'subtitle_file').name('Subtitle').listen();
+if (typeof subtitleFileController.disable === 'function') {
+  subtitleFileController.disable();
+}
+
+presetController = actionsFolder
+.add(actionState, 'preset_name', { 'Preset…': '' })
+.name('Preset')
+.onChange(value => {
+  presetSelect.value = value || '';
+  refreshGui();
+});
+
+actionsFolder.add(actionState, 'load_preset').name('Load preset');
+actionsFolder.add(actionState, 'save_preset').name('Save preset');
+actionsFolder.add(actionState, 'save_as_preset').name('Save preset as');
+actionsFolder.add(actionState, 'delete_preset').name('Delete preset');
+actionsFolder.add(actionState, 'export_preset').name('Export preset');
+actionsFolder.add(actionState, 'import_preset').name('Import preset');
+
+actionsFolder.add(actionState, 'render_full').name('Render full');
+
+const renderStatusController = actionsFolder.add(actionState, 'render_status').name('Status').listen();
+if (typeof renderStatusController.disable === 'function') {
+  renderStatusController.disable();
+}
+
+const previewReadyController = actionsFolder.add(actionState, 'preview_ready').name('Preview link').listen();
+if (typeof previewReadyController.disable === 'function') {
+  previewReadyController.disable();
+}
+
+const assReadyController = actionsFolder.add(actionState, 'ass_ready').name('ASS link').listen();
+if (typeof assReadyController.disable === 'function') {
+  assReadyController.disable();
+}
+
+actionsFolder.add(actionState, 'open_preview').name('Open preview');
+actionsFolder.add(actionState, 'open_ass').name('Open ASS');
+actionsFolder.add(actionState, 'reset_all').name('Reset');
+//actionsFolder.close();
 
 presetSelect.addEventListener('change', () => {
   const name = presetSelect.value;
@@ -1331,21 +2032,42 @@ presetSelect.addEventListener('change', () => {
     applyPresetObject(presetsCache[name]);
     showStatus('ok', `Preset loaded: <strong>${name}</strong>`);
   }
+
+  refreshGui();
 });
 
-savePresetBtn.addEventListener('click', savePreset);
-saveAsPresetBtn.addEventListener('click', savePresetAs);
+savePresetBtn.addEventListener('click', async () => {
+  await savePreset();
+  refreshGui();
+});
 
-deletePresetBtn.addEventListener('click', deletePreset);
-exportPresetBtn.addEventListener('click', exportPreset);
+saveAsPresetBtn.addEventListener('click', async () => {
+  await savePresetAs();
+  refreshGui();
+});
+
+deletePresetBtn.addEventListener('click', async () => {
+  await deletePreset();
+  refreshGui();
+});
+
+exportPresetBtn.addEventListener('click', () => {
+  exportPreset();
+  refreshGui();
+});
 
 presetImportInput.addEventListener('change', async () => {
   const file = presetImportInput.files[0];
+
   if (file) {
     await importPreset(file);
   }
+
   presetImportInput.value = '';
+  refreshGui();
 });
+
+bindActionGuiObservers();
 
 ['dragenter', 'dragover'].forEach(name => {
   document.body.addEventListener(name, event => {
@@ -1361,10 +2083,10 @@ presetImportInput.addEventListener('change', async () => {
   });
 });
 
+/* Accept dropped source video and subtitle files, then persist the video in browser cache for reuse. */
 document.body.addEventListener('drop', async event => {
   const files = [...event.dataTransfer.files];
   const videoFile = files.find(file => /\.(mp4|mov|m4v)$/i.test(file.name));
-
   const srtFile = files.find(file => /\.(srt|vtt)$/i.test(file.name));
 
   if (videoFile) {
@@ -1380,12 +2102,15 @@ document.body.addEventListener('drop', async event => {
   updateMeta();
 });
 
+/* Load a newly selected source video, update preview, and refresh the cached browser copy. */
 videoInput.addEventListener('change', async () => {
-  updateMeta();
   const file = videoInput.files[0];
+
   if (file) {
     await loadSourceVideoPreview(file);
   }
+
+  updateMeta();
 });
 
 srtInput.addEventListener('change', async () => {
@@ -1394,6 +2119,7 @@ srtInput.addEventListener('change', async () => {
   if (file) {
     await readSrtPreview(file);
   }
+  refreshGui();
 });
 
 previewVideo.addEventListener('loadedmetadata', () => {
@@ -1410,6 +2136,29 @@ previewVideo.addEventListener('loadeddata', () => {
     applyHelperPreview();
   });
 });
+
+/* Keep native subtitle preview synchronized with local video playback. */
+previewVideo.addEventListener('timeupdate', () => {
+  syncNativeCaptionPreview();
+});
+
+/* Recompute visible caption text when playback state changes. */
+previewVideo.addEventListener('seeked', () => {
+  syncNativeCaptionPreview();
+});
+
+/* Refresh native preview when playback is paused at a subtitle boundary. */
+previewVideo.addEventListener('pause', () => {
+  syncNativeCaptionPreview();
+});
+
+/* Refresh native preview when playback resumes. */
+previewVideo.addEventListener('play', () => {
+  syncNativeCaptionPreview();
+});
+
+
+
 
 window.addEventListener('resize', () => {
   requestAnimationFrame(() => {
@@ -1431,6 +2180,8 @@ previewBtn.addEventListener('click', renderPreview);
 renderFullBtn.addEventListener('click', () => renderVideo('full'));
 resetBtn.addEventListener('click', resetUI);
 
+/* Restore cached source-video metadata on startup so the UI shows that a reusable video already exists. */
+cachedVideoMeta = readCachedVideoMetaFromStorage();
 await loadPresets();
 updateMeta();
 applyHelperPreview();

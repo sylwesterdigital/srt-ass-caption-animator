@@ -17,6 +17,8 @@ FFPROBE_BIN = os.path.expanduser("~/ffmpeg-full/bin/ffprobe")
 
 app = Flask(__name__, template_folder="templates")
 app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024 * 1024
+# Enable Flask template auto-reload during development so HTML changes are picked up without restarting.
+app.config["TEMPLATES_AUTO_RELOAD"] = True
 
 JOBS = {}
 
@@ -536,27 +538,69 @@ def srt_to_animated_ass(src, dst, settings, video_info):
 
 
 
+# Trim and shift ASS events so preview renders start at local time zero while honoring preview_start.
+def shift_ass_for_preview(ass_path, preview_start=0, preview_seconds=None):
+    subs = pysubs2.load(ass_path, encoding="utf-8")
+    start_ms = max(0, int(float(preview_start or 0) * 1000))
+    end_ms = None if preview_seconds is None else start_ms + max(1, int(float(preview_seconds) * 1000))
+
+    shifted_events = []
+
+    for event in subs.events:
+        if event.end <= start_ms:
+          continue
+
+        if end_ms is not None and event.start >= end_ms:
+          continue
+
+        new_event = event.copy()
+        new_event.start = max(0, event.start - start_ms)
+        new_event.end = max(1, event.end - start_ms)
+
+        if end_ms is not None:
+            new_event.end = min(new_event.end, max(1, end_ms - start_ms))
+
+        if new_event.end <= new_event.start:
+            continue
+
+        shifted_events.append(new_event)
+
+    subs.events = shifted_events
+    subs.save(ass_path)
 
 
 
-def render_preview(video_path, ass_path, output_path, preview_seconds=8):
+
+# Render a preview video with optional start offset and limited duration.
+def render_preview(video_path, ass_path, output_path, preview_start=0, preview_seconds=8):
     cmd = [
         FFMPEG_BIN,
         "-y",
+    ]
+
+    # Vulnerable block: keep start offset numeric and non-negative before passing it to ffmpeg.
+    if preview_start is not None and float(preview_start) > 0:
+        cmd += ["-ss", str(preview_start)]
+
+    cmd += [
         "-i", video_path,
     ]
 
+    # Vulnerable block: keep preview duration numeric and bounded by the caller before passing it to ffmpeg.
     if preview_seconds is not None:
         cmd += ["-t", str(preview_seconds)]
 
     cmd += [
         "-vf", f"ass={ass_path}",
+        "-map", "0:v:0",
+        "-map", "0:a?",
         "-c:v", "libx264",
         "-crf", "18",
         "-preset", "medium",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         "-b:a", "192k",
+        "-shortest",
         output_path,
     ]
 
@@ -565,7 +609,11 @@ def render_preview(video_path, ass_path, output_path, preview_seconds=8):
         raise RuntimeError(result.stderr.strip() or "FFmpeg render failed")
 
 
-def process_preview(job_id, video_path, srt_path, ass_path, preview_path, settings, preview_seconds=8):
+
+
+
+# Build ASS subtitles and render either a bounded preview or a full-length output segment.
+def process_preview(job_id, video_path, srt_path, ass_path, preview_path, settings, preview_start=0, preview_seconds=8):
     try:
         JOBS[job_id]["status"] = "preparing"
         JOBS[job_id]["message"] = "Reading video resolution..."
@@ -575,9 +623,18 @@ def process_preview(job_id, video_path, srt_path, ass_path, preview_path, settin
         JOBS[job_id]["message"] = "Generating animated ASS..."
         srt_to_animated_ass(srt_path, ass_path, settings, video_info)
 
+        if preview_start or preview_seconds is not None:
+            shift_ass_for_preview(ass_path, preview_start=preview_start, preview_seconds=preview_seconds)
+
         JOBS[job_id]["status"] = "rendering"
         JOBS[job_id]["message"] = "Rendering video..."
-        render_preview(video_path, ass_path, preview_path, preview_seconds=preview_seconds)
+        render_preview(
+            video_path,
+            ass_path,
+            preview_path,
+            preview_start=preview_start,
+            preview_seconds=preview_seconds,
+        )
 
         JOBS[job_id]["status"] = "done"
         JOBS[job_id]["message"] = "Render ready."
@@ -615,7 +672,15 @@ def api_preview():
             return jsonify({"ok": False, "error": "Subtitle file must be .srt or .vtt"}), 400
 
         mode = request.form.get("mode", "preview")
-        preview_seconds = 8 if mode == "preview" else None
+
+        # Use configurable preview start and duration from the UI for preview jobs and keep full renders unrestricted.
+        preview_start = 0
+        preview_seconds = None
+
+        if mode == "preview":
+            # Vulnerable block: clamp user-provided preview window before passing it to ffmpeg.
+            preview_start = max(0, min(24 * 60 * 60, _safe_float(request.form.get("preview_start", 0), 0)))
+            preview_seconds = max(1, min(60, _safe_float(request.form.get("preview_duration", 8), 8)))
 
         job_id = str(uuid.uuid4())[:8]
 
@@ -631,7 +696,9 @@ def api_preview():
         video_name = f"src_{video_hash}{video_ext}"
         srt_name = f"src_{srt_hash}{srt_ext}"
         ass_name = f"{job_id}.ass"
-        output_name = f"{job_id}_{'preview' if mode == 'preview' else 'full'}.mp4"
+
+        # Build output filename for the queued render job.
+        output_name = f"{job_id}_{'preview' if mode == 'preview' else 'full'}.mp4"        
 
         video_path = os.path.join(UPLOAD_DIR, video_name)
         srt_path = os.path.join(UPLOAD_DIR, srt_name)
@@ -693,12 +760,15 @@ def api_preview():
             "ass_file": None,
         }
 
-        thread = threading.Thread(
-            target=process_preview,
-            args=(job_id, video_path, srt_path, ass_path, output_path, settings, preview_seconds),
-            daemon=True,
-        )
-        thread.start()
+        threading.Thread(
+                    target=process_preview,
+                    args=(job_id, video_path, srt_path, ass_path, output_path, settings),
+                    kwargs={
+                        "preview_start": preview_start,
+                        "preview_seconds": preview_seconds,
+                    },
+                    daemon=True,
+                ).start()
 
         return jsonify({"ok": True, "job_id": job_id})
 
@@ -727,4 +797,4 @@ def serve_output(filename):
 
 if __name__ == "__main__":
     ensure_dirs()
-    app.run(host="127.0.0.1", port=5151, debug=False, threaded=False, use_reloader=False)
+    app.run(host="127.0.0.1", port=5151, debug=True, threaded=False, use_reloader=True)
