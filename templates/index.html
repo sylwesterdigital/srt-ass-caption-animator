@@ -330,10 +330,129 @@
         max-width: none;
       }
     }
+
+
+
+    .font-gallery-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      z-index: 80;
+    }
+
+    .font-gallery-overlay.open {
+      display: block;
+    }
+
+    .font-gallery-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(8px);
+    }
+
+    .font-gallery-panel {
+      position: relative;
+      width: min(960px, 92vw);
+      height: min(760px, 86vh);
+      margin: 6vh auto 0;
+      background: rgba(18, 22, 30, 0.96);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.45);
+    }
+
+    .font-gallery-toolbar {
+      display: flex;
+      gap: 12px;
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .font-gallery-toolbar input {
+      flex: 1;
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      padding: 0 14px;
+      font-size: 14px;
+    }
+
+    .font-gallery-close {
+      appearance: none;
+      border: 0;
+      border-radius: 12px;
+      min-height: 42px;
+      padding: 0 16px;
+      background: #2a3140;
+      color: #fff;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .font-gallery-list {
+      flex: 1;
+      overflow: auto;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .font-gallery-item {
+      appearance: none;
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      padding: 16px 18px;
+      cursor: pointer;
+    }
+
+    .font-gallery-item:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    .font-gallery-item small {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+    }
+
+
+
+
   </style>
 </head>
 <body>
   <div class="app">
+
+    <div id="fontGalleryOverlay" class="font-gallery-overlay" aria-hidden="true">
+      <div class="font-gallery-backdrop"></div>
+
+      <div class="font-gallery-panel">
+        <div class="font-gallery-toolbar">
+          <input id="fontGalleryPhrase" type="text" placeholder="Preview phrase">
+          <button id="fontGalleryClose" type="button" class="font-gallery-close">Close</button>
+        </div>
+
+        <div id="fontGalleryList" class="font-gallery-list"></div>
+      </div>
+    </div>
+
+
+
     <div class="stage">
       <div class="topbar">
         <div class="badge" id="selectionMeta">No files selected.</div>
@@ -407,6 +526,7 @@
     </div>
   </div>
 
+
   <script type="module">
     import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.20/+esm';
 
@@ -435,12 +555,19 @@
     const exportPresetBtn = document.getElementById('exportPresetBtn');
 
     const presetImportInput = document.getElementById('presetImportInput');
+    const fontGalleryOverlay = document.getElementById('fontGalleryOverlay');
+    const fontGalleryPhrase = document.getElementById('fontGalleryPhrase');
+    const fontGalleryList = document.getElementById('fontGalleryList');
+    const fontGalleryClose = document.getElementById('fontGalleryClose');
 
     const fontUploadInput = document.createElement('input');
     fontUploadInput.type = 'file';
     fontUploadInput.accept = '.ttf,.otf,.woff,.woff2';
     fontUploadInput.hidden = true;
     document.body.appendChild(fontUploadInput);
+
+
+
 
     const PRESET_DB_NAME = 'captionAnimatorPresetsDB';
     const PRESET_STORE_NAME = 'presets';
@@ -478,25 +605,28 @@
 
 /* Define the complete default editor state used by lil-gui, reset flows, and render requests. */
     const defaultControls = {
-  /* Typography controls. */
       font_name: 'Arial',
       font_size: 24,
       helper_font_scale: 0.86,
       bold: false,
       italic: false,
+      all_caps: false,
       primary_colour: '#ffffff',
       active_word_colour: '#ff0000',
       active_word_lead_ms: 80,
+      reveal_offset_ms: 0,
       outline_colour: '#000000',
       shadow_colour: '#000000',
       background_colour: '#000000',
       use_background: false,
       background_alpha: 0.45,
+      background_pad_x: 10,
       outline: 2,
       shadow: 0,
       blur: 0.8,
+      word_display_mode: 'phrase',
+      font_gallery_preview_text: 'Study your niche before posting.',
 
-  /* Placement controls. */
       alignment: 2,
       margin_v: 60,
       margin_h: 40,
@@ -507,7 +637,6 @@
       rotation_z: 0,
       letter_spacing: 0,
 
-  /* Animation controls. */
       animation_type: 'fade',
       intro_ms: 180,
       outro_ms: 120,
@@ -525,7 +654,6 @@
       settle_ms: 90,
       out_mode: 'fade',
 
-  /* Preview controls. */
       preview_start: 0,
       preview_duration: 8
     };
@@ -611,6 +739,7 @@
         fontNameController.updateDisplay();
       }
 
+      renderFontGallery();
       refreshGui();
       applyHelperPreview();
     }
@@ -635,7 +764,10 @@
         throw new Error(data.error || 'Font upload failed.');
       }
 
-      customFontsCache = Array.isArray(data.fonts) ? data.fonts : [];
+      const allFonts = Array.isArray(data.fonts) ? data.fonts : [];
+      customFontsCache = allFonts.filter(item => item.source === 'uploaded');
+      availableFonts = allFonts.map(item => String(item.family || '').trim()).filter(Boolean);
+
       await loadCustomFontsIntoBrowser();
 
       if (data.font?.family) {
@@ -648,13 +780,24 @@
       }
 
       if (fontNameController) {
+        const options = {};
+        availableFonts.forEach(name => {
+          options[name] = name;
+        });
+        fontNameController.options(options);
         fontNameController.updateDisplay();
       }
 
+      renderFontGallery();
       refreshGui();
       applyHelperPreview();
       showStatus('ok', `Font uploaded: <strong>${controls.font_name}</strong>`);
     }
+
+
+
+
+
 
     fontUploadInput.addEventListener('change', async event => {
       const file = event.target.files?.[0];
@@ -876,22 +1019,96 @@
 
 
 
+  function renderFontGallery() {
+    if (!fontGalleryList) {
+      return;
+    }
 
-/* Repaint helper so it matches rendered width/scale/anchor more closely. */
+    const previewTextRaw = String(fontGalleryPhrase?.value || controls.font_gallery_preview_text || 'Study your niche before posting.').trim() || 'Study your niche before posting.';
+    const previewText = controls.all_caps ? previewTextRaw.toUpperCase() : previewTextRaw;
+
+    controls.font_gallery_preview_text = previewTextRaw;
+    fontGalleryList.innerHTML = '';
+
+    const fonts = (availableFonts.length ? availableFonts : ['Arial'])
+    .filter(name => String(name || '').trim())
+    .filter(name => !String(name).startsWith('.'));
+
+    fonts.forEach(font => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'font-gallery-item';
+
+      const preview = document.createElement('div');
+      preview.textContent = previewText;
+      preview.style.fontFamily = `"${font}", Arial, sans-serif`;
+      preview.style.fontSize = '34px';
+      preview.style.lineHeight = '1.2';
+      preview.style.fontWeight = controls.bold ? '700' : '400';
+      preview.style.fontStyle = controls.italic ? 'italic' : 'normal';
+      preview.style.letterSpacing = `${controls.letter_spacing}px`;
+      preview.style.color = controls.primary_colour;
+
+      const meta = document.createElement('small');
+      meta.textContent = font;
+
+      item.appendChild(preview);
+      item.appendChild(meta);
+
+      item.addEventListener('click', () => {
+        controls.font_name = font;
+        refreshGui();
+        applyHelperPreview();
+        closeFontGallery();
+      });
+
+      fontGalleryList.appendChild(item);
+    });
+  }
+
+
+
+  function openFontGallery() {
+    fontGalleryPhrase.value = controls.font_gallery_preview_text || 'Study your niche before posting.';
+    renderFontGallery();
+    fontGalleryOverlay.classList.add('open');
+  }
+
+  function closeFontGallery() {
+    fontGalleryOverlay.classList.remove('open');
+  }
+
+  fontGalleryClose.addEventListener('click', closeFontGallery);
+  fontGalleryOverlay.querySelector('.font-gallery-backdrop').addEventListener('click', closeFontGallery);
+  fontGalleryPhrase.addEventListener('input', () => {
+    controls.font_gallery_preview_text = fontGalleryPhrase.value;
+    renderFontGallery();
+  });
+
+
+
+
+
+
+/* Repaint helper so it matches rendered width, style, and active-word preview state. */
   function applyHelperPreview() {
     const scale = getPreviewScaleFactor();
     const rect = helperLayer.getBoundingClientRect();
     const displayedWidth = rect.width || 0;
-
     const renderedBoxWidth = displayedWidth
     ? Math.max(120, displayedWidth - (controls.margin_h * scale * 2))
     : 320;
 
     const helperFontSize = Math.max(8, controls.font_size * scale * controls.helper_font_scale);
     const helperTranslate = getHelperTranslateForAlignment(controls.alignment);
+    const singleWordMode = controls.word_display_mode === 'current_word';
+    const helperPadY = controls.use_background ? Math.max(2, helperFontSize * 0.18) : Math.max(1, helperFontSize * 0.06);
+    const helperPadX = controls.use_background
+    ? Math.max(4, helperFontSize * 0.35 + (controls.background_pad_x * scale))
+    : Math.max(2, helperFontSize * 0.16);
 
-    helperCaptionText.textContent = srtPreviewText;
-    helperCaption.style.fontFamily = controls.font_name;
+    helperCaptionText.innerHTML = renderHelperPreviewContent();
+    helperCaption.style.fontFamily = `"${controls.font_name}", Arial, sans-serif`;
     helperCaption.style.fontSize = `${helperFontSize}px`;
     helperCaption.style.fontWeight = controls.bold ? '700' : '400';
     helperCaption.style.fontStyle = controls.italic ? 'italic' : 'normal';
@@ -899,15 +1116,14 @@
     helperCaption.style.textAlign = 'center';
     helperCaption.style.justifyContent = 'center';
     helperCaption.style.alignItems = 'center';
-    helperCaption.style.width = `${renderedBoxWidth}px`;
-    helperCaption.style.maxWidth = `${renderedBoxWidth}px`;
+    helperCaption.style.width = singleWordMode ? 'auto' : `${renderedBoxWidth}px`;
+    helperCaption.style.maxWidth = singleWordMode ? '80%' : `${renderedBoxWidth}px`;
+    helperCaption.style.minWidth = singleWordMode ? '0px' : '140px';
     helperCaption.style.minHeight = '0px';
     helperCaption.style.backgroundColor = controls.use_background
     ? `rgba(${parseInt(controls.background_colour.slice(1, 3), 16)}, ${parseInt(controls.background_colour.slice(3, 5), 16)}, ${parseInt(controls.background_colour.slice(5, 7), 16)}, ${controls.background_alpha})`
     : 'transparent';
-    helperCaption.style.padding = controls.use_background
-    ? `${0.18 * scale}em ${0.35 * scale}em`
-    : `${0.06 * scale}em ${0.16 * scale}em`;
+    helperCaption.style.padding = `${helperPadY}px ${helperPadX}px`;
     helperCaption.style.letterSpacing = `${controls.letter_spacing * scale}px`;
     helperCaption.style.textShadow =
     `${controls.outline * scale}px 0 ${controls.outline_colour},
@@ -923,7 +1139,6 @@
   syncOverlayToVideo();
   applyHelpersVisibility();
 }
-
 
 
 /* Match helper anchor behavior to ASS alignment anchors. */
@@ -1512,7 +1727,9 @@ function parseSrtCues(text) {
   .filter(cue => cue && cue.end > cue.start);
 }
 
-/* Parse VTT subtitle text into timed cues for local native preview playback. */
+
+
+
 function parseVttCues(text) {
   const normalized = String(text || '').replace(/\r/g, '').trim();
   if (!normalized) {
@@ -1524,8 +1741,7 @@ function parseVttCues(text) {
   .map(block => block.trim())
   .filter(Boolean)
   .map(block => {
-    const lines = block.split('\n').filter(Boolean);
-
+    const lines = block.split('\n');
     if (!lines.length) {
       return null;
     }
@@ -1535,33 +1751,101 @@ function parseVttCues(text) {
     }
 
     const timingLineIndex = lines.findIndex(line => line.includes('-->'));
-
     if (timingLineIndex === -1) {
       return null;
     }
 
     const timingLine = lines[timingLineIndex];
     const match = timingLine.match(/(\d{2}:\d{2}:\d{2}\.\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}\.\d{3})/);
-
     if (!match) {
       return null;
     }
 
-    const textLines = lines.slice(timingLineIndex + 1);
-    const cueText = normalizeCueText(textLines.join('\n'));
-
+    const payload = lines.slice(timingLineIndex + 1).join('\n');
+    const cueText = normalizeCueText(payload);
     if (!cueText) {
       return null;
     }
 
+    const cueStart = parseCueTimeToMs(match[1]);
+    const timedWords = [];
+    const wordMatches = [...payload.matchAll(/<(\d{2}:\d{2}:\d{2}\.\d{3})><c>(.*?)<\/c>/gs)];
+
+    const firstWordPos = wordMatches.length ? wordMatches[0].index : payload.length;
+    const prefixPayload = payload.slice(0, firstWordPos);
+    const prefixPlain = normalizeCueText(prefixPayload);
+
+    prefixPlain.split(/\s+/).filter(Boolean).forEach(word => {
+      timedWords.push({
+        start: cueStart,
+        word
+      });
+    });
+
+    wordMatches.forEach(matchItem => {
+      const wordStart = parseCueTimeToMs(matchItem[1]);
+      const wordText = normalizeCueText(matchItem[2]);
+
+      wordText.split(/\s+/).filter(Boolean).forEach(word => {
+        timedWords.push({
+          start: wordStart,
+          word
+        });
+      });
+    });
+
     return {
-      start: parseCueTimeToMs(match[1]),
+      start: cueStart,
       end: parseCueTimeToMs(match[2]),
-      text: cueText
+      text: cueText,
+      timed_words: timedWords
     };
   })
   .filter(cue => cue && cue.end > cue.start);
 }
+
+
+function getCurrentHelperText() {
+  const fallbackText = String(srtPreviewText || '').trim() || 'Preview caption will appear here';
+
+  if (!nativeCaptionPreviewEnabled || !subtitleCues.length || previewVideo.style.display === 'none') {
+    if (controls.word_display_mode === 'current_word') {
+      return fallbackText.split(/\s+/).filter(Boolean)[0] || fallbackText;
+    }
+    return fallbackText;
+  }
+
+  const currentMs = Math.max(0, Math.floor((previewVideo.currentTime || 0) * 1000));
+  const activeCue = getActiveSubtitleCue(currentMs);
+
+  if (!activeCue) {
+    return '';
+  }
+
+  if (controls.word_display_mode !== 'current_word') {
+    return activeCue.text;
+  }
+
+  const timedWords = Array.isArray(activeCue.timed_words) ? activeCue.timed_words : [];
+  if (!timedWords.length) {
+    return String(activeCue.text || '').trim().split(/\s+/).filter(Boolean)[0] || activeCue.text || '';
+  }
+
+  let activeWord = timedWords[0].word;
+  for (const item of timedWords) {
+    if (currentMs >= item.start) {
+      activeWord = item.word;
+    } else {
+      break;
+    }
+  }
+
+  return activeWord || activeCue.text || '';
+}
+
+
+
+
 
 /* Parse subtitle cues from the uploaded subtitle file for local live preview playback. */
 function parseSubtitleCues(text, filename) {
@@ -1577,17 +1861,116 @@ function getActiveSubtitleCue(currentMs) {
   return subtitleCues.find(cue => currentMs >= cue.start && currentMs < cue.end) || null;
 }
 
-/* Update the helper caption text so the local player shows timed native subtitle preview. */
-function syncNativeCaptionPreview() {
+/* Escape text for safe helper HTML rendering. */
+function escapeHtml(value) {
+  return String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+}
+
+
+
+
+/* Compute current helper text and active word index for preview rendering. */
+
+
+function getCurrentHelperState() {
+  const fallbackText = String(srtPreviewText || '').trim() || 'Preview caption will appear here';
+  const applyCase = text => controls.all_caps ? String(text || '').toUpperCase() : String(text || '');
+  const revealOffset = Number(controls.reveal_offset_ms || 0);
+
   if (!nativeCaptionPreviewEnabled || !subtitleCues.length || previewVideo.style.display === 'none') {
-    helperCaptionText.textContent = srtPreviewText;
-    return;
+    const fallbackWords = fallbackText.split(/\s+/).filter(Boolean);
+    return {
+      text: applyCase(fallbackText),
+      activeWord: applyCase(fallbackWords[0] || ''),
+      activeIndex: fallbackWords.length ? 0 : -1
+    };
   }
 
-  const currentMs = Math.max(0, Math.floor((previewVideo.currentTime || 0) * 1000));
+  const currentMs = Math.max(0, Math.floor((previewVideo.currentTime || 0) * 1000) - revealOffset);
   const activeCue = getActiveSubtitleCue(currentMs);
 
-  helperCaptionText.textContent = activeCue ? activeCue.text : '';
+  if (!activeCue) {
+    return {
+      text: '',
+      activeWord: '',
+      activeIndex: -1
+    };
+  }
+
+  const timedWords = Array.isArray(activeCue.timed_words) ? activeCue.timed_words : [];
+  if (!timedWords.length) {
+    const plainWords = String(activeCue.text || '').split(/\s+/).filter(Boolean);
+    return {
+      text: applyCase(activeCue.text || ''),
+      activeWord: applyCase(plainWords[0] || ''),
+      activeIndex: plainWords.length ? 0 : -1
+    };
+  }
+
+  let activeIndex = 0;
+  for (let i = 0; i < timedWords.length; i += 1) {
+    if (currentMs >= timedWords[i].start + revealOffset) {
+      activeIndex = i;
+    } else {
+      break;
+    }
+  }
+
+  return {
+    text: applyCase(activeCue.text || ''),
+    activeWord: applyCase(timedWords[activeIndex]?.word || ''),
+    activeIndex
+  };
+}
+
+
+
+/* Render helper HTML with active-word highlighting for both display modes. */
+function renderHelperPreviewContent() {
+  const state = getCurrentHelperState();
+
+  if (!state.text) {
+    return '';
+  }
+
+  if (controls.word_display_mode === 'current_word') {
+    return `<span style="color:${controls.active_word_colour}">${escapeHtml(state.activeWord || state.text)}</span>`;
+  }
+
+  const tokens = String(state.text).split(/(\s+)/);
+  let wordIndex = 0;
+
+  return tokens.map(token => {
+    if (!token) {
+      return '';
+    }
+
+    if (/^\s+$/.test(token)) {
+      return token.replace(/\n/g, '<br>');
+    }
+
+    const html = escapeHtml(token);
+    const isActive = wordIndex === state.activeIndex;
+    wordIndex += 1;
+
+    return isActive
+    ? `<span style="color:${controls.active_word_colour}">${html}</span>`
+    : `<span>${html}</span>`;
+  }).join('');
+}
+
+
+
+
+/* Update the helper caption text so the local player shows timed native subtitle preview. */
+/* Refresh helper HTML so active-word highlighting updates during playback. */
+function syncNativeCaptionPreview() {
+  helperCaptionText.innerHTML = renderHelperPreviewContent();
 }
 
 
@@ -1973,6 +2356,10 @@ function bindActionGuiObservers() {
 
 
 
+
+
+
+
 const typeFolder = gui.addFolder('Typography');
 
 typeFolder.add({
@@ -1981,35 +2368,98 @@ typeFolder.add({
   }
 }, 'upload_font').name('upload font');
 
+typeFolder.add({
+  font_gallery() {
+    openFontGallery();
+  }
+}, 'font_gallery').name('font gallery');
+
 uploadedFontsController = typeFolder.add({
   get uploaded_fonts() {
     return String(customFontsCache.length);
   }
 }, 'uploaded_fonts').name('uploaded fonts (0)');
 
-fontNameController = typeFolder.add(controls, 'font_name', { Arial: 'Arial' }).name('font').onChange(applyHelperPreview);
+fontNameController = typeFolder.add(controls, 'font_name', { Arial: 'Arial' }).name('font').onChange(() => {
+  renderFontGallery();
+  applyHelperPreview();
+});
 
-typeFolder.add(controls, 'font_size', 8, 96, 1).onChange(applyHelperPreview);
+typeFolder.add(controls, 'word_display_mode', {
+  'Full phrase': 'phrase',
+  'Current word only': 'current_word'
+}).name('display mode').onChange(() => {
+  syncNativeCaptionPreview();
+  applyHelperPreview();
+});
+
+typeFolder.add(controls, 'all_caps').name('all caps').onChange(() => {
+  renderFontGallery();
+  syncNativeCaptionPreview();
+  applyHelperPreview();
+});
+
+typeFolder.add(controls, 'font_gallery_preview_text').name('gallery text').onFinishChange(() => {
+  if (fontGalleryPhrase) {
+    fontGalleryPhrase.value = controls.font_gallery_preview_text;
+  }
+  renderFontGallery();
+});
+
+typeFolder.add(controls, 'font_size', 8, 96, 1).onChange(() => {
+  renderFontGallery();
+  applyHelperPreview();
+});
 typeFolder.add(controls, 'helper_font_scale', 0.6, 1.2, 0.01).name('helper font match').onChange(applyHelperPreview);
-typeFolder.addColor(controls, 'primary_colour').name('text').onChange(applyHelperPreview);
+typeFolder.addColor(controls, 'primary_colour').name('text').onChange(() => {
+  renderFontGallery();
+  applyHelperPreview();
+});
 typeFolder.addColor(controls, 'active_word_colour').name('active word').onChange(applyHelperPreview);
+
 typeFolder.add(controls, 'active_word_lead_ms', 0, 200, 1).name('active lead ms');
+typeFolder.add(controls, 'reveal_offset_ms', -500, 500, 1).name('reveal offset ms').onChange(() => {
+  syncNativeCaptionPreview();
+  applyHelperPreview();
+});
 typeFolder.add(controls, 'use_background').name('background').onChange(applyHelperPreview);
 typeFolder.addColor(controls, 'background_colour').name('bg color').onChange(applyHelperPreview);
 typeFolder.add(controls, 'background_alpha', 0, 1, 0.01).name('bg alpha').onChange(applyHelperPreview);
+typeFolder.add(controls, 'background_pad_x', 0, 40, 1).name('bg pad x').onChange(applyHelperPreview);
+
+
 typeFolder.addColor(controls, 'outline_colour').name('outline').onChange(applyHelperPreview);
 typeFolder.addColor(controls, 'shadow_colour').name('shadow color').onChange(applyHelperPreview);
 typeFolder.add(controls, 'outline', 0, 12, 0.5).onChange(applyHelperPreview);
 typeFolder.add(controls, 'shadow', 0, 12, 0.5).onChange(applyHelperPreview);
 typeFolder.add(controls, 'blur', 0, 8, 0.1);
-typeFolder.add(controls, 'bold').onChange(applyHelperPreview);
-typeFolder.add(controls, 'italic').onChange(applyHelperPreview);
-typeFolder.add(controls, 'letter_spacing', -10, 30, 0.1).onChange(applyHelperPreview);
+typeFolder.add(controls, 'bold').onChange(() => {
+  renderFontGallery();
+  applyHelperPreview();
+});
+typeFolder.add(controls, 'italic').onChange(() => {
+  renderFontGallery();
+  applyHelperPreview();
+});
+typeFolder.add(controls, 'letter_spacing', -10, 30, 0.1).onChange(() => {
+  renderFontGallery();
+  applyHelperPreview();
+});
 typeFolder.open();
 
 refreshFontsFromServer().catch(error => {
   showStatus('err', error.message || 'Could not load fonts.');
 });
+
+
+
+
+
+
+
+
+
+
 
 const placeFolder = gui.addFolder('Placement');
 placeFolder.add(controls, 'alignment', {

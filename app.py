@@ -293,6 +293,12 @@ def _escape_ass_text(text):
     return text.replace("\\", r"\\").replace("{", r"\{").replace("}", r"\}").replace("\n", r"\N").strip()
 
 
+# Apply optional all-caps transform before ASS text is emitted.
+# Keeps one backend path for phrase and word-only rendering.
+def _apply_text_case(text, settings):
+    value = str(text or "")
+    return value.upper() if settings.get("all_caps") else value
+
 
 def _ts_to_ms(ts):
     hh, mm, rest = ts.split(":")
@@ -414,6 +420,7 @@ def _parse_vtt_cues(vtt_path):
 
 def _build_vtt_word_reveal_text(cue, settings, video_info, past_words, active_word):
     pos_x, pos_y = _compute_position(video_info, settings)
+    box_or_shadow_colour = settings["background_colour"] if settings.get("use_background") else settings["shadow_colour"]
 
     tags = [
         rf"\an{settings['alignment']}",
@@ -423,7 +430,7 @@ def _build_vtt_word_reveal_text(cue, settings, video_info, past_words, active_wo
         rf"\blur{settings['blur']:g}",
         rf"\1c{settings['primary_colour']}",
         rf"\3c{settings['outline_colour']}",
-        rf"\4c{settings['shadow_colour']}",
+        rf"\4c{box_or_shadow_colour}",
         rf"\fsp{settings['letter_spacing']:g}",
         rf"\frz{settings['rotation_z']:g}",
         rf"\fscx{settings['end_scale']}",
@@ -431,13 +438,87 @@ def _build_vtt_word_reveal_text(cue, settings, video_info, past_words, active_wo
     ]
 
     prefix = "{" + "".join(tags) + "}"
+    transformed_text = _apply_text_case(cue["text"], settings)
+    transformed_active_word = _apply_text_case(active_word or "", settings)
+    hard_spaces = r"\h" * max(0, int(settings.get("background_pad_x", 0))) if settings.get("use_background") else ""
 
-    shown_past = len([word for word in past_words if word.strip()])
+    if settings.get("word_display_mode", "phrase") == "current_word":
+        current_word = _escape_ass_text(transformed_active_word.strip())
+
+        if not current_word:
+            fallback_words = re.findall(r"\S+", transformed_text)
+            current_word = _escape_ass_text(fallback_words[0]) if fallback_words else ""
+
+        if not current_word:
+            return prefix
+
+        if hard_spaces:
+            current_word = f"{hard_spaces}{current_word}{hard_spaces}"
+
+        return (
+            prefix
+            + "{"
+            + rf"\1c{settings['active_word_colour']}"
+            + "}"
+            + current_word
+            + "{"
+            + rf"\1c{settings['primary_colour']}"
+            + "}"
+        )
+
+    shown_past = len([word for word in past_words if str(word).strip()])
     revealed_count = 0
     active_done = False
     parts = []
 
-    tokens = re.split(r"(\s+)", cue["text"])
+    tokens = re.split(r"(\s+)", transformed_text)
+
+    if settings.get("use_background"):
+        visible_parts = []
+        pending_space = ""
+
+        for token in tokens:
+            if token == "":
+                continue
+
+            if token.isspace():
+                if visible_parts:
+                    pending_space = token.replace("\n", r"\N")
+                continue
+
+            escaped_word = _escape_ass_text(token)
+
+            if revealed_count < shown_past:
+                if pending_space:
+                    visible_parts.append(pending_space)
+                    pending_space = ""
+                visible_parts.append(escaped_word)
+                revealed_count += 1
+                continue
+
+            if not active_done and transformed_active_word and token == transformed_active_word:
+                if pending_space:
+                    visible_parts.append(pending_space)
+                    pending_space = ""
+
+                visible_parts.append(
+                    "{"
+                    + rf"\1c{settings['active_word_colour']}"
+                    + "}"
+                    + escaped_word
+                    + "{"
+                    + rf"\1c{settings['primary_colour']}"
+                    + "}"
+                )
+                active_done = True
+                break
+
+            break
+
+        if not visible_parts:
+            return prefix
+
+        return prefix + hard_spaces + "".join(visible_parts) + hard_spaces
 
     for token in tokens:
         if token == "":
@@ -451,23 +532,32 @@ def _build_vtt_word_reveal_text(cue, settings, video_info, past_words, active_wo
 
         if revealed_count < shown_past:
             parts.append(escaped_word)
-        elif not active_done and active_word and token == active_word:
+        elif not active_done and transformed_active_word and token == transformed_active_word:
             parts.append(
-                "{" + rf"\1c{settings['active_word_colour']}" + "}"
-                + escaped_word +
-                "{" + rf"\1c{settings['primary_colour']}" + "}"
+                "{"
+                + rf"\1c{settings['active_word_colour']}"
+                + "}"
+                + escaped_word
+                + "{"
+                + rf"\1c{settings['primary_colour']}"
+                + "}"
             )
             active_done = True
         else:
             parts.append(
-                "{" + r"\alpha&HFF&" + "}"
-                + escaped_word +
-                "{" + r"\alpha&H00&" + "}"
+                "{"
+                + r"\alpha&HFF&"
+                + "}"
+                + escaped_word
+                + "{"
+                + r"\alpha&H00&"
+                + "}"
             )
 
         revealed_count += 1
 
     return prefix + "".join(parts)
+
 
 
 
@@ -576,6 +666,13 @@ def _build_karaoke_text(text, mode, intro_ms):
     return "".join(out)
 
 
+
+
+
+
+
+
+
 def _build_line_override(text, duration, settings, video_info):
     pos_x, pos_y = _compute_position(video_info, settings)
 
@@ -588,6 +685,8 @@ def _build_line_override(text, duration, settings, video_info):
     end_x = pos_x + settings["out_offset_x"]
     end_y = pos_y + settings["out_offset_y"]
 
+    box_or_shadow_colour = settings["background_colour"] if settings.get("use_background") else settings["shadow_colour"]
+
     tags = [
         rf"\an{settings['alignment']}",
         rf"\bord{settings['outline']:g}",
@@ -595,7 +694,7 @@ def _build_line_override(text, duration, settings, video_info):
         rf"\blur{settings['blur']:g}",
         rf"\1c{settings['primary_colour']}",
         rf"\3c{settings['outline_colour']}",
-        rf"\4c{settings['shadow_colour']}",
+        rf"\4c{box_or_shadow_colour}",
         rf"\fsp{settings['letter_spacing']:g}",
         rf"\frz{settings['rotation_z']:g}",
         rf"\fscx{settings['start_scale']}",
@@ -629,6 +728,12 @@ def _build_line_override(text, duration, settings, video_info):
     else:
         body += rf"\alpha&H00&\fscx{settings['end_scale']}\fscy{settings['end_scale']}"
 
+    text = _apply_text_case(text, settings)
+
+    if settings.get("use_background") and int(settings.get("background_pad_x", 0)) > 0:
+        hard_spaces = r"\h" * int(settings["background_pad_x"])
+        text = f"{hard_spaces}{text}{hard_spaces}"
+
     if outro_ms > 0:
         if settings["out_mode"] == "move":
             body += rf"\t({exit_start},{duration},\move({pos_x},{pos_y},{end_x},{end_y},{exit_start},{duration})\alpha{settings['end_alpha']})"
@@ -641,6 +746,12 @@ def _build_line_override(text, duration, settings, video_info):
 
 
 
+
+
+
+
+# Build the final ASS file for SRT or VTT using one consistent text/background style path.
+# Keeps background color + alpha handling the same in both branches.
 def srt_to_animated_ass(src, dst, settings, video_info):
     def ass_bgr_to_color(value, default="&H00FFFFFF"):
         value = (value or default).strip().upper()
@@ -657,6 +768,15 @@ def srt_to_animated_ass(src, dst, settings, video_info):
 
     ext = os.path.splitext(src)[1].lower()
 
+    bg_alpha_hex = f"{max(0, min(255, round((1 - settings['background_alpha']) * 255))):02X}"
+    bg_value = str(settings.get("background_colour", "&H00000000")).strip().upper()
+    if bg_value.startswith("&H"):
+        bg_value = bg_value[2:]
+    bg_value = bg_value.rjust(8, "0")[-8:]
+
+    box_color = ass_bgr_to_color(f"&H{bg_alpha_hex}{bg_value[2:]}")
+    borderstyle = 4 if settings.get("use_background") else 1
+
     if ext == ".vtt":
         subs = pysubs2.SSAFile()
         subs.info["PlayResX"] = str(video_info["width"])
@@ -664,26 +784,24 @@ def srt_to_animated_ass(src, dst, settings, video_info):
         subs.info["ScaledBorderAndShadow"] = "yes"
         subs.info["WrapStyle"] = "0"
 
-        bg_alpha_hex = f"{max(0, min(255, round((1 - settings['background_alpha']) * 255))):02X}"
-
         style = pysubs2.SSAStyle()
         style.fontname = settings["font_name"]
         style.fontsize = settings["font_size"]
         style.primarycolor = ass_bgr_to_color(settings["primary_colour"], "&H00FFFFFF")
         style.outlinecolor = ass_bgr_to_color(settings["outline_colour"], "&H00000000")
-        style.backcolor = ass_bgr_to_color(settings["background_colour"], f"&H{bg_alpha_hex}000000")
+        style.backcolor = box_color
         style.bold = settings["bold"]
         style.italic = settings["italic"]
-        style.borderstyle = 3 if settings["use_background"] else 1
+        style.borderstyle = borderstyle
         style.outline = settings["outline"]
         style.shadow = settings["shadow"]
         style.alignment = settings["alignment"]
         style.marginv = settings["margin_v"]
         style.marginl = settings["margin_h"]
         style.marginr = settings["margin_h"]
-
-
         subs.styles["Default"] = style
+
+        reveal_offset_ms = int(settings.get("reveal_offset_ms", 0))
 
         for cue in _parse_vtt_cues(src):
             timed_words = cue["timed_words"]
@@ -708,8 +826,12 @@ def srt_to_animated_ass(src, dst, settings, video_info):
             past_words = []
 
             for index, item in enumerate(timed_words):
-                start_ms = max(cue["start"], item["start"])
-                end_ms = cue["end"] if index == len(timed_words) - 1 else timed_words[index + 1]["start"]
+                start_ms = max(cue["start"], item["start"] + reveal_offset_ms)
+
+                if index == len(timed_words) - 1:
+                    end_ms = cue["end"]
+                else:
+                    end_ms = min(cue["end"], timed_words[index + 1]["start"] + reveal_offset_ms)
 
                 if end_ms <= start_ms:
                     past_words.append(item["word"])
@@ -745,23 +867,22 @@ def srt_to_animated_ass(src, dst, settings, video_info):
     subs.info["ScaledBorderAndShadow"] = "yes"
     subs.info["WrapStyle"] = "0"
 
-    bg_alpha_hex = f"{max(0, min(255, round((1 - settings['background_alpha']) * 255))):02X}"
-
     style = subs.styles["Default"]
     style.fontname = settings["font_name"]
     style.fontsize = settings["font_size"]
     style.primarycolor = ass_bgr_to_color(settings["primary_colour"], "&H00FFFFFF")
     style.outlinecolor = ass_bgr_to_color(settings["outline_colour"], "&H00000000")
-    style.backcolor = ass_bgr_to_color(settings["background_colour"], f"&H{bg_alpha_hex}000000")
+    style.backcolor = box_color
     style.bold = settings["bold"]
     style.italic = settings["italic"]
-    style.borderstyle = 3 if settings["use_background"] else 1
+    style.borderstyle = borderstyle
     style.outline = settings["outline"]
     style.shadow = settings["shadow"]
     style.alignment = settings["alignment"]
     style.marginv = settings["margin_v"]
     style.marginl = settings["margin_h"]
     style.marginr = settings["margin_h"]
+    subs.styles["Default"] = style
 
     for line in subs:
         text = _escape_ass_text(line.text)
@@ -992,6 +1113,7 @@ def api_preview():
                 f.write(srt_bytes)
 
         settings = {
+            "word_display_mode": request.form.get("word_display_mode", "phrase"),
             "font_name": request.form.get("font_name", "Arial"),
             "font_size": _safe_int(request.form.get("font_size", 24), 24),
             "outline": _safe_float(request.form.get("outline", 2), 2),
@@ -1002,16 +1124,19 @@ def api_preview():
             "alignment": _safe_int(request.form.get("alignment", 2), 2),
             "bold": _safe_bool(request.form.get("bold", "0")),
             "italic": _safe_bool(request.form.get("italic", "0")),
+            "all_caps": _safe_bool(request.form.get("all_caps", "0")),
             "primary_colour": _hex_to_ass_bgr(request.form.get("primary_colour", "#FFFFFF"), "00"),
             "outline_colour": _hex_to_ass_bgr(request.form.get("outline_colour", "#000000"), "00"),
-
             "shadow_colour": _hex_to_ass_bgr(request.form.get("shadow_colour", "#000000"), "00"),
             "use_background": _safe_bool(request.form.get("use_background", "0")),
             "background_colour": _hex_to_ass_bgr(request.form.get("background_colour", "#000000"), "00"),
-            "background_alpha": _safe_float(request.form.get("background_alpha", 0.45), 0.45),
-            "active_word_colour": _hex_to_ass_bgr(request.form.get("active_word_colour", "#ff0000"), "00"),
 
+            "background_alpha": _safe_float(request.form.get("background_alpha", 0.45), 0.45),
+            "background_pad_x": _safe_int(request.form.get("background_pad_x", 10), 10),
+            "active_word_colour": _hex_to_ass_bgr(request.form.get("active_word_colour", "#ff0000"), "00"),
             "active_word_lead_ms": _safe_int(request.form.get("active_word_lead_ms", 80), 80),
+            "reveal_offset_ms": _safe_int(request.form.get("reveal_offset_ms", 0), 0),
+
             "animation_type": request.form.get("animation_type", "fade"),
             "intro_ms": _safe_int(request.form.get("intro_ms", 180), 180),
             "outro_ms": _safe_int(request.form.get("outro_ms", 120), 120),
