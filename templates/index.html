@@ -433,7 +433,14 @@
     const saveAsPresetBtn = document.getElementById('saveAsPresetBtn');
     const deletePresetBtn = document.getElementById('deletePresetBtn');
     const exportPresetBtn = document.getElementById('exportPresetBtn');
+
     const presetImportInput = document.getElementById('presetImportInput');
+
+    const fontUploadInput = document.createElement('input');
+    fontUploadInput.type = 'file';
+    fontUploadInput.accept = '.ttf,.otf,.woff,.woff2';
+    fontUploadInput.hidden = true;
+    document.body.appendChild(fontUploadInput);
 
     const PRESET_DB_NAME = 'captionAnimatorPresetsDB';
     const PRESET_STORE_NAME = 'presets';
@@ -460,6 +467,10 @@
     let presetDb = null;
     let presetsCache = {};
     let helpersVisible = true;
+    let customFontsCache = [];
+    let fontNameController = null;
+    let uploadedFontsController = null;
+    let availableFonts = [];    
 /* Keep metadata for the last cached source video available across reloads. */
     let cachedVideoMeta = readCachedVideoMetaFromStorage();
 
@@ -541,6 +552,124 @@
       dt.items.add(file);
       input.files = dt.files;
     }
+
+    async function loadCustomFontsIntoBrowser() {
+      if (!('FontFace' in window) || !document.fonts) {
+        return;
+      }
+
+      for (const item of customFontsCache) {
+        const family = String(item?.family || '').trim();
+        const sourceUrl = String(item?.url || '').trim();
+
+        if (!family || !sourceUrl) {
+          continue;
+        }
+
+        try {
+          const face = new FontFace(family, `url("${sourceUrl}")`);
+          await face.load();
+          document.fonts.add(face);
+        } catch {}
+      }
+    }
+
+
+
+
+    async function refreshFontsFromServer() {
+      const response = await fetch('/api/fonts');
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || 'Could not load fonts.');
+      }
+
+      const allFonts = Array.isArray(data.fonts) ? data.fonts : [];
+      customFontsCache = allFonts.filter(item => item.source === 'uploaded');
+      availableFonts = allFonts.map(item => String(item.family || '').trim()).filter(Boolean);
+
+      await loadCustomFontsIntoBrowser();
+
+      if (uploadedFontsController) {
+        uploadedFontsController.name(`uploaded fonts (${customFontsCache.length})`);
+        uploadedFontsController.updateDisplay();
+      }
+
+      if (fontNameController) {
+        const options = {};
+        availableFonts.forEach(name => {
+          options[name] = name;
+        });
+
+        fontNameController.options(options);
+
+        if (!availableFonts.includes(controls.font_name) && availableFonts.length) {
+          controls.font_name = availableFonts[0];
+        }
+
+        fontNameController.updateDisplay();
+      }
+
+      refreshGui();
+      applyHelperPreview();
+    }
+
+
+
+
+
+
+    async function uploadCustomFont(file) {
+      const formData = new FormData();
+      formData.append('font', file, file.name);
+
+      const response = await fetch('/api/fonts/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || 'Font upload failed.');
+      }
+
+      customFontsCache = Array.isArray(data.fonts) ? data.fonts : [];
+      await loadCustomFontsIntoBrowser();
+
+      if (data.font?.family) {
+        controls.font_name = data.font.family;
+      }
+
+      if (uploadedFontsController) {
+        uploadedFontsController.name(`uploaded fonts (${customFontsCache.length})`);
+        uploadedFontsController.updateDisplay();
+      }
+
+      if (fontNameController) {
+        fontNameController.updateDisplay();
+      }
+
+      refreshGui();
+      applyHelperPreview();
+      showStatus('ok', `Font uploaded: <strong>${controls.font_name}</strong>`);
+    }
+
+    fontUploadInput.addEventListener('change', async event => {
+      const file = event.target.files?.[0];
+      if (!file) {
+        return;
+      }
+
+      try {
+        await uploadCustomFont(file);
+      } catch (error) {
+        showStatus('err', error.message || 'Font upload failed.');
+      } finally {
+        fontUploadInput.value = '';
+      }
+    });
 
 /* Read cached source-video metadata from localStorage for quick UI restore. */
     function readCachedVideoMetaFromStorage() {
@@ -1845,19 +1974,20 @@ function bindActionGuiObservers() {
 
 
 const typeFolder = gui.addFolder('Typography');
-typeFolder.add(controls, 'font_name', [
-  'Arial',
-  'Helvetica',
-  'Verdana',
-  'Trebuchet MS',
-  'Georgia',
-  'Times New Roman',
-  'Courier New',
-  'Avenir Next',
-  'SF Pro Display',
-  'Futura',
-  'Impact'
-]).onChange(applyHelperPreview);
+
+typeFolder.add({
+  upload_font() {
+    fontUploadInput.click();
+  }
+}, 'upload_font').name('upload font');
+
+uploadedFontsController = typeFolder.add({
+  get uploaded_fonts() {
+    return String(customFontsCache.length);
+  }
+}, 'uploaded_fonts').name('uploaded fonts (0)');
+
+fontNameController = typeFolder.add(controls, 'font_name', { Arial: 'Arial' }).name('font').onChange(applyHelperPreview);
 
 typeFolder.add(controls, 'font_size', 8, 96, 1).onChange(applyHelperPreview);
 typeFolder.add(controls, 'helper_font_scale', 0.6, 1.2, 0.01).name('helper font match').onChange(applyHelperPreview);
@@ -1876,6 +2006,10 @@ typeFolder.add(controls, 'bold').onChange(applyHelperPreview);
 typeFolder.add(controls, 'italic').onChange(applyHelperPreview);
 typeFolder.add(controls, 'letter_spacing', -10, 30, 0.1).onChange(applyHelperPreview);
 typeFolder.open();
+
+refreshFontsFromServer().catch(error => {
+  showStatus('err', error.message || 'Could not load fonts.');
+});
 
 const placeFolder = gui.addFolder('Placement');
 placeFolder.add(controls, 'alignment', {

@@ -1,4 +1,6 @@
-from flask import Flask, request, send_from_directory, jsonify, render_template
+# Flask imports used by the app, API routes, and font file serving.
+from flask import Flask, request, send_from_directory, jsonify, render_template, url_for
+
 from werkzeug.utils import secure_filename
 import os
 import re
@@ -7,11 +9,21 @@ import uuid
 import subprocess
 import threading
 import json
+import platform
 import pysubs2
+from fontTools.ttLib import TTFont
 
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(APP_ROOT, "uploads")
 OUTPUT_DIR = os.path.join(APP_ROOT, "outputs")
+
+
+
+
+
+# Store reusable application state outside transient request objects.
+APP_STATE_PATH = os.path.join(APP_ROOT, "app_state.json")
+
 FFMPEG_BIN = os.path.expanduser("~/ffmpeg-full/bin/ffmpeg")
 FFPROBE_BIN = os.path.expanduser("~/ffmpeg-full/bin/ffprobe")
 
@@ -21,11 +33,228 @@ app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024 * 1024
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 
 JOBS = {}
+# Manage uploaded custom fonts for browser preview and FFmpeg/libass rendering.
+FONTS_DIR = os.path.join(APP_ROOT, "fonts")
+ALLOWED_FONT_EXTENSIONS = {".ttf", ".otf", ".woff", ".woff2"}
 
 
+# Ensure all runtime directories exist, including the custom font store.
 def ensure_dirs():
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(FONTS_DIR, exist_ok=True)
+
+
+# Validate uploaded font file extensions before saving or serving them.
+def _allowed_font_file(filename):
+    ext = os.path.splitext(filename or "")[1].lower()
+    return ext in ALLOWED_FONT_EXTENSIONS
+
+
+# Derive the font family label from the uploaded file name.
+def _font_family_from_filename(filename):
+    font_path = os.path.join(FONTS_DIR, secure_filename(filename or ""))
+
+    def _read_name(record):
+        try:
+            value = record.toUnicode().strip()
+        except Exception:
+            return None
+        return value or None
+
+    try:
+        font = TTFont(font_path)
+        name_table = font["name"]
+
+        names_by_id = {}
+        for record in name_table.names:
+            value = _read_name(record)
+            if not value:
+                continue
+            names_by_id.setdefault(record.nameID, [])
+            if value not in names_by_id[record.nameID]:
+                names_by_id[record.nameID].append(value)
+
+        # Best match for libass / real face selection:
+        # 4 = Full font name
+        if names_by_id.get(4):
+            return names_by_id[4][0]
+
+        # 16 + 17 = Typographic family + subfamily
+        if names_by_id.get(16) and names_by_id.get(17):
+            return f"{names_by_id[16][0]} {names_by_id[17][0]}".strip()
+
+        # 1 + 2 = Legacy family + subfamily
+        if names_by_id.get(1) and names_by_id.get(2):
+            subfamily = names_by_id[2][0]
+            if subfamily.lower() == "regular":
+                return names_by_id[1][0]
+            return f"{names_by_id[1][0]} {subfamily}".strip()
+
+        # 6 = PostScript name
+        if names_by_id.get(6):
+            return names_by_id[6][0]
+
+        if names_by_id.get(16):
+            return names_by_id[16][0]
+
+        if names_by_id.get(1):
+            return names_by_id[1][0]
+
+    except Exception:
+        pass
+
+    base = os.path.splitext(os.path.basename(filename or ""))[0]
+    family = re.sub(r"[_\-]+", " ", base)
+    family = re.sub(r"\s+", " ", family).strip()
+    return family or "Custom Font"
+
+# Escape filesystem paths for safe use inside ffmpeg filter strings.
+def _escape_ffmpeg_filter_path(path_value):
+    value = os.path.abspath(path_value or "")
+    value = value.replace("\\", "/")
+    value = value.replace(":", r"\:")
+    value = value.replace("'", r"\'")
+    value = value.replace(",", r"\,")
+    value = value.replace("[", r"\[")
+    value = value.replace("]", r"\]")
+    return value
+
+
+
+def _list_system_fonts():
+    candidates = []
+
+    if platform.system() == "Darwin":
+        candidates = [
+            "/System/Library/Fonts",
+            "/Library/Fonts",
+            os.path.expanduser("~/Library/Fonts"),
+        ]
+    elif platform.system() == "Windows":
+        windir = os.environ.get("WINDIR", r"C:\Windows")
+        candidates = [
+            os.path.join(windir, "Fonts"),
+        ]
+    else:
+        candidates = [
+            "/usr/share/fonts",
+            "/usr/local/share/fonts",
+            os.path.expanduser("~/.fonts"),
+            os.path.expanduser("~/.local/share/fonts"),
+        ]
+
+    seen = set()
+    fonts = []
+
+    for root_dir in candidates:
+        if not os.path.isdir(root_dir):
+            continue
+
+        for root, _, files in os.walk(root_dir):
+            for filename in files:
+                if not _allowed_font_file(filename):
+                    continue
+
+                full_path = os.path.join(root, filename)
+
+                try:
+                    family = None
+                    font = TTFont(full_path)
+                    name_table = font["name"]
+
+                    for preferred_name_id in (4, 16, 1, 6):
+                        for record in name_table.names:
+                            if record.nameID != preferred_name_id:
+                                continue
+                            try:
+                                value = record.toUnicode().strip()
+                            except Exception:
+                                continue
+                            if value:
+                                family = value
+                                break
+                        if family:
+                            break
+
+                    if not family:
+                        family = _font_family_from_filename(filename)
+
+                    key = family.lower()
+                    if key in seen:
+                        continue
+
+                    seen.add(key)
+                    fonts.append({
+                        "family": family,
+                        "source": "system",
+                    })
+                except Exception:
+                    continue
+
+    fonts.sort(key=lambda item: item["family"].lower())
+    return fonts
+
+# List uploaded custom fonts for the frontend Typography controls.
+def _list_custom_fonts():
+    ensure_dirs()
+    fonts = []
+
+    for filename in sorted(os.listdir(FONTS_DIR), key=lambda value: value.lower()):
+        safe_name = secure_filename(filename)
+        if not safe_name or not _allowed_font_file(safe_name):
+            continue
+
+        fonts.append({
+            "file": safe_name,
+            "family": _font_family_from_filename(safe_name),
+            "url": f"/fonts/{safe_name}",
+        })
+
+    return fonts
+
+
+# Render a preview or full output while exposing uploaded fonts to libass.
+def render_preview(video_path, ass_path, output_path, preview_start=0, preview_seconds=8):
+    ass_filter = (
+        f"ass='{_escape_ffmpeg_filter_path(ass_path)}'"
+        f":fontsdir='{_escape_ffmpeg_filter_path(FONTS_DIR)}'"
+    )
+
+    cmd = [
+        FFMPEG_BIN,
+        "-y",
+    ]
+
+    if preview_start is not None and float(preview_start) > 0:
+        cmd += ["-ss", str(preview_start)]
+
+    cmd += [
+        "-i", video_path,
+    ]
+
+    if preview_seconds is not None:
+        cmd += ["-t", str(preview_seconds)]
+
+    cmd += [
+        "-vf", ass_filter,
+        "-map", "0:v:0",
+        "-map", "0:a?",
+        "-c:v", "libx264",
+        "-crf", "18",
+        "-preset", "medium",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-shortest",
+        output_path,
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or "FFmpeg render failed")
+
+
 
 
 def _hex_to_ass_bgr(value, alpha_hex="00"):
@@ -435,21 +664,25 @@ def srt_to_animated_ass(src, dst, settings, video_info):
         subs.info["ScaledBorderAndShadow"] = "yes"
         subs.info["WrapStyle"] = "0"
 
+        bg_alpha_hex = f"{max(0, min(255, round((1 - settings['background_alpha']) * 255))):02X}"
+
         style = pysubs2.SSAStyle()
         style.fontname = settings["font_name"]
         style.fontsize = settings["font_size"]
         style.primarycolor = ass_bgr_to_color(settings["primary_colour"], "&H00FFFFFF")
         style.outlinecolor = ass_bgr_to_color(settings["outline_colour"], "&H00000000")
-        style.backcolor = ass_bgr_to_color(settings["shadow_colour"], "&H00000000")
+        style.backcolor = ass_bgr_to_color(settings["background_colour"], f"&H{bg_alpha_hex}000000")
         style.bold = settings["bold"]
         style.italic = settings["italic"]
-        style.borderstyle = 1
+        style.borderstyle = 3 if settings["use_background"] else 1
         style.outline = settings["outline"]
         style.shadow = settings["shadow"]
         style.alignment = settings["alignment"]
         style.marginv = settings["margin_v"]
         style.marginl = settings["margin_h"]
         style.marginr = settings["margin_h"]
+
+
         subs.styles["Default"] = style
 
         for cue in _parse_vtt_cues(src):
@@ -512,15 +745,17 @@ def srt_to_animated_ass(src, dst, settings, video_info):
     subs.info["ScaledBorderAndShadow"] = "yes"
     subs.info["WrapStyle"] = "0"
 
+    bg_alpha_hex = f"{max(0, min(255, round((1 - settings['background_alpha']) * 255))):02X}"
+
     style = subs.styles["Default"]
     style.fontname = settings["font_name"]
     style.fontsize = settings["font_size"]
     style.primarycolor = ass_bgr_to_color(settings["primary_colour"], "&H00FFFFFF")
     style.outlinecolor = ass_bgr_to_color(settings["outline_colour"], "&H00000000")
-    style.backcolor = ass_bgr_to_color(settings["shadow_colour"], "&H00000000")
+    style.backcolor = ass_bgr_to_color(settings["background_colour"], f"&H{bg_alpha_hex}000000")
     style.bold = settings["bold"]
     style.italic = settings["italic"]
-    style.borderstyle = 1
+    style.borderstyle = 3 if settings["use_background"] else 1
     style.outline = settings["outline"]
     style.shadow = settings["shadow"]
     style.alignment = settings["alignment"]
@@ -571,43 +806,6 @@ def shift_ass_for_preview(ass_path, preview_start=0, preview_seconds=None):
 
 
 
-# Render a preview video with optional start offset and limited duration.
-def render_preview(video_path, ass_path, output_path, preview_start=0, preview_seconds=8):
-    cmd = [
-        FFMPEG_BIN,
-        "-y",
-    ]
-
-    # Vulnerable block: keep start offset numeric and non-negative before passing it to ffmpeg.
-    if preview_start is not None and float(preview_start) > 0:
-        cmd += ["-ss", str(preview_start)]
-
-    cmd += [
-        "-i", video_path,
-    ]
-
-    # Vulnerable block: keep preview duration numeric and bounded by the caller before passing it to ffmpeg.
-    if preview_seconds is not None:
-        cmd += ["-t", str(preview_seconds)]
-
-    cmd += [
-        "-vf", f"ass={ass_path}",
-        "-map", "0:v:0",
-        "-map", "0:a?",
-        "-c:v", "libx264",
-        "-crf", "18",
-        "-preset", "medium",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
-        "-b:a", "192k",
-        "-shortest",
-        output_path,
-    ]
-
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or "FFmpeg render failed")
-
 
 
 
@@ -649,6 +847,86 @@ def process_preview(job_id, video_path, srt_path, ass_path, preview_path, settin
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+# Return uploaded custom fonts for the Typography UI.
+@app.route("/api/fonts", methods=["GET"])
+def api_fonts():
+    try:
+        uploaded_fonts = _list_custom_fonts()
+        system_fonts = _list_system_fonts()
+
+        merged = []
+        seen = set()
+
+        for item in uploaded_fonts + system_fonts:
+            family = str(item.get("family", "")).strip()
+            if not family:
+                continue
+
+            key = family.lower()
+            if key in seen:
+                continue
+
+            seen.add(key)
+            merged.append(item)
+
+        merged.sort(key=lambda item: item["family"].lower())
+
+        return jsonify({
+            "ok": True,
+            "fonts": merged,
+        })
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+# Accept one uploaded custom font file and return the refreshed font registry.
+@app.route("/api/fonts/upload", methods=["POST"])
+def api_fonts_upload():
+    try:
+        ensure_dirs()
+
+        font = request.files.get("font")
+        if not font or not font.filename:
+            return jsonify({"ok": False, "error": "Upload a font file."}), 400
+
+        filename = secure_filename(font.filename)
+        if not filename:
+            return jsonify({"ok": False, "error": "Invalid font filename."}), 400
+
+        if not _allowed_font_file(filename):
+            return jsonify({"ok": False, "error": "Allowed: .ttf, .otf, .woff, .woff2"}), 400
+
+        target_path = os.path.join(FONTS_DIR, filename)
+
+        # Vulnerable block: save only validated font files into the dedicated font directory.
+        font.save(target_path)
+
+        uploaded_font = {
+            "file": filename,
+            "family": _font_family_from_filename(filename),
+            "url": f"/fonts/{filename}",
+        }
+
+        return jsonify({
+            "ok": True,
+            "font": uploaded_font,
+            "fonts": _list_custom_fonts(),
+        })
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+# Serve uploaded custom font files for browser preview loading.
+@app.route("/fonts/<path:filename>")
+def serve_font(filename):
+    safe_name = secure_filename(filename)
+    if not safe_name or not _allowed_font_file(safe_name):
+        return jsonify({"ok": False, "error": "Font not found."}), 404
+
+    return send_from_directory(FONTS_DIR, safe_name)
+
 
 
 
@@ -726,8 +1004,13 @@ def api_preview():
             "italic": _safe_bool(request.form.get("italic", "0")),
             "primary_colour": _hex_to_ass_bgr(request.form.get("primary_colour", "#FFFFFF"), "00"),
             "outline_colour": _hex_to_ass_bgr(request.form.get("outline_colour", "#000000"), "00"),
+
             "shadow_colour": _hex_to_ass_bgr(request.form.get("shadow_colour", "#000000"), "00"),
+            "use_background": _safe_bool(request.form.get("use_background", "0")),
+            "background_colour": _hex_to_ass_bgr(request.form.get("background_colour", "#000000"), "00"),
+            "background_alpha": _safe_float(request.form.get("background_alpha", 0.45), 0.45),
             "active_word_colour": _hex_to_ass_bgr(request.form.get("active_word_colour", "#ff0000"), "00"),
+
             "active_word_lead_ms": _safe_int(request.form.get("active_word_lead_ms", 80), 80),
             "animation_type": request.form.get("animation_type", "fade"),
             "intro_ms": _safe_int(request.form.get("intro_ms", 180), 180),
