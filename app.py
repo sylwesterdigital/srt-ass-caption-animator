@@ -10,6 +10,12 @@ import subprocess
 import threading
 import json
 import tempfile
+import shutil
+import stat
+import urllib.error
+import urllib.request
+import zipfile
+import time
 
 
 import platform
@@ -19,9 +25,24 @@ from fontTools.ttLib import TTFont
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(APP_ROOT, "uploads")
 OUTPUT_DIR = os.path.join(APP_ROOT, "outputs")
-
-
-
+TOOLS_DIR = os.path.join(APP_ROOT, "tools")
+REALESRGAN_DIR = os.path.join(TOOLS_DIR, "realesrgan")
+REALESRGAN_RELEASE = "v0.2.5.0"
+REALESRGAN_BOOTSTRAP_LOCK = threading.Lock()
+REALESRGAN_RELEASE_ASSETS = {
+    "Darwin": {
+        "filename": "realesrgan-ncnn-vulkan-20220424-macos.zip",
+        "url": f"https://github.com/xinntao/Real-ESRGAN/releases/download/{REALESRGAN_RELEASE}/realesrgan-ncnn-vulkan-20220424-macos.zip",
+    },
+    "Linux": {
+        "filename": "realesrgan-ncnn-vulkan-20220424-ubuntu.zip",
+        "url": f"https://github.com/xinntao/Real-ESRGAN/releases/download/{REALESRGAN_RELEASE}/realesrgan-ncnn-vulkan-20220424-ubuntu.zip",
+    },
+    "Windows": {
+        "filename": "realesrgan-ncnn-vulkan-20220424-windows.zip",
+        "url": f"https://github.com/xinntao/Real-ESRGAN/releases/download/{REALESRGAN_RELEASE}/realesrgan-ncnn-vulkan-20220424-windows.zip",
+    },
+}
 
 
 # Store reusable application state outside transient request objects.
@@ -46,6 +67,8 @@ def ensure_dirs():
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(FONTS_DIR, exist_ok=True)
+    os.makedirs(TOOLS_DIR, exist_ok=True)
+    os.makedirs(REALESRGAN_DIR, exist_ok=True)
 
 
 # Validate uploaded font file extensions before saving or serving them.
@@ -824,6 +847,539 @@ def get_video_duration(video_path):
     return duration
 
 
+# Probe source video dimensions, frame rate, and audio presence for processing jobs.
+def get_video_stream_meta(video_path):
+    cmd = [
+        FFPROBE_BIN,
+        "-v", "error",
+        "-show_entries", "stream=index,codec_type,width,height,avg_frame_rate,r_frame_rate",
+        "-of", "json",
+        video_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or "ffprobe stream info failed")
+
+    try:
+        data = json.loads(result.stdout or "{}")
+    except Exception as exc:
+        raise RuntimeError("Could not parse ffprobe stream info") from exc
+
+    streams = data.get("streams") or []
+    video_stream = next((item for item in streams if item.get("codec_type") == "video"), None)
+    if not video_stream:
+        raise RuntimeError("No video stream found")
+
+    fps_value = (video_stream.get("avg_frame_rate") or "").strip()
+    if not fps_value or fps_value == "0/0":
+        fps_value = (video_stream.get("r_frame_rate") or "").strip()
+    if not fps_value or fps_value == "0/0":
+        fps_value = "30"
+
+    return {
+        "width": int(video_stream.get("width") or 0),
+        "height": int(video_stream.get("height") or 0),
+        "fps": fps_value,
+        "has_audio": any(item.get("codec_type") == "audio" for item in streams),
+    }
+
+
+def _even_size(value):
+    value = max(2, int(round(float(value))))
+    if value % 2:
+        value += 1
+    return value
+
+
+_JOB_PROGRESS_UNSET = object()
+
+
+def _set_job_progress(
+    job_id,
+    status=None,
+    message=None,
+    phase=_JOB_PROGRESS_UNSET,
+    current=_JOB_PROGRESS_UNSET,
+    total=_JOB_PROGRESS_UNSET,
+    eta_seconds=_JOB_PROGRESS_UNSET,
+):
+    job = JOBS.get(job_id)
+    if not job:
+        return
+    if status is not None:
+        job["status"] = status
+    if message is not None:
+        job["message"] = message
+    if phase is not _JOB_PROGRESS_UNSET:
+        job["phase"] = phase
+    if current is not _JOB_PROGRESS_UNSET:
+        job["progress_current"] = None if current is None else max(0, int(current))
+    if total is not _JOB_PROGRESS_UNSET:
+        job["progress_total"] = None if total is None else max(0, int(total))
+    if eta_seconds is not _JOB_PROGRESS_UNSET:
+        job["eta_seconds"] = None if eta_seconds is None else max(0, int(eta_seconds))
+
+
+def _count_png_frames(directory_path):
+    if not directory_path or not os.path.isdir(directory_path):
+        return 0
+    count = 0
+    with os.scandir(directory_path) as entries:
+        for entry in entries:
+            if entry.is_file() and entry.name.lower().endswith('.png'):
+                count += 1
+    return count
+
+
+def _estimate_eta_seconds(started_at, completed, total):
+    try:
+        completed = int(completed)
+        total = int(total)
+    except Exception:
+        return None
+
+    if not started_at or completed <= 0 or total <= 0 or completed >= total:
+        return None
+
+    elapsed = max(0.001, float(time.monotonic()) - float(started_at))
+    rate = completed / elapsed
+    if rate <= 0:
+        return None
+
+    remaining = max(0, total - completed)
+    return int(round(remaining / rate))
+
+
+def _find_first_executable(candidates):
+    seen = set()
+    for value in candidates:
+        if not value:
+            continue
+        expanded = os.path.abspath(os.path.expanduser(str(value)))
+        if expanded in seen:
+            continue
+        seen.add(expanded)
+
+        if os.path.isfile(expanded) and os.access(expanded, os.X_OK):
+            return expanded
+
+        resolved = shutil.which(str(value))
+        if resolved and os.access(resolved, os.X_OK):
+            return resolved
+
+    return None
+
+
+def _download_file(url, destination_path):
+    temp_path = f"{destination_path}.part"
+    request_obj = urllib.request.Request(
+        url,
+        headers={"User-Agent": "CaptionAnimator/1.0"},
+    )
+
+    try:
+        with urllib.request.urlopen(request_obj, timeout=180) as response, open(temp_path, "wb") as target:
+            shutil.copyfileobj(response, target)
+        os.replace(temp_path, destination_path)
+    except Exception:
+        try:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        except Exception:
+            pass
+        raise
+
+
+def _mark_executable(path_value):
+    if not path_value or not os.path.isfile(path_value):
+        return
+
+    try:
+        current_mode = os.stat(path_value).st_mode
+        os.chmod(path_value, current_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    except Exception:
+        pass
+
+
+def _find_realesrgan_binary(search_root):
+    if not search_root or not os.path.isdir(search_root):
+        return None
+
+    preferred_names = ["realesrgan-ncnn-vulkan.exe", "realesrgan-ncnn-vulkan"]
+    for root, _, files in os.walk(search_root):
+        lower_map = {filename.lower(): filename for filename in files}
+        for preferred in preferred_names:
+            actual_name = lower_map.get(preferred.lower())
+            if not actual_name:
+                continue
+
+            candidate = os.path.join(root, actual_name)
+            _mark_executable(candidate)
+            if os.access(candidate, os.X_OK):
+                return candidate
+
+    return None
+
+
+def _find_realesrgan_models(search_root):
+    if not search_root or not os.path.isdir(search_root):
+        return None
+
+    for root, _, files in os.walk(search_root):
+        lower_files = {filename.lower() for filename in files}
+        if 'realesrgan-x4plus.param' in lower_files and 'realesrgan-x4plus.bin' in lower_files:
+            return root
+
+    return None
+
+
+def _get_realesrgan_asset():
+    asset = REALESRGAN_RELEASE_ASSETS.get(platform.system())
+    if asset:
+        return asset
+
+    raise RuntimeError(
+        f"Real-ESRGAN auto-install is not supported on {platform.system() or 'this platform'}."
+    )
+
+
+def _bootstrap_realesrgan_backend(job_id=None):
+    ensure_dirs()
+    asset = _get_realesrgan_asset()
+    install_name = os.path.splitext(asset['filename'])[0]
+    install_dir = os.path.join(REALESRGAN_DIR, install_name)
+    archive_path = os.path.join(REALESRGAN_DIR, asset['filename'])
+
+    with REALESRGAN_BOOTSTRAP_LOCK:
+        existing_binary = _find_realesrgan_binary(install_dir)
+        existing_models = _find_realesrgan_models(install_dir)
+        if existing_binary and existing_models:
+            return {
+                'binary': existing_binary,
+                'model_dir': existing_models,
+            }
+
+        if job_id:
+            _set_job_progress(job_id, 'preparing', 'Downloading Real-ESRGAN runtime...')
+
+        if not os.path.exists(archive_path):
+            try:
+                _download_file(asset['url'], archive_path)
+            except urllib.error.URLError as exc:
+                reason = getattr(exc, 'reason', None) or str(exc)
+                raise RuntimeError(f"Could not download Real-ESRGAN runtime: {reason}") from exc
+            except Exception as exc:
+                raise RuntimeError(f"Could not download Real-ESRGAN runtime: {exc}") from exc
+
+        if job_id:
+            _set_job_progress(job_id, 'preparing', 'Installing Real-ESRGAN runtime...')
+
+        extract_dir = f"{install_dir}__extracting"
+        shutil.rmtree(extract_dir, ignore_errors=True)
+        os.makedirs(extract_dir, exist_ok=True)
+
+        try:
+            with zipfile.ZipFile(archive_path, 'r') as archive:
+                archive.extractall(extract_dir)
+        except Exception as exc:
+            shutil.rmtree(extract_dir, ignore_errors=True)
+            try:
+                os.remove(archive_path)
+            except Exception:
+                pass
+            raise RuntimeError(f"Could not unpack Real-ESRGAN runtime: {exc}") from exc
+
+        shutil.rmtree(install_dir, ignore_errors=True)
+        os.replace(extract_dir, install_dir)
+
+        binary = _find_realesrgan_binary(install_dir)
+        model_dir = _find_realesrgan_models(install_dir)
+
+        if not binary:
+            raise RuntimeError('Real-ESRGAN runtime unpacked, but the executable was not found.')
+        if not model_dir:
+            raise RuntimeError('Real-ESRGAN runtime unpacked, but the model files were not found.')
+
+        return {
+            'binary': binary,
+            'model_dir': model_dir,
+        }
+
+
+def _resolve_realesrgan_backend(job_id=None):
+    binary = _find_first_executable([
+        os.environ.get('REALESRGAN_BIN'),
+        os.environ.get('AI_UPSCALER_BIN'),
+        os.path.join(APP_ROOT, 'tools', 'realesrgan-ncnn-vulkan'),
+        os.path.join(APP_ROOT, 'tools', 'realesrgan-ncnn-vulkan.exe'),
+        os.path.join(REALESRGAN_DIR, 'realesrgan-ncnn-vulkan'),
+        os.path.join(REALESRGAN_DIR, 'realesrgan-ncnn-vulkan.exe'),
+        'realesrgan-ncnn-vulkan',
+        'realesrgan-ncnn-vulkan.exe',
+    ])
+
+    model_dir = None
+    candidate_model_dirs = [os.environ.get('REALESRGAN_MODEL_DIR')]
+
+    if binary:
+        candidate_model_dirs.extend([
+            os.path.join(os.path.dirname(binary), 'models'),
+            os.path.join(APP_ROOT, 'models'),
+            os.path.join(APP_ROOT, 'models', 'realesrgan'),
+            REALESRGAN_DIR,
+        ])
+
+    for candidate in candidate_model_dirs:
+        if candidate and os.path.isdir(candidate):
+            resolved_models = _find_realesrgan_models(candidate) or candidate
+            if resolved_models and _find_realesrgan_models(resolved_models):
+                model_dir = resolved_models
+                break
+
+    if binary and model_dir:
+        return {
+            'binary': binary,
+            'model_dir': model_dir,
+        }
+
+    return _bootstrap_realesrgan_backend(job_id=job_id)
+
+
+def process_upscale_video(video_path, output_path, upscale_factor=2, upscale_mode="traditional", preview_start=0, preview_seconds=None, job_id=None):
+    upscale_factor = 4 if int(upscale_factor or 2) >= 4 else 2
+    upscale_mode = "ai" if str(upscale_mode or "traditional").lower() == "ai" else "traditional"
+
+    source_meta = get_video_stream_meta(video_path)
+    target_width = _even_size(source_meta["width"] * upscale_factor)
+    target_height = _even_size(source_meta["height"] * upscale_factor)
+
+    if upscale_mode == "traditional":
+        _set_job_progress(job_id, "rendering", f"Upscaling video {upscale_factor}x...")
+        vf_expr = f"scale={target_width}:{target_height}:flags=lanczos:param0=3"
+
+        cmd = [
+            FFMPEG_BIN,
+            "-y",
+            "-nostdin",
+            "-hwaccel", "none",
+        ]
+
+        if preview_start is not None and float(preview_start) > 0:
+            cmd += ["-ss", f"{float(preview_start):.6f}"]
+
+        cmd += ["-i", video_path]
+
+        if preview_seconds is not None:
+            cmd += ["-t", f"{max(0.1, float(preview_seconds)):.6f}"]
+
+        cmd += [
+            "-vf", vf_expr,
+            "-map", "0:v:0",
+            "-map", "0:a:0?",
+            "-c:v", "libx264",
+            "-crf", "18",
+            "-preset", "medium",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-movflags", "+faststart",
+            output_path,
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or "Traditional upscale failed")
+        return
+
+    backend = _resolve_realesrgan_backend(job_id=job_id)
+
+    with tempfile.TemporaryDirectory(prefix="video_upscale_") as work_dir:
+        frames_in_dir = os.path.join(work_dir, "frames_in")
+        frames_out_dir = os.path.join(work_dir, "frames_out")
+        audio_path = os.path.join(work_dir, "audio.m4a")
+        os.makedirs(frames_in_dir, exist_ok=True)
+        os.makedirs(frames_out_dir, exist_ok=True)
+
+        _set_job_progress(job_id, "preparing", "Extracting frames...")
+
+        extract_cmd = [
+            FFMPEG_BIN,
+            "-y",
+            "-nostdin",
+            "-hwaccel", "none",
+        ]
+
+        if preview_start is not None and float(preview_start) > 0:
+            extract_cmd += ["-ss", f"{float(preview_start):.6f}"]
+
+        extract_cmd += ["-i", video_path]
+
+        if preview_seconds is not None:
+            extract_cmd += ["-t", f"{max(0.1, float(preview_seconds)):.6f}"]
+
+        extract_cmd += [
+            "-map", "0:v:0",
+            "-vsync", "0",
+            os.path.join(frames_in_dir, "frame_%08d.png"),
+        ]
+
+        extract_result = subprocess.run(extract_cmd, capture_output=True, text=True)
+        if extract_result.returncode != 0:
+            raise RuntimeError(extract_result.stderr.strip() or "Could not extract source frames")
+
+        input_frames = sorted(
+            name for name in os.listdir(frames_in_dir)
+            if name.lower().endswith('.png')
+        )
+        if not input_frames:
+            raise RuntimeError('No source frames were extracted for AI upscaling.')
+
+        if source_meta["has_audio"]:
+            audio_cmd = [
+                FFMPEG_BIN,
+                "-y",
+                "-nostdin",
+                "-hwaccel", "none",
+            ]
+
+            if preview_start is not None and float(preview_start) > 0:
+                audio_cmd += ["-ss", f"{float(preview_start):.6f}"]
+
+            audio_cmd += ["-i", video_path]
+
+            if preview_seconds is not None:
+                audio_cmd += ["-t", f"{max(0.1, float(preview_seconds)):.6f}"]
+
+            audio_cmd += [
+                "-map", "0:a:0",
+                "-vn",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                audio_path,
+            ]
+
+            audio_result = subprocess.run(audio_cmd, capture_output=True, text=True)
+            if audio_result.returncode != 0:
+                audio_path = None
+
+        total_frames = len(input_frames)
+        _set_job_progress(
+            job_id,
+            "rendering",
+            f"Upscaling frames with Real-ESRGAN... 0/{total_frames}",
+            phase="ai_upscale",
+            current=0,
+            total=total_frames,
+            eta_seconds=None,
+        )
+
+        ai_cmd = [
+            backend['binary'],
+            '-i', frames_in_dir,
+            '-o', frames_out_dir,
+            '-s', str(upscale_factor),
+            '-n', 'realesrgan-x4plus',
+            '-m', backend['model_dir'],
+            '-f', 'png',
+            '-t', '0',
+        ]
+
+        ai_log_path = os.path.join(work_dir, 'realesrgan.log')
+        ai_started_at = time.monotonic()
+
+        with open(ai_log_path, 'w+', encoding='utf-8', errors='replace') as ai_log_handle:
+            ai_process = subprocess.Popen(
+                ai_cmd,
+                stdout=ai_log_handle,
+                stderr=subprocess.STDOUT,
+                text=True,
+                cwd=os.path.dirname(backend['binary']),
+            )
+
+            last_reported = -1
+            while True:
+                completed_frames = _count_png_frames(frames_out_dir)
+                if completed_frames != last_reported:
+                    eta_seconds = _estimate_eta_seconds(ai_started_at, completed_frames, total_frames)
+                    _set_job_progress(
+                        job_id,
+                        "rendering",
+                        f"Upscaling frames with Real-ESRGAN... {completed_frames}/{total_frames}",
+                        phase="ai_upscale",
+                        current=completed_frames,
+                        total=total_frames,
+                        eta_seconds=eta_seconds,
+                    )
+                    last_reported = completed_frames
+
+                if ai_process.poll() is not None:
+                    break
+
+                time.sleep(0.35)
+
+            ai_return_code = ai_process.wait()
+            ai_log_handle.flush()
+            ai_log_handle.seek(0)
+            ai_details = ai_log_handle.read().strip()
+
+        completed_frames = _count_png_frames(frames_out_dir)
+        _set_job_progress(
+            job_id,
+            "rendering",
+            f"Upscaling frames with Real-ESRGAN... {completed_frames}/{total_frames}",
+            phase="ai_upscale",
+            current=completed_frames,
+            total=total_frames,
+            eta_seconds=0 if completed_frames >= total_frames else None,
+        )
+
+        if ai_return_code != 0:
+            raise RuntimeError(ai_details or 'AI frame upscale failed')
+
+        encoded_frames = sorted(
+            name for name in os.listdir(frames_out_dir)
+            if name.lower().endswith('.png')
+        )
+        if not encoded_frames:
+            raise RuntimeError('AI upscale produced no output frames')
+
+        _set_job_progress(job_id, "rendering", "Encoding upscaled video...", phase="encoding", current=None, total=None, eta_seconds=None)
+
+        encode_cmd = [
+            FFMPEG_BIN,
+            "-y",
+            "-nostdin",
+            '-framerate', source_meta['fps'],
+            '-i', os.path.join(frames_out_dir, 'frame_%08d.png'),
+        ]
+
+        if audio_path and os.path.exists(audio_path):
+            encode_cmd += ['-i', audio_path]
+
+        encode_cmd += ['-map', '0:v:0']
+
+        if audio_path and os.path.exists(audio_path):
+            encode_cmd += ['-map', '1:a:0']
+
+        encode_cmd += [
+            '-c:v', 'libx264',
+            '-crf', '18',
+            '-preset', 'medium',
+            '-pix_fmt', 'yuv420p',
+        ]
+
+        if audio_path and os.path.exists(audio_path):
+            encode_cmd += ['-c:a', 'aac', '-b:a', '192k', '-shortest']
+        else:
+            encode_cmd += ['-an']
+
+        encode_cmd += ['-movflags', '+faststart', output_path]
+
+        encode_result = subprocess.run(encode_cmd, capture_output=True, text=True)
+        if encode_result.returncode != 0:
+            raise RuntimeError(encode_result.stderr.strip() or 'Could not encode upscaled video')
+
+
 # Analyze silence and render either talk-only or silence-only segments into one output video.
 # Uses ffmpeg silencedetect so no extra Python audio pipeline is needed inside the app.
 def process_silence_video(video_path, output_path, silence_threshold=-40.0, min_silence_duration=0.4, keep_mode="talk", preview_start=0, preview_seconds=None):
@@ -1033,6 +1589,18 @@ def process_video_job(job_id, video_path, output_path, process_kind, settings, p
                 speed_factor=settings["speed_factor"],
                 preview_start=preview_start,
                 preview_seconds=preview_seconds,
+            )
+        elif process_kind == "upscale":
+            JOBS[job_id]["status"] = "preparing"
+            JOBS[job_id]["message"] = "Preparing video upscale..."
+            process_upscale_video(
+                video_path,
+                output_path,
+                upscale_factor=settings["upscale_factor"],
+                upscale_mode=settings["upscale_mode"],
+                preview_start=preview_start,
+                preview_seconds=preview_seconds,
+                job_id=job_id,
             )
         else:
             raise RuntimeError("Unsupported processing mode.")
@@ -1837,6 +2405,10 @@ def api_preview():
             "message": "Queued...",
             "preview_file": None,
             "ass_file": None,
+            "phase": None,
+            "progress_current": None,
+            "progress_total": None,
+            "eta_seconds": None,
         }
 
         threading.Thread(
@@ -1871,7 +2443,7 @@ def api_process_video():
             return jsonify({"ok": False, "error": "Video must be mp4, mov, m4v, or webm."}), 400
 
         process_kind = request.form.get("process_kind", "silence")
-        if process_kind not in ("silence", "speed"):
+        if process_kind not in ("silence", "speed", "upscale"):
             return jsonify({"ok": False, "error": "Invalid processing mode."}), 400
 
         mode = request.form.get("mode", "preview")
@@ -1902,6 +2474,8 @@ def api_process_video():
             "min_silence_duration": _safe_float(request.form.get("min_silence_duration", 0.4), 0.4),
             "silence_mode": request.form.get("silence_mode", "talk"),
             "speed_factor": _safe_float(request.form.get("speed_factor", 1.25), 1.25),
+            "upscale_factor": 4 if int(_safe_float(request.form.get("upscale_factor", 2), 2)) >= 4 else 2,
+            "upscale_mode": "ai" if request.form.get("upscale_mode", "traditional") == "ai" else "traditional",
         }
 
         JOBS[job_id] = {
@@ -1909,6 +2483,10 @@ def api_process_video():
             "message": "Queued...",
             "preview_file": None,
             "ass_file": None,
+            "phase": None,
+            "progress_current": None,
+            "progress_total": None,
+            "eta_seconds": None,
         }
 
         threading.Thread(
@@ -1971,6 +2549,10 @@ def api_get_captions():
             "ass_file": None,
             "captions_file": None,
             "captions_text": None,
+            "phase": None,
+            "progress_current": None,
+            "progress_total": None,
+            "eta_seconds": None,
         }
 
         threading.Thread(
@@ -1993,10 +2575,22 @@ def api_status(job_id):
     if not job:
         return jsonify({"ok": False, "error": "Job not found"}), 404
 
+    progress_current = job.get("progress_current")
+    progress_total = job.get("progress_total")
+    progress_percent = None
+
+    if isinstance(progress_current, int) and isinstance(progress_total, int) and progress_total > 0:
+        progress_percent = max(0.0, min(100.0, (progress_current / progress_total) * 100.0))
+
     return jsonify({
         "ok": True,
         "status": job["status"],
         "message": job["message"],
+        "phase": job.get("phase"),
+        "progress_current": progress_current,
+        "progress_total": progress_total,
+        "progress_percent": progress_percent,
+        "eta_seconds": job.get("eta_seconds"),
         "preview_url": f"/outputs/{job['preview_file']}" if job.get("preview_file") else None,
         "ass_url": f"/outputs/{job['ass_file']}" if job.get("ass_file") else None,
         "captions_url": f"/outputs/{job['captions_file']}" if job.get("captions_file") else None,

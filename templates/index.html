@@ -682,6 +682,8 @@
       min_silence_duration: 0.4,
       silence_mode: 'talk',
       speed_factor: 1.25,
+      upscale_factor: 2,
+      upscale_mode: 'traditional',
 
       caption_model: 'small',
       caption_language: '',
@@ -1707,6 +1709,37 @@ function resetUI() {
 
 
 
+function formatEtaSeconds(totalSeconds) {
+  const seconds = Math.max(0, Math.round(Number(totalSeconds) || 0));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+
+  if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
+  if (minutes > 0) return `${minutes}m ${secs}s`;
+  return `${secs}s`;
+}
+
+function formatJobStatusMessage(data) {
+  const base = String(data?.message || '').trim() || 'Working...';
+  const current = Number.isFinite(Number(data?.progress_current)) ? Number(data.progress_current) : null;
+  const total = Number.isFinite(Number(data?.progress_total)) ? Number(data.progress_total) : null;
+  const eta = Number.isFinite(Number(data?.eta_seconds)) ? Number(data.eta_seconds) : null;
+
+  if (current !== null && total !== null && total > 0) {
+    const percent = Math.max(0, Math.min(100, Math.round((current / total) * 100)));
+    const etaText = eta !== null && current < total ? ` · ETA ${formatEtaSeconds(eta)}` : '';
+    return `${base} (${current}/${total}, ${percent}%)${etaText}`;
+  }
+
+  if (eta !== null && eta > 0) {
+    return `${base} · ETA ${formatEtaSeconds(eta)}`;
+  }
+
+  return base;
+}
+
+
 /* Poll backend job status until a render, processing job, or caption job is ready. */
 /* Caption jobs auto-load the generated VTT into the existing subtitle preview flow. */
 async function startPolling(jobId) {
@@ -1722,7 +1755,7 @@ async function startPolling(jobId) {
       }
 
       if (data.status === 'queued' || data.status === 'preparing' || data.status === 'rendering') {
-        showStatus('info', data.message);
+        showStatus('info', formatJobStatusMessage(data));
         return;
       }
 
@@ -2329,12 +2362,26 @@ async function processVideo(processKind, mode) {
   openPreview.style.display = 'none';
   openAss.style.display = 'none';
 
-  showStatus(
-    'info',
-    processKind === 'silence'
-    ? (mode === 'preview' ? 'Starting silence preview...' : 'Starting silence processing...')
-    : (mode === 'preview' ? 'Starting speed preview...' : 'Starting speed processing...')
-    );
+  const processMessages = {
+    silence: {
+      preview: 'Starting silence preview...',
+      full: 'Starting silence processing...'
+    },
+    speed: {
+      preview: 'Starting speed preview...',
+      full: 'Starting speed processing...'
+    },
+    upscale: {
+      preview: controls.upscale_mode === 'ai'
+        ? 'Starting Real-ESRGAN preview...'
+        : 'Starting traditional upscale preview...',
+      full: controls.upscale_mode === 'ai'
+        ? 'Starting Real-ESRGAN full upscale...'
+        : 'Starting traditional full upscale...'
+    }
+  };
+
+  showStatus('info', processMessages[processKind]?.[mode] || 'Starting video processing...');
 
   try {
     const response = await fetch('/api/process_video', {
@@ -3029,10 +3076,27 @@ speedFolder.add({
 }, 'process_full').name('Process full');
 speedFolder.close();
 
-
-
-
-
+/* Group video-upscaling controls and reuse the existing preview/full processing workflow. */
+const upscaleFolder = gui.addFolder('Video Upscale');
+upscaleFolder.add(controls, 'upscale_mode', {
+  'Real-ESRGAN AI': 'ai',
+  'Traditional (Lanczos)': 'traditional'
+}).name('mode');
+upscaleFolder.add(controls, 'upscale_factor', {
+  '2x': 2,
+  '4x': 4
+}).name('scale');
+upscaleFolder.add({
+  process_preview() {
+    return processVideo('upscale', 'preview');
+  }
+}, 'process_preview').name('Upscale preview');
+upscaleFolder.add({
+  process_full() {
+    return processVideo('upscale', 'full');
+  }
+}, 'process_full').name('Upscale full');
+upscaleFolder.close();
 
 
 const captionsFolder = gui.addFolder('Captions');
