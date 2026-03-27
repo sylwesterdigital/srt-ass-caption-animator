@@ -461,7 +461,7 @@
         <!-- Keep only backend bridge elements required by the current JavaScript while moving visible controls to lil-gui. -->
         <div class="backend-bridge" hidden aria-hidden="true">
           <!-- Backend file input used by lil-gui video actions and drag/drop import. -->
-          <input type="file" id="video" accept=".mp4,.mov,.m4v">
+          <input type="file" id="video" accept=".mp4,.mov,.m4v,.webm">
 
           <!-- Backend file input used by lil-gui subtitle actions and drag/drop import. -->
           <input type="file" id="srt" accept=".srt,.vtt">
@@ -581,6 +581,7 @@
 
     let pollTimer = null;
     let sourceObjectUrl = null;
+    let currentCaptionsDownloadUrl = null;
     let srtPreviewText = 'Preview caption will appear here';
 
 /* Store parsed subtitle cues for native in-browser preview playback. */
@@ -611,16 +612,36 @@
       bold: false,
       italic: false,
       all_caps: false,
+
       primary_colour: '#ffffff',
+      primary_colour_mode: 'fixed',
+      primary_palette: '#ffffff,#ffd54f,#80cbc4,#7dd3fc',
+
       active_word_colour: '#ff0000',
+      active_word_colour_mode: 'fixed',
+      active_palette: '#ff4d4f,#ff9800,#ffd54f,#7c4dff',
+
       active_word_lead_ms: 80,
       reveal_offset_ms: 0,
+
       outline_colour: '#000000',
       shadow_colour: '#000000',
+
       background_colour: '#000000',
+      background_colour_mode: 'fixed',
+      background_palette: '#000000,#1f2937,#374151,#4b5563',
       use_background: false,
       background_alpha: 0.45,
       background_pad_x: 10,
+
+      random_position_jitter: false,
+      position_jitter_x: 0,
+      position_jitter_y: 0,
+
+      random_timing_jitter: false,
+      timing_jitter_ms: 0,
+      variation_seed: 7,
+
       outline: 2,
       shadow: 0,
       blur: 0.8,
@@ -655,7 +676,18 @@
       out_mode: 'fade',
 
       preview_start: 0,
-      preview_duration: 8
+      preview_duration: 8,
+
+      silence_threshold: -40,
+      min_silence_duration: 0.4,
+      silence_mode: 'talk',
+      speed_factor: 1.25,
+
+      caption_model: 'small',
+      caption_language: '',
+      caption_word_timestamps: true,
+      caption_vad_filter: true      
+
     };
 
 
@@ -702,6 +734,56 @@
       }
     }
 
+/* Parse comma-separated hex colors into a normalized palette list. */
+/* Falls back to the fixed color when the palette field is empty. */
+    function parsePaletteColours(paletteText, fallbackColour) {
+      const palette = String(paletteText || '')
+      .split(/[\n,;]+/)
+      .map(item => item.trim())
+      .filter(Boolean)
+      .map(item => item.startsWith('#') ? item : `#${item}`)
+      .filter(item => /^#[0-9a-fA-F]{6}$/.test(item))
+      .map(item => item.toUpperCase());
+
+      return palette.length ? palette : [String(fallbackColour || '#FFFFFF').toUpperCase()];
+    }
+
+/* Pick one deterministic color for a cue/word from fixed, palette-step, or random-palette mode. */
+/* Preview and render stay aligned because the pick is based on cue time, index, and seed. */
+    function pickVariantColour(mode, fixedColour, paletteText, cueStartMs, itemIndex, seed, salt = 0) {
+      const palette = parsePaletteColours(paletteText, fixedColour);
+      const base = Math.abs(Math.floor(Number(cueStartMs || 0)))
+      + Math.abs(Math.floor(Number(itemIndex || 0))) * 131
+      + Math.abs(Math.floor(Number(seed || 0))) * 17
+      + Math.abs(Math.floor(Number(salt || 0))) * 53;
+
+      if (mode === 'palette') {
+        return palette[base % palette.length];
+      }
+
+      if (mode === 'random') {
+        return palette[(base * 37 + 11) % palette.length];
+      }
+
+      return String(fixedColour || palette[0] || '#FFFFFF').toUpperCase();
+    }
+
+
+/* Pick one deterministic signed jitter offset for a cue/word. */
+/* The value is stable across preview and final render for the same seed and index. */
+    function pickVariantOffset(enabled, maxAmount, cueStartMs, itemIndex, seed, salt) {
+      const limit = Math.max(0, Math.floor(Number(maxAmount || 0)));
+      if (!enabled || !limit) {
+        return 0;
+      }
+
+      const base = Math.abs(Math.floor(Number(cueStartMs || 0)))
+      + Math.abs(Math.floor(Number(itemIndex || 0))) * 131
+      + Math.abs(Math.floor(Number(seed || 0))) * 17
+      + Math.abs(Math.floor(Number(salt || 0))) * 53;
+
+      return ((base * 73 + 19) % (limit * 2 + 1)) - limit;
+    }
 
 
 
@@ -814,7 +896,12 @@
       }
     });
 
-/* Read cached source-video metadata from localStorage for quick UI restore. */
+
+
+
+
+
+/* Read cached source-video metadata from localStorage and preserve WebM MIME type when the browser saved it. */
     function readCachedVideoMetaFromStorage() {
       try {
         const raw = localStorage.getItem(VIDEO_CACHE_META_KEY);
@@ -829,7 +916,10 @@
 
         return {
           name: String(parsed.name || ''),
-          type: String(parsed.type || 'video/mp4'),
+          type: String(
+            parsed.type
+            || (/\.(webm)$/i.test(String(parsed.name || '')) ? 'video/webm' : 'video/mp4')
+            ),
           size: Number(parsed.size || 0),
           lastModified: Number(parsed.lastModified || Date.now()),
           savedAt: Number(parsed.savedAt || Date.now())
@@ -839,17 +929,30 @@
       }
     }
 
-/* Persist cached source-video metadata for fast reload and UI display. */
+
+
+
+
+/* Persist cached source-video metadata for fast reload and keep WebM MIME type aligned with the saved file name. */
     function writeCachedVideoMetaToStorage(meta) {
   /* Vulnerable block: persist only the small metadata object, never arbitrary DOM state or HTML. */
       localStorage.setItem(VIDEO_CACHE_META_KEY, JSON.stringify({
         name: String(meta.name || ''),
-        type: String(meta.type || 'video/mp4'),
+        type: String(
+          meta.type
+          || (/\.(webm)$/i.test(String(meta.name || '')) ? 'video/webm' : 'video/mp4')
+          ),
         size: Number(meta.size || 0),
         lastModified: Number(meta.lastModified || Date.now()),
         savedAt: Number(meta.savedAt || Date.now())
       }));
     }
+
+
+
+
+
+
 
 /* Open the IndexedDB database used for source-video caching. */
     function openVideoCacheDb() {
@@ -869,7 +972,12 @@
       });
     }
 
-/* Save the current source video into IndexedDB for reuse after reload. */
+
+
+
+
+
+/* Save the current source video into IndexedDB for reuse after reload while preserving WebM MIME type. */
     async function saveCachedSourceVideo(file) {
       if (!(file instanceof Blob)) {
         return;
@@ -886,7 +994,7 @@
           id: VIDEO_CACHE_KEY,
           blob: file,
           name: file.name || 'cached-video.mp4',
-          type: file.type || 'video/mp4',
+          type: file.type || (/\.(webm)$/i.test(String(file.name || '')) ? 'video/webm' : 'video/mp4'),
           size: Number(file.size || 0),
           lastModified: Number(file.lastModified || Date.now()),
           savedAt: Date.now()
@@ -899,7 +1007,7 @@
 
       cachedVideoMeta = {
         name: file.name || 'cached-video.mp4',
-        type: file.type || 'video/mp4',
+        type: file.type || (/\.(webm)$/i.test(String(file.name || '')) ? 'video/webm' : 'video/mp4'),
         size: Number(file.size || 0),
         lastModified: Number(file.lastModified || Date.now()),
         savedAt: Date.now()
@@ -908,7 +1016,12 @@
       writeCachedVideoMetaToStorage(cachedVideoMeta);
     }
 
-/* Load the cached source video back from IndexedDB as a File for preview and rendering. */
+
+
+
+
+
+/* Load the cached source video back from IndexedDB as a File and preserve WebM MIME type for preview playback. */
     async function getCachedSourceVideoFile() {
       const db = await openVideoCacheDb();
 
@@ -929,11 +1042,18 @@
         [record.blob],
         record.name || cachedVideoMeta?.name || 'cached-video.mp4',
         {
-          type: record.type || cachedVideoMeta?.type || 'video/mp4',
+          type:
+          record.type
+          || cachedVideoMeta?.type
+          || (/\.(webm)$/i.test(String(record.name || cachedVideoMeta?.name || '')) ? 'video/webm' : 'video/mp4'),
           lastModified: Number(record.lastModified || cachedVideoMeta?.lastModified || Date.now())
         }
         );
     }
+
+
+
+
 
 /* Determine whether a reusable cached source video is available in the browser. */
     async function hasCachedSourceVideo() {
@@ -1090,7 +1210,6 @@
 
 
 
-/* Repaint helper so it matches rendered width, style, and active-word preview state. */
   function applyHelperPreview() {
     const scale = getPreviewScaleFactor();
     const rect = helperLayer.getBoundingClientRect();
@@ -1099,6 +1218,8 @@
     ? Math.max(120, displayedWidth - (controls.margin_h * scale * 2))
     : 320;
 
+    const state = getCurrentHelperState();
+    const activeIndex = Math.max(0, state.activeIndex);
     const helperFontSize = Math.max(8, controls.font_size * scale * controls.helper_font_scale);
     const helperTranslate = getHelperTranslateForAlignment(controls.alignment);
     const singleWordMode = controls.word_display_mode === 'current_word';
@@ -1106,6 +1227,34 @@
     const helperPadX = controls.use_background
     ? Math.max(4, helperFontSize * 0.35 + (controls.background_pad_x * scale))
     : Math.max(2, helperFontSize * 0.16);
+
+    const previewBackgroundColour = pickVariantColour(
+      controls.background_colour_mode,
+      controls.background_colour,
+      controls.background_palette,
+      state.cueStart,
+      activeIndex,
+      controls.variation_seed,
+      79
+      );
+
+    const jitterX = pickVariantOffset(
+      controls.random_position_jitter,
+      controls.position_jitter_x,
+      state.cueStart,
+      activeIndex,
+      controls.variation_seed,
+      101
+      );
+
+    const jitterY = pickVariantOffset(
+      controls.random_position_jitter,
+      controls.position_jitter_y,
+      state.cueStart,
+      activeIndex,
+      controls.variation_seed,
+      151
+      );
 
     helperCaptionText.innerHTML = renderHelperPreviewContent();
     helperCaption.style.fontFamily = `"${controls.font_name}", Arial, sans-serif`;
@@ -1121,7 +1270,7 @@
     helperCaption.style.minWidth = singleWordMode ? '0px' : '140px';
     helperCaption.style.minHeight = '0px';
     helperCaption.style.backgroundColor = controls.use_background
-    ? `rgba(${parseInt(controls.background_colour.slice(1, 3), 16)}, ${parseInt(controls.background_colour.slice(3, 5), 16)}, ${parseInt(controls.background_colour.slice(5, 7), 16)}, ${controls.background_alpha})`
+    ? `rgba(${parseInt(previewBackgroundColour.slice(1, 3), 16)}, ${parseInt(previewBackgroundColour.slice(3, 5), 16)}, ${parseInt(previewBackgroundColour.slice(5, 7), 16)}, ${controls.background_alpha})`
     : 'transparent';
     helperCaption.style.padding = `${helperPadY}px ${helperPadX}px`;
     helperCaption.style.letterSpacing = `${controls.letter_spacing * scale}px`;
@@ -1134,7 +1283,7 @@
     helperCaption.style.left = `${controls.anchor_x * 100}%`;
     helperCaption.style.top = `${controls.anchor_y * 100}%`;
     helperCaption.style.transform =
-  `translate(${helperTranslate}) translate(${controls.offset_x * scale}px, ${controls.offset_y * scale}px) rotate(${-controls.rotation_z}deg) scale(${controls.end_scale / 100})`;
+  `translate(${helperTranslate}) translate(${(controls.offset_x + jitterX) * scale}px, ${(controls.offset_y + jitterY) * scale}px) rotate(${-controls.rotation_z}deg) scale(${controls.end_scale / 100})`;
 
   syncOverlayToVideo();
   applyHelpersVisibility();
@@ -1504,7 +1653,6 @@ async function importPreset(file) {
 
 
 
-
 /* Reset UI, preview and controls to defaults while keeping the cached source video available. */
 function resetUI() {
   if (pollTimer) {
@@ -1515,6 +1663,11 @@ function resetUI() {
   if (sourceObjectUrl) {
     URL.revokeObjectURL(sourceObjectUrl);
     sourceObjectUrl = null;
+  }
+
+  if (currentCaptionsDownloadUrl) {
+    URL.revokeObjectURL(currentCaptionsDownloadUrl);
+    currentCaptionsDownloadUrl = null;
   }
 
   videoInput.value = '';
@@ -1554,10 +1707,8 @@ function resetUI() {
 
 
 
-
-
-
-/* Poll backend render status until preview/full render is ready or failed. */
+/* Poll backend job status until a render, processing job, or caption job is ready. */
+/* Caption jobs auto-load the generated VTT into the existing subtitle preview flow. */
 async function startPolling(jobId) {
   if (pollTimer) clearInterval(pollTimer);
 
@@ -1578,6 +1729,23 @@ async function startPolling(jobId) {
       if (data.status === 'done') {
         clearInterval(pollTimer);
         pollTimer = null;
+
+        if (data.captions_text) {
+          const subtitleName = data.captions_filename || 'generated_captions.vtt';
+          const subtitleFile = new File([data.captions_text], subtitleName, { type: 'text/vtt' });
+
+          if (currentCaptionsDownloadUrl) {
+            URL.revokeObjectURL(currentCaptionsDownloadUrl);
+            currentCaptionsDownloadUrl = null;
+          }
+
+          setFileInput(srtInput, subtitleFile);
+          await readSrtPreview(subtitleFile);
+          updateMeta();
+          refreshGui();
+          showStatus('ok', 'Captions ready.');
+          return;
+        }
 
         previewVideo.src = `${data.preview_url}?t=${Date.now()}`;
         previewVideo.style.display = 'block';
@@ -1631,6 +1799,7 @@ async function startPolling(jobId) {
 
 
 
+
 /* Read preview text from SRT or VTT and show it in helper caption. */
 /* Parse subtitle cues from SRT or VTT and prepare native in-browser caption preview. */
 async function readSrtPreview(file) {
@@ -1666,6 +1835,40 @@ function parseCueTimeToMs(value) {
 
   return (((hours * 60) + minutes) * 60 + seconds) * 1000 + milliseconds;
 }
+
+
+/* Format milliseconds into SRT timestamp text. */
+/* Used when exporting loaded captions to .srt. */
+function formatCueTimeToSrt(ms) {
+  const total = Math.max(0, Math.floor(Number(ms || 0)));
+  const hours = Math.floor(total / 3600000);
+  const minutes = Math.floor((total % 3600000) / 60000);
+  const seconds = Math.floor((total % 60000) / 1000);
+  const millis = total % 1000;
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')},${String(millis).padStart(3, '0')}`;
+}
+
+
+/* Save plain text content as a downloaded file. */
+/* Reuses the same object URL slot as the existing caption save flow. */
+function saveTextDownload(filename, content, mimeType = 'text/plain;charset=utf-8') {
+  if (currentCaptionsDownloadUrl) {
+    URL.revokeObjectURL(currentCaptionsDownloadUrl);
+    currentCaptionsDownloadUrl = null;
+  }
+
+  const blob = new Blob([content], { type: mimeType });
+  currentCaptionsDownloadUrl = URL.createObjectURL(blob);
+
+  const link = document.createElement('a');
+  link.href = currentCaptionsDownloadUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 
 /* Normalize subtitle text by removing lightweight markup used in VTT and preserving line breaks. */
 function normalizeCueText(text) {
@@ -1880,22 +2083,24 @@ function escapeHtml(value) {
 function getCurrentHelperState() {
   const fallbackText = String(srtPreviewText || '').trim() || 'Preview caption will appear here';
   const applyCase = text => controls.all_caps ? String(text || '').toUpperCase() : String(text || '');
-  const revealOffset = Number(controls.reveal_offset_ms || 0);
 
   if (!nativeCaptionPreviewEnabled || !subtitleCues.length || previewVideo.style.display === 'none') {
     const fallbackWords = fallbackText.split(/\s+/).filter(Boolean);
+
     return {
+      cueStart: 0,
       text: applyCase(fallbackText),
       activeWord: applyCase(fallbackWords[0] || ''),
       activeIndex: fallbackWords.length ? 0 : -1
     };
   }
 
-  const currentMs = Math.max(0, Math.floor((previewVideo.currentTime || 0) * 1000) - revealOffset);
+  const currentMs = Math.max(0, Math.floor((previewVideo.currentTime || 0) * 1000));
   const activeCue = getActiveSubtitleCue(currentMs);
 
   if (!activeCue) {
     return {
+      cueStart: 0,
       text: '',
       activeWord: '',
       activeIndex: -1
@@ -1905,7 +2110,9 @@ function getCurrentHelperState() {
   const timedWords = Array.isArray(activeCue.timed_words) ? activeCue.timed_words : [];
   if (!timedWords.length) {
     const plainWords = String(activeCue.text || '').split(/\s+/).filter(Boolean);
+
     return {
+      cueStart: activeCue.start || 0,
       text: applyCase(activeCue.text || ''),
       activeWord: applyCase(plainWords[0] || ''),
       activeIndex: plainWords.length ? 0 : -1
@@ -1913,8 +2120,20 @@ function getCurrentHelperState() {
   }
 
   let activeIndex = 0;
+
   for (let i = 0; i < timedWords.length; i += 1) {
-    if (currentMs >= timedWords[i].start + revealOffset) {
+    const threshold = timedWords[i].start
+    + Number(controls.reveal_offset_ms || 0)
+    + pickVariantOffset(
+      controls.random_timing_jitter,
+      controls.timing_jitter_ms,
+      activeCue.start || 0,
+      i,
+      controls.variation_seed,
+      211
+      );
+
+    if (currentMs >= threshold) {
       activeIndex = i;
     } else {
       break;
@@ -1922,6 +2141,7 @@ function getCurrentHelperState() {
   }
 
   return {
+    cueStart: activeCue.start || 0,
     text: applyCase(activeCue.text || ''),
     activeWord: applyCase(timedWords[activeIndex]?.word || ''),
     activeIndex
@@ -1933,13 +2153,23 @@ function getCurrentHelperState() {
 /* Render helper HTML with active-word highlighting for both display modes. */
 function renderHelperPreviewContent() {
   const state = getCurrentHelperState();
-
   if (!state.text) {
     return '';
   }
 
+  const activeIndex = Math.max(0, state.activeIndex);
+  const activeColour = pickVariantColour(
+    controls.active_word_colour_mode,
+    controls.active_word_colour,
+    controls.active_palette,
+    state.cueStart,
+    activeIndex,
+    controls.variation_seed,
+    31
+    );
+
   if (controls.word_display_mode === 'current_word') {
-    return `<span style="color:${controls.active_word_colour}">${escapeHtml(state.activeWord || state.text)}</span>`;
+    return `<span style="color:${activeColour}">${escapeHtml(state.activeWord || state.text)}</span>`;
   }
 
   const tokens = String(state.text).split(/(\s+)/);
@@ -1956,11 +2186,21 @@ function renderHelperPreviewContent() {
 
     const html = escapeHtml(token);
     const isActive = wordIndex === state.activeIndex;
-    wordIndex += 1;
 
-    return isActive
-    ? `<span style="color:${controls.active_word_colour}">${html}</span>`
-    : `<span>${html}</span>`;
+    const colour = isActive
+    ? activeColour
+    : pickVariantColour(
+      controls.primary_colour_mode,
+      controls.primary_colour,
+      controls.primary_palette,
+      state.cueStart,
+      wordIndex,
+      controls.variation_seed,
+      17
+      );
+
+    wordIndex += 1;
+    return `<span style="color:${colour}">${html}</span>`;
   }).join('');
 }
 
@@ -2060,7 +2300,165 @@ async function renderVideo(mode) {
 
 
 
+/* Start silence-chop or speed processing for the current source video. */
+/* Reuses the existing preview window controls and backend job polling flow. */
+async function processVideo(processKind, mode) {
+  clearStatus();
 
+  let video = videoInput.files[0];
+
+  if (!video) {
+    try {
+      video = await getCachedSourceVideoFile();
+    } catch {
+      video = null;
+    }
+  }
+
+  if (!video) {
+    showStatus('err', 'Choose a video first or reuse the cached one.');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('video', video, video.name);
+  formData.append('process_kind', processKind);
+  formData.append('mode', mode);
+  collectSettings(formData);
+
+  openPreview.style.display = 'none';
+  openAss.style.display = 'none';
+
+  showStatus(
+    'info',
+    processKind === 'silence'
+    ? (mode === 'preview' ? 'Starting silence preview...' : 'Starting silence processing...')
+    : (mode === 'preview' ? 'Starting speed preview...' : 'Starting speed processing...')
+    );
+
+  try {
+    const response = await fetch('/api/process_video', {
+      method: 'POST',
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(data.error || 'Could not start processing.');
+    }
+
+    startPolling(data.job_id);
+  } catch (err) {
+    showStatus('err', err.message || 'Processing request failed.');
+  }
+}
+
+
+
+/* Start one transcription job for the current source video and auto-load the returned VTT. */
+/* Uses the same job polling path as render and post-processing jobs. */
+async function generateCaptions() {
+  clearStatus();
+
+  let video = videoInput.files[0];
+
+  if (!video) {
+    try {
+      video = await getCachedSourceVideoFile();
+    } catch {
+      video = null;
+    }
+  }
+
+  if (!video) {
+    showStatus('err', 'Choose a video first or reuse the cached one.');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('video', video, video.name);
+  collectSettings(formData);
+
+  showStatus('info', 'Starting caption transcription...');
+
+  try {
+    const response = await fetch('/api/get_captions', {
+      method: 'POST',
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(data.error || 'Could not start caption transcription.');
+    }
+
+    startPolling(data.job_id);
+  } catch (error) {
+    showStatus('err', error.message || 'Caption request failed.');
+  }
+}
+
+
+
+/* Download the currently loaded subtitle file as original, .srt, or plain .txt. */
+/* Conversion is done in-browser from the subtitle already loaded into the app. */
+async function saveCurrentCaptions(format = 'original') {
+  const subtitleFile = srtInput.files?.[0];
+
+  if (!subtitleFile) {
+    showStatus('err', 'No captions are loaded yet.');
+    return;
+  }
+
+  const originalName = subtitleFile.name || 'captions.vtt';
+  const baseName = originalName.replace(/\.[^.]+$/, '') || 'captions';
+
+  if (format === 'original') {
+    if (currentCaptionsDownloadUrl) {
+      URL.revokeObjectURL(currentCaptionsDownloadUrl);
+      currentCaptionsDownloadUrl = null;
+    }
+
+    currentCaptionsDownloadUrl = URL.createObjectURL(subtitleFile);
+
+    const link = document.createElement('a');
+    link.href = currentCaptionsDownloadUrl;
+    link.download = originalName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    return;
+  }
+
+  const rawText = await subtitleFile.text();
+  const cues = parseSubtitleCues(rawText, originalName);
+
+  if (!Array.isArray(cues) || !cues.length) {
+    showStatus('err', 'Could not parse loaded captions.');
+    return;
+  }
+
+  if (format === 'srt') {
+    const srtText = cues.map((cue, index) => {
+      const text = String(cue.text || '').trim();
+      return `${index + 1}\n${formatCueTimeToSrt(cue.start)} --> ${formatCueTimeToSrt(cue.end)}\n${text}`;
+    }).join('\n\n') + '\n';
+
+    saveTextDownload(`${baseName}.srt`, srtText, 'application/x-subrip;charset=utf-8');
+    return;
+  }
+
+  if (format === 'txt') {
+    const txtText = cues
+    .map(cue => String(cue.text || '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n') + '\n';
+
+    saveTextDownload(`${baseName}.txt`, txtText, 'text/plain;charset=utf-8');
+  }
+}
 
 
 
@@ -2359,7 +2757,6 @@ function bindActionGuiObservers() {
 
 
 
-
 const typeFolder = gui.addFolder('Typography');
 
 typeFolder.add({
@@ -2406,28 +2803,71 @@ typeFolder.add(controls, 'font_gallery_preview_text').name('gallery text').onFin
   renderFontGallery();
 });
 
-typeFolder.add(controls, 'font_size', 8, 96, 1).onChange(() => {
+typeFolder.add(controls, 'primary_colour_mode', {
+  'Fixed': 'fixed',
+  'Random palette': 'random',
+  'Palette step': 'palette'
+}).name('text mode').onChange(applyHelperPreview);
+
+typeFolder.addColor(controls, 'primary_colour').name('text fixed').onChange(() => {
+  renderFontGallery();
+  applyHelperPreview();
+});
+
+typeFolder.add(controls, 'primary_palette').name('text palette').onFinishChange(() => {
+  renderFontGallery();
+  applyHelperPreview();
+});
+
+typeFolder.add(controls, 'active_word_colour_mode', {
+  'Fixed': 'fixed',
+  'Random palette': 'random',
+  'Palette step': 'palette'
+}).name('active mode').onChange(applyHelperPreview);
+
+typeFolder.addColor(controls, 'active_word_colour').name('active fixed').onChange(applyHelperPreview);
+typeFolder.add(controls, 'active_palette').name('active palette').onFinishChange(applyHelperPreview);
+
+typeFolder.add(controls, 'background_colour_mode', {
+  'Fixed': 'fixed',
+  'Random palette': 'random',
+  'Palette step': 'palette'
+}).name('bg mode').onChange(applyHelperPreview);
+
+typeFolder.add(controls, 'use_background').name('background').onChange(applyHelperPreview);
+typeFolder.addColor(controls, 'background_colour').name('bg fixed').onChange(applyHelperPreview);
+typeFolder.add(controls, 'background_palette').name('bg palette').onFinishChange(applyHelperPreview);
+typeFolder.add(controls, 'background_alpha', 0, 1, 0.01).name('bg alpha').onChange(applyHelperPreview);
+typeFolder.add(controls, 'background_pad_x', 0, 40, 1).name('bg pad x').onChange(applyHelperPreview);
+
+typeFolder.add(controls, 'random_position_jitter').name('random pos').onChange(applyHelperPreview);
+typeFolder.add(controls, 'position_jitter_x', 0, 120, 1).name('jitter x').onChange(applyHelperPreview);
+typeFolder.add(controls, 'position_jitter_y', 0, 120, 1).name('jitter y').onChange(applyHelperPreview);
+
+typeFolder.add(controls, 'random_timing_jitter').name('random reveal').onChange(() => {
+  syncNativeCaptionPreview();
+  applyHelperPreview();
+});
+typeFolder.add(controls, 'timing_jitter_ms', 0, 250, 1).name('timing jitter ms').onChange(() => {
+  syncNativeCaptionPreview();
+  applyHelperPreview();
+});
+typeFolder.add(controls, 'variation_seed', 0, 999, 1).name('variation seed').onChange(() => {
+  syncNativeCaptionPreview();
+  renderFontGallery();
+  applyHelperPreview();
+});
+
+typeFolder.add(controls, 'font_size', 8, 512, 1).onChange(() => {
   renderFontGallery();
   applyHelperPreview();
 });
 typeFolder.add(controls, 'helper_font_scale', 0.6, 1.2, 0.01).name('helper font match').onChange(applyHelperPreview);
-typeFolder.addColor(controls, 'primary_colour').name('text').onChange(() => {
-  renderFontGallery();
-  applyHelperPreview();
-});
-typeFolder.addColor(controls, 'active_word_colour').name('active word').onChange(applyHelperPreview);
-
 typeFolder.add(controls, 'active_word_lead_ms', 0, 200, 1).name('active lead ms');
 typeFolder.add(controls, 'reveal_offset_ms', -500, 500, 1).name('reveal offset ms').onChange(() => {
   syncNativeCaptionPreview();
   applyHelperPreview();
 });
-typeFolder.add(controls, 'use_background').name('background').onChange(applyHelperPreview);
-typeFolder.addColor(controls, 'background_colour').name('bg color').onChange(applyHelperPreview);
-typeFolder.add(controls, 'background_alpha', 0, 1, 0.01).name('bg alpha').onChange(applyHelperPreview);
-typeFolder.add(controls, 'background_pad_x', 0, 40, 1).name('bg pad x').onChange(applyHelperPreview);
-
-
 typeFolder.addColor(controls, 'outline_colour').name('outline').onChange(applyHelperPreview);
 typeFolder.addColor(controls, 'shadow_colour').name('shadow color').onChange(applyHelperPreview);
 typeFolder.add(controls, 'outline', 0, 12, 0.5).onChange(applyHelperPreview);
@@ -2450,9 +2890,6 @@ typeFolder.open();
 refreshFontsFromServer().catch(error => {
   showStatus('err', error.message || 'Could not load fonts.');
 });
-
-
-
 
 
 
@@ -2553,6 +2990,90 @@ previewFolder.add({
 }, 'render_preview').name('Render preview');
 
 previewFolder.close();
+
+
+
+
+/* Group silence-based post-processing controls and reuse the global preview window for partial processing. */
+const silenceFolder = gui.addFolder('Silence Chop');
+silenceFolder.add(controls, 'silence_threshold', -80, -5, 0.5).name('threshold dB');
+silenceFolder.add(controls, 'min_silence_duration', 0.1, 3, 0.05).name('min silence s');
+silenceFolder.add(controls, 'silence_mode', {
+  'Keep talk': 'talk',
+  'Keep silence': 'silence'
+}).name('mode');
+silenceFolder.add({
+  process_preview() {
+    return processVideo('silence', 'preview');
+  }
+}, 'process_preview').name('Process preview');
+silenceFolder.add({
+  process_full() {
+    return processVideo('silence', 'full');
+  }
+}, 'process_full').name('Process full');
+silenceFolder.close();
+
+/* Group speed-processing controls and reuse the global preview window for partial processing. */
+const speedFolder = gui.addFolder('Video Speed');
+speedFolder.add(controls, 'speed_factor', 0.25, 4, 0.05).name('speed factor');
+speedFolder.add({
+  process_preview() {
+    return processVideo('speed', 'preview');
+  }
+}, 'process_preview').name('Process preview');
+speedFolder.add({
+  process_full() {
+    return processVideo('speed', 'full');
+  }
+}, 'process_full').name('Process full');
+speedFolder.close();
+
+
+
+
+
+
+
+const captionsFolder = gui.addFolder('Captions');
+captionsFolder.add(controls, 'caption_model', {
+  'Tiny': 'tiny',
+  'Base': 'base',
+  'Small': 'small',
+  'Medium': 'medium'
+}).name('model');
+
+captionsFolder.add(controls, 'caption_language').name('language');
+captionsFolder.add(controls, 'caption_word_timestamps').name('word timestamps');
+captionsFolder.add(controls, 'caption_vad_filter').name('vad filter');
+
+captionsFolder.add({
+  get_captions() {
+    return generateCaptions();
+  }
+}, 'get_captions').name('Get captions');
+
+captionsFolder.add({
+  save_original() {
+    return saveCurrentCaptions('original');
+  }
+}, 'save_original').name('Save original');
+
+captionsFolder.add({
+  save_srt() {
+    return saveCurrentCaptions('srt');
+  }
+}, 'save_srt').name('Save SRT');
+
+captionsFolder.add({
+  save_txt() {
+    return saveCurrentCaptions('txt');
+  }
+}, 'save_txt').name('Save TXT');
+
+captionsFolder.close();
+
+
 
 
 
@@ -2667,10 +3188,10 @@ bindActionGuiObservers();
   });
 });
 
-/* Accept dropped source video and subtitle files, then persist the video in browser cache for reuse. */
+/* Accept dropped source video and subtitle files, including WebM, then persist the video in browser cache for reuse. */
 document.body.addEventListener('drop', async event => {
   const files = [...event.dataTransfer.files];
-  const videoFile = files.find(file => /\.(mp4|mov|m4v)$/i.test(file.name));
+  const videoFile = files.find(file => /\.(mp4|mov|m4v|webm)$/i.test(file.name));
   const srtFile = files.find(file => /\.(srt|vtt)$/i.test(file.name));
 
   if (videoFile) {
@@ -2685,6 +3206,8 @@ document.body.addEventListener('drop', async event => {
 
   updateMeta();
 });
+
+
 
 /* Load a newly selected source video, update preview, and refresh the cached browser copy. */
 videoInput.addEventListener('change', async () => {

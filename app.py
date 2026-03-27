@@ -9,6 +9,9 @@ import uuid
 import subprocess
 import threading
 import json
+import tempfile
+
+
 import platform
 import pysubs2
 from fontTools.ttLib import TTFont
@@ -216,43 +219,148 @@ def _list_custom_fonts():
 
 # Render a preview or full output while exposing uploaded fonts to libass.
 def render_preview(video_path, ass_path, output_path, preview_start=0, preview_seconds=8):
-    ass_filter = (
-        f"ass='{_escape_ffmpeg_filter_path(ass_path)}'"
-        f":fontsdir='{_escape_ffmpeg_filter_path(FONTS_DIR)}'"
-    )
+    # Render a preview or full output while exposing uploaded fonts to libass.
+    # Force AV1 inputs through an explicit software decoder and render with a clean libass font directory.
+    import shutil
 
-    cmd = [
-        FFMPEG_BIN,
-        "-y",
-    ]
+    source_duration = get_video_duration(video_path)
 
-    if preview_start is not None and float(preview_start) > 0:
-        cmd += ["-ss", str(preview_start)]
+    requested_start = max(0.0, float(preview_start or 0.0))
+    if requested_start >= source_duration:
+        requested_start = 0.0
 
-    cmd += [
-        "-i", video_path,
-    ]
-
+    requested_end = source_duration
     if preview_seconds is not None:
-        cmd += ["-t", str(preview_seconds)]
+        requested_length = max(0.1, float(preview_seconds))
+        requested_end = min(source_duration, requested_start + requested_length)
 
-    cmd += [
-        "-vf", ass_filter,
-        "-map", "0:v:0",
-        "-map", "0:a?",
-        "-c:v", "libx264",
-        "-crf", "18",
-        "-preset", "medium",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
-        "-b:a", "192k",
-        "-shortest",
-        output_path,
+    has_audio = False
+    audio_probe_cmd = [
+        FFPROBE_BIN,
+        "-v", "error",
+        "-select_streams", "a:0",
+        "-show_entries", "stream=index",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        video_path,
     ]
+    audio_probe_result = subprocess.run(audio_probe_cmd, capture_output=True, text=True)
+    if audio_probe_result.returncode == 0 and (audio_probe_result.stdout or "").strip():
+        has_audio = True
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or "FFmpeg render failed")
+    video_codec_name = ""
+    codec_probe_cmd = [
+        FFPROBE_BIN,
+        "-v", "error",
+        "-select_streams", "v:0",
+        "-show_entries", "stream=codec_name",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        video_path,
+    ]
+    codec_probe_result = subprocess.run(codec_probe_cmd, capture_output=True, text=True)
+    if codec_probe_result.returncode == 0:
+        video_codec_name = (codec_probe_result.stdout or "").strip().lower()
+
+    input_decoder_args = []
+    if video_codec_name == "av1":
+        decoder_list_cmd = [FFMPEG_BIN, "-hide_banner", "-decoders"]
+        decoder_list_result = subprocess.run(decoder_list_cmd, capture_output=True, text=True)
+        decoder_listing = "\n".join([
+            decoder_list_result.stdout or "",
+            decoder_list_result.stderr or "",
+        ])
+
+        if re.search(r"^\s*V\S*\s+libdav1d\b", decoder_listing, flags=re.MULTILINE):
+            input_decoder_args = [
+                "-c:v", "libdav1d",
+                "-threads:v", "1",
+            ]
+        else:
+            input_decoder_args = [
+                "-c:v", "av1",
+                "-threads:v", "1",
+            ]
+
+    temp_fonts_dir = tempfile.mkdtemp(prefix="libass_fonts_", dir=APP_ROOT)
+
+    try:
+        # Vulnerable block: copy only validated font files into the temporary libass font directory.
+        for filename in os.listdir(FONTS_DIR):
+            safe_name = secure_filename(filename)
+            if not safe_name or not _allowed_font_file(safe_name):
+                continue
+
+            source_font_path = os.path.join(FONTS_DIR, safe_name)
+            if not os.path.isfile(source_font_path):
+                continue
+
+            shutil.copy2(source_font_path, os.path.join(temp_fonts_dir, safe_name))
+
+        ass_filter = (
+            f"ass='{_escape_ffmpeg_filter_path(ass_path)}'"
+            f":fontsdir='{_escape_ffmpeg_filter_path(temp_fonts_dir)}'"
+        )
+
+        if preview_seconds is not None:
+            video_chain = (
+                f"[0:v]trim=start={requested_start:.6f}:end={requested_end:.6f},"
+                f"setpts=PTS-STARTPTS,{ass_filter}[v]"
+            )
+        else:
+            video_chain = f"[0:v]setpts=PTS-STARTPTS,{ass_filter}[v]"
+
+        filter_parts = [video_chain]
+
+        if has_audio:
+            if preview_seconds is not None:
+                filter_parts.append(
+                    f"[0:a]atrim=start={requested_start:.6f}:end={requested_end:.6f},asetpts=PTS-STARTPTS[a]"
+                )
+            else:
+                filter_parts.append("[0:a]asetpts=PTS-STARTPTS[a]")
+
+        filter_complex = ";".join(filter_parts)
+
+        # Vulnerable block: media paths and generated filter graphs are passed to ffmpeg as tokenized arguments.
+        cmd = [
+            FFMPEG_BIN,
+            "-y",
+            "-nostdin",
+            *input_decoder_args,
+            "-i", video_path,
+            "-filter_complex", filter_complex,
+            "-map", "[v]",
+        ]
+
+        if has_audio:
+            cmd += ["-map", "[a]"]
+
+        cmd += [
+            "-c:v", "libx264",
+            "-crf", "18",
+            "-preset", "medium",
+            "-pix_fmt", "yuv420p",
+        ]
+
+        if has_audio:
+            cmd += [
+                "-c:a", "aac",
+                "-b:a", "192k",
+            ]
+
+        cmd += [
+            "-movflags", "+faststart",
+            output_path,
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or "FFmpeg render failed")
+
+    finally:
+        try:
+            shutil.rmtree(temp_fonts_dir, ignore_errors=True)
+        except Exception:
+            pass
 
 
 
@@ -267,6 +375,61 @@ def _hex_to_ass_bgr(value, alpha_hex="00"):
     gg = value[2:4]
     bb = value[4:6]
     return f"&H{alpha_hex}{bb}{gg}{rr}"
+
+# Parse a comma-separated palette into normalized ASS colors.
+# Falls back to the fixed color when the palette field is empty.
+def _parse_palette_colours(palette_text, fallback_colour):
+    colours = []
+
+    for item in re.split(r"[,;\n]+", str(palette_text or "")):
+        token = item.strip()
+        if not token:
+            continue
+
+        if token.startswith("#"):
+            token = token[1:]
+            if re.fullmatch(r"[0-9A-Fa-f]{6}", token):
+                rr = token[0:2]
+                gg = token[2:4]
+                bb = token[4:6]
+                colours.append(f"&H00{bb}{gg}{rr}".upper())
+            elif re.fullmatch(r"[0-9A-Fa-f]{8}", token):
+                colours.append(f"&H{token}".upper())
+            continue
+
+        if token.upper().startswith("&H"):
+            token = token[2:]
+            if re.fullmatch(r"[0-9A-Fa-f]{8}", token):
+                colours.append(f"&H{token}".upper())
+
+    return colours or [str(fallback_colour or "&H00FFFFFF").upper()]    
+
+
+# Pick one deterministic color from fixed, palette-step, or random-palette mode.
+# The same cue, index, and seed always return the same color.
+def _pick_variant_colour(mode, fixed_colour, palette_text, cue_start_ms, item_index, seed, salt=0):
+    palette = _parse_palette_colours(palette_text, fixed_colour)
+    base = abs(int(cue_start_ms or 0)) + abs(int(item_index or 0)) * 131 + abs(int(seed or 0)) * 17 + abs(int(salt or 0)) * 53
+
+    if mode == "palette":
+        return palette[base % len(palette)]
+
+    if mode == "random":
+        return palette[(base * 37 + 11) % len(palette)]
+
+    return str(fixed_colour or palette[0]).upper()
+
+
+# Pick one deterministic signed jitter offset for a cue/word.
+# Preview and final render stay aligned because the value is seed-based.
+def _pick_variant_offset(enabled, max_amount, cue_start_ms, item_index, seed, salt):
+    limit = max(0, int(max_amount or 0))
+    if not enabled or limit == 0:
+        return 0
+
+    base = abs(int(cue_start_ms or 0)) + abs(int(item_index or 0)) * 131 + abs(int(seed or 0)) * 17 + abs(int(salt or 0)) * 53
+    return ((base * 73 + 19) % (limit * 2 + 1)) - limit
+
 
 
 def _safe_int(value, default_value):
@@ -418,9 +581,39 @@ def _parse_vtt_cues(vtt_path):
 
 
 
+
+
+
 def _build_vtt_word_reveal_text(cue, settings, video_info, past_words, active_word):
+    current_index = len([word for word in past_words if str(word).strip()])
+
     pos_x, pos_y = _compute_position(video_info, settings)
-    box_or_shadow_colour = settings["background_colour"] if settings.get("use_background") else settings["shadow_colour"]
+    pos_x += _pick_variant_offset(
+        settings.get("random_position_jitter"),
+        settings.get("position_jitter_x", 0),
+        cue["start"],
+        current_index,
+        settings.get("variation_seed", 0),
+        101,
+    )
+    pos_y += _pick_variant_offset(
+        settings.get("random_position_jitter"),
+        settings.get("position_jitter_y", 0),
+        cue["start"],
+        current_index,
+        settings.get("variation_seed", 0),
+        151,
+    )
+
+    box_or_shadow_colour = _pick_variant_colour(
+        settings.get("background_colour_mode", "fixed"),
+        settings["background_colour"],
+        settings.get("background_palette", ""),
+        cue["start"],
+        current_index,
+        settings.get("variation_seed", 0),
+        79,
+    ) if settings.get("use_background") else settings["shadow_colour"]
 
     tags = [
         rf"\an{settings['alignment']}",
@@ -455,22 +648,21 @@ def _build_vtt_word_reveal_text(cue, settings, video_info, past_words, active_wo
         if hard_spaces:
             current_word = f"{hard_spaces}{current_word}{hard_spaces}"
 
-        return (
-            prefix
-            + "{"
-            + rf"\1c{settings['active_word_colour']}"
-            + "}"
-            + current_word
-            + "{"
-            + rf"\1c{settings['primary_colour']}"
-            + "}"
+        active_colour = _pick_variant_colour(
+            settings.get("active_word_colour_mode", "fixed"),
+            settings["active_word_colour"],
+            settings.get("active_palette", ""),
+            cue["start"],
+            current_index,
+            settings.get("variation_seed", 0),
+            31,
         )
 
-    shown_past = len([word for word in past_words if str(word).strip()])
+        return prefix + "{" + rf"\1c{active_colour}" + "}" + current_word
+
+    shown_past = current_index
     revealed_count = 0
     active_done = False
-    parts = []
-
     tokens = re.split(r"(\s+)", transformed_text)
 
     if settings.get("use_background"):
@@ -492,7 +684,18 @@ def _build_vtt_word_reveal_text(cue, settings, video_info, past_words, active_wo
                 if pending_space:
                     visible_parts.append(pending_space)
                     pending_space = ""
-                visible_parts.append(escaped_word)
+
+                word_colour = _pick_variant_colour(
+                    settings.get("primary_colour_mode", "fixed"),
+                    settings["primary_colour"],
+                    settings.get("primary_palette", ""),
+                    cue["start"],
+                    revealed_count,
+                    settings.get("variation_seed", 0),
+                    17,
+                )
+
+                visible_parts.append("{" + rf"\1c{word_colour}" + "}" + escaped_word)
                 revealed_count += 1
                 continue
 
@@ -501,15 +704,17 @@ def _build_vtt_word_reveal_text(cue, settings, video_info, past_words, active_wo
                     visible_parts.append(pending_space)
                     pending_space = ""
 
-                visible_parts.append(
-                    "{"
-                    + rf"\1c{settings['active_word_colour']}"
-                    + "}"
-                    + escaped_word
-                    + "{"
-                    + rf"\1c{settings['primary_colour']}"
-                    + "}"
+                active_colour = _pick_variant_colour(
+                    settings.get("active_word_colour_mode", "fixed"),
+                    settings["active_word_colour"],
+                    settings.get("active_palette", ""),
+                    cue["start"],
+                    revealed_count,
+                    settings.get("variation_seed", 0),
+                    31,
                 )
+
+                visible_parts.append("{" + rf"\1c{active_colour}" + "}" + escaped_word)
                 active_done = True
                 break
 
@@ -519,6 +724,8 @@ def _build_vtt_word_reveal_text(cue, settings, video_info, past_words, active_wo
             return prefix
 
         return prefix + hard_spaces + "".join(visible_parts) + hard_spaces
+
+    parts = []
 
     for token in tokens:
         if token == "":
@@ -531,28 +738,34 @@ def _build_vtt_word_reveal_text(cue, settings, video_info, past_words, active_wo
         escaped_word = _escape_ass_text(token)
 
         if revealed_count < shown_past:
-            parts.append(escaped_word)
+            word_colour = _pick_variant_colour(
+                settings.get("primary_colour_mode", "fixed"),
+                settings["primary_colour"],
+                settings.get("primary_palette", ""),
+                cue["start"],
+                revealed_count,
+                settings.get("variation_seed", 0),
+                17,
+            )
+
+            parts.append("{" + rf"\1c{word_colour}" + "}" + escaped_word)
+
         elif not active_done and transformed_active_word and token == transformed_active_word:
-            parts.append(
-                "{"
-                + rf"\1c{settings['active_word_colour']}"
-                + "}"
-                + escaped_word
-                + "{"
-                + rf"\1c{settings['primary_colour']}"
-                + "}"
+            active_colour = _pick_variant_colour(
+                settings.get("active_word_colour_mode", "fixed"),
+                settings["active_word_colour"],
+                settings.get("active_palette", ""),
+                cue["start"],
+                revealed_count,
+                settings.get("variation_seed", 0),
+                31,
             )
+
+            parts.append("{" + rf"\1c{active_colour}" + "}" + escaped_word)
             active_done = True
+
         else:
-            parts.append(
-                "{"
-                + r"\alpha&HFF&"
-                + "}"
-                + escaped_word
-                + "{"
-                + r"\alpha&H00&"
-                + "}"
-            )
+            parts.append("{" + r"\alpha&HFF&" + "}" + escaped_word + "{" + r"\alpha&H00&" + "}")
 
         revealed_count += 1
 
@@ -584,6 +797,391 @@ def get_video_info(video_path):
         "width": int(streams[0]["width"]),
         "height": int(streams[0]["height"]),
     }
+
+
+# Probe total media duration in seconds for preview clipping and segment building.
+# Keeps post-processing preview aligned with the existing preview window controls.
+def get_video_duration(video_path):
+    cmd = [
+        FFPROBE_BIN,
+        "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        video_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or "ffprobe duration failed")
+
+    try:
+        duration = float((result.stdout or "").strip())
+    except Exception as exc:
+        raise RuntimeError("Could not read video duration") from exc
+
+    if duration <= 0:
+        raise RuntimeError("Video duration is invalid")
+
+    return duration
+
+
+# Analyze silence and render either talk-only or silence-only segments into one output video.
+# Uses ffmpeg silencedetect so no extra Python audio pipeline is needed inside the app.
+def process_silence_video(video_path, output_path, silence_threshold=-40.0, min_silence_duration=0.4, keep_mode="talk", preview_start=0, preview_seconds=None):
+    # Analyze silence and render the kept segments while forcing software decode for source-video compatibility.
+    total_duration = get_video_duration(video_path)
+    clip_start = max(0.0, float(preview_start or 0.0))
+    clip_end = total_duration if preview_seconds is None else min(total_duration, clip_start + max(0.1, float(preview_seconds)))
+    clip_duration = max(0.0, clip_end - clip_start)
+
+    if clip_duration <= 0.05:
+        raise RuntimeError("Preview window is empty.")
+
+    # Vulnerable block: caller-provided timing and threshold values are passed as tokenized ffmpeg arguments.
+    detect_cmd = [
+        FFMPEG_BIN,
+        "-hide_banner",
+        "-loglevel", "info",
+        "-nostdin",
+        "-hwaccel", "none",
+    ]
+
+    if clip_start > 0:
+        detect_cmd += ["-ss", f"{clip_start:.6f}"]
+
+    detect_cmd += ["-i", video_path]
+
+    if preview_seconds is not None:
+        detect_cmd += ["-t", f"{clip_duration:.6f}"]
+
+    detect_cmd += [
+        "-af", f"silencedetect=noise={float(silence_threshold):.2f}dB:d={float(min_silence_duration):.3f}",
+        "-f", "null",
+        "-",
+    ]
+
+    detect_result = subprocess.run(detect_cmd, capture_output=True, text=True)
+    if detect_result.returncode != 0:
+        raise RuntimeError(detect_result.stderr.strip() or "Silence analysis failed")
+
+    silence_segments = []
+    silence_start = None
+
+    for line in (detect_result.stderr or "").splitlines():
+        start_match = re.search(r"silence_start:\s*([0-9.]+)", line)
+        if start_match:
+            silence_start = float(start_match.group(1))
+            continue
+
+        end_match = re.search(r"silence_end:\s*([0-9.]+)\s*\|\s*silence_duration:\s*([0-9.]+)", line)
+        if end_match and silence_start is not None:
+            start_value = max(0.0, silence_start)
+            end_value = min(clip_duration, float(end_match.group(1)))
+            if end_value - start_value >= float(min_silence_duration):
+                silence_segments.append((start_value, end_value))
+            silence_start = None
+
+    if silence_start is not None and clip_duration - silence_start >= float(min_silence_duration):
+        silence_segments.append((max(0.0, silence_start), clip_duration))
+
+    keep_segments = []
+
+    if keep_mode == "silence":
+        keep_segments = silence_segments[:]
+    else:
+        if not silence_segments:
+            keep_segments = [(0.0, clip_duration)]
+        else:
+            cursor = 0.0
+            for start_value, end_value in silence_segments:
+                if start_value > cursor:
+                    keep_segments.append((cursor, start_value))
+                cursor = max(cursor, end_value)
+
+            if cursor < clip_duration:
+                keep_segments.append((cursor, clip_duration))
+
+    keep_segments = [
+        (max(0.0, start_value), min(clip_duration, end_value))
+        for start_value, end_value in keep_segments
+        if end_value - start_value >= 0.03
+    ]
+
+    if not keep_segments:
+        raise RuntimeError("No segments matched the selected silence settings.")
+
+    filter_parts = []
+    concat_inputs = []
+
+    for index, (start_value, end_value) in enumerate(keep_segments):
+        abs_start = clip_start + start_value
+        abs_end = clip_start + end_value
+
+        filter_parts.append(
+            f"[0:v]trim=start={abs_start:.6f}:end={abs_end:.6f},setpts=PTS-STARTPTS[v{index}]"
+        )
+        filter_parts.append(
+            f"[0:a]atrim=start={abs_start:.6f}:end={abs_end:.6f},asetpts=PTS-STARTPTS[a{index}]"
+        )
+        concat_inputs.append(f"[v{index}][a{index}]")
+
+    filter_complex = ";".join(filter_parts) + ";" + "".join(concat_inputs) + f"concat=n={len(keep_segments)}:v=1:a=1[v][a]"
+
+    # Vulnerable block: generated filter graph uses computed segment boundaries only and is passed as one ffmpeg argument.
+    render_cmd = [
+        FFMPEG_BIN,
+        "-y",
+        "-nostdin",
+        "-hwaccel", "none",
+        "-i", video_path,
+        "-filter_complex", filter_complex,
+        "-map", "[v]",
+        "-map", "[a]",
+        "-c:v", "libx264",
+        "-crf", "18",
+        "-preset", "medium",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-movflags", "+faststart",
+        output_path,
+    ]
+
+    render_result = subprocess.run(render_cmd, capture_output=True, text=True)
+    if render_result.returncode != 0:
+        raise RuntimeError(render_result.stderr.strip() or "Silence processing failed")
+
+
+# Render a speed-adjusted video while keeping pitch stable with chained atempo filters.
+# Supports both preview-window processing and full-length processing.
+def process_speed_video(video_path, output_path, speed_factor=1.25, preview_start=0, preview_seconds=None):
+    # Render the speed-adjusted output while forcing software decode for source-video compatibility.
+    speed_factor = float(speed_factor)
+    if speed_factor <= 0:
+        raise RuntimeError("Speed factor must be greater than 0.")
+
+    atempo_filters = []
+    remaining = speed_factor
+
+    while remaining > 2.0:
+        atempo_filters.append("atempo=2.0")
+        remaining /= 2.0
+
+    while remaining < 0.5:
+        atempo_filters.append("atempo=0.5")
+        remaining /= 0.5
+
+    atempo_filters.append(f"atempo={remaining:.8f}")
+    filter_complex = f"[0:v]setpts={1.0 / speed_factor:.12f}*PTS[v];[0:a]{','.join(atempo_filters)}[a]"
+
+    # Vulnerable block: user-controlled preview timing is passed as tokenized ffmpeg arguments and the filter graph is generated server-side.
+    cmd = [
+        FFMPEG_BIN,
+        "-y",
+        "-nostdin",
+        "-hwaccel", "none",
+    ]
+
+    if preview_start is not None and float(preview_start) > 0:
+        cmd += ["-ss", f"{float(preview_start):.6f}"]
+
+    cmd += ["-i", video_path]
+
+    if preview_seconds is not None:
+        cmd += ["-t", f"{max(0.1, float(preview_seconds)):.6f}"]
+
+    cmd += [
+        "-filter_complex", filter_complex,
+        "-map", "[v]",
+        "-map", "[a]",
+        "-c:v", "libx264",
+        "-crf", "18",
+        "-preset", "medium",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-movflags", "+faststart",
+        output_path,
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or "Speed processing failed")
+
+
+# Run one post-processing job and publish the resulting video through the existing job polling flow.
+# Reuses the app’s preview_url player loading instead of inventing a second status system.
+def process_video_job(job_id, video_path, output_path, process_kind, settings, preview_start=0, preview_seconds=None):
+    try:
+        if process_kind == "silence":
+            JOBS[job_id]["status"] = "preparing"
+            JOBS[job_id]["message"] = "Analyzing silence..."
+            process_silence_video(
+                video_path,
+                output_path,
+                silence_threshold=settings["silence_threshold"],
+                min_silence_duration=settings["min_silence_duration"],
+                keep_mode=settings["silence_mode"],
+                preview_start=preview_start,
+                preview_seconds=preview_seconds,
+            )
+        elif process_kind == "speed":
+            JOBS[job_id]["status"] = "rendering"
+            JOBS[job_id]["message"] = "Processing video speed..."
+            process_speed_video(
+                video_path,
+                output_path,
+                speed_factor=settings["speed_factor"],
+                preview_start=preview_start,
+                preview_seconds=preview_seconds,
+            )
+        else:
+            raise RuntimeError("Unsupported processing mode.")
+
+        JOBS[job_id]["status"] = "done"
+        JOBS[job_id]["message"] = "Processed video ready."
+        JOBS[job_id]["preview_file"] = os.path.basename(output_path)
+        JOBS[job_id]["ass_file"] = None
+
+    except Exception as exc:
+        JOBS[job_id]["status"] = "error"
+        JOBS[job_id]["message"] = str(exc)
+
+
+
+
+# Transcribe one video file into WEBVTT using faster-whisper.
+# Generates normal segment cues or word-timestamp cues for the existing VTT parser.
+def transcribe_video_to_vtt(video_path, model_name="small", language=None, word_timestamps=True, vad_filter=True):
+    # Extract mono WAV audio from the source video and transcribe it into WEBVTT with optional word timestamps.
+    try:
+        from faster_whisper import WhisperModel
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("Missing dependency: faster-whisper. Install it in your venv.") from exc
+
+    def _vtt_ts(seconds):
+        total_ms = max(0, int(round(float(seconds) * 1000)))
+        hh = total_ms // 3600000
+        mm = (total_ms % 3600000) // 60000
+        ss = (total_ms % 60000) // 1000
+        ms = total_ms % 1000
+        return f"{hh:02d}:{mm:02d}:{ss:02d}.{ms:03d}"
+
+    def _clean_text(value):
+        return " ".join(str(value or "").split()).strip()
+
+    tmp_wav_path = None
+
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_wav:
+            tmp_wav_path = tmp_wav.name
+
+        # Vulnerable block: source path is passed as tokenized ffmpeg arguments and audio extraction is forced to software decode mode.
+        extract_cmd = [
+            FFMPEG_BIN,
+            "-y",
+            "-nostdin",
+            "-hwaccel", "none",
+            "-i", video_path,
+            "-vn",
+            "-ac", "1",
+            "-ar", "16000",
+            "-c:a", "pcm_s16le",
+            tmp_wav_path,
+        ]
+        extract_result = subprocess.run(extract_cmd, capture_output=True, text=True)
+        if extract_result.returncode != 0:
+            raise RuntimeError(extract_result.stderr.strip() or "Audio extraction failed")
+
+        model = WhisperModel(model_name, compute_type="auto")
+        segments, _ = model.transcribe(
+            tmp_wav_path,
+            language=(language or None),
+            vad_filter=bool(vad_filter),
+            beam_size=5,
+            word_timestamps=bool(word_timestamps),
+            condition_on_previous_text=False,
+        )
+
+        lines = ["WEBVTT", ""]
+        cue_count = 0
+
+        for segment in segments:
+            start_value = max(0.0, float(getattr(segment, "start", 0.0) or 0.0))
+            end_value = max(start_value + 0.01, float(getattr(segment, "end", start_value + 0.01) or (start_value + 0.01)))
+            text_value = _clean_text(getattr(segment, "text", ""))
+
+            if not text_value:
+                continue
+
+            cue_text = text_value
+            words = list(getattr(segment, "words", []) or [])
+
+            if word_timestamps and words:
+                timed_parts = []
+
+                for index, word in enumerate(words):
+                    word_text = _clean_text(getattr(word, "word", ""))
+                    word_start = float(getattr(word, "start", start_value) or start_value)
+
+                    if not word_text:
+                        continue
+
+                    prefix = "" if index == 0 else " "
+                    timed_parts.append(f"<{_vtt_ts(word_start)}><c>{prefix}{word_text}</c>")
+
+                if timed_parts:
+                    cue_text = "".join(timed_parts)
+
+            lines.append(f"{_vtt_ts(start_value)} --> {_vtt_ts(end_value)}")
+            lines.append(cue_text)
+            lines.append("")
+            cue_count += 1
+
+        if cue_count == 0:
+            raise RuntimeError("No captions were produced from this video.")
+
+        return "\n".join(lines).strip() + "\n"
+
+    finally:
+        if tmp_wav_path and os.path.exists(tmp_wav_path):
+            try:
+                os.remove(tmp_wav_path)
+            except Exception:
+                pass    
+
+
+# Run one caption-transcription job and publish the generated VTT through the existing job poller.
+# The resulting VTT is saved on disk and also returned inline so the UI can load it immediately.
+def transcribe_captions_job(job_id, video_path, output_path, settings):
+    try:
+        JOBS[job_id]["status"] = "preparing"
+        JOBS[job_id]["message"] = "Extracting audio..."
+
+        vtt_text = transcribe_video_to_vtt(
+            video_path,
+            model_name=settings["caption_model"],
+            language=settings["caption_language"],
+            word_timestamps=settings["caption_word_timestamps"],
+            vad_filter=settings["caption_vad_filter"],
+        )
+
+        JOBS[job_id]["status"] = "rendering"
+        JOBS[job_id]["message"] = "Saving captions..."
+
+        with open(output_path, "w", encoding="utf-8") as handle:
+            handle.write(vtt_text)
+
+        JOBS[job_id]["status"] = "done"
+        JOBS[job_id]["message"] = "Captions ready."
+        JOBS[job_id]["preview_file"] = None
+        JOBS[job_id]["ass_file"] = None
+        JOBS[job_id]["captions_file"] = os.path.basename(output_path)
+        JOBS[job_id]["captions_text"] = vtt_text
+
+    except Exception as exc:
+        JOBS[job_id]["status"] = "error"
+        JOBS[job_id]["message"] = str(exc)
+
 
 
 def _alignment_to_anchor(alignment):
@@ -673,8 +1271,30 @@ def _build_karaoke_text(text, mode, intro_ms):
 
 
 
-def _build_line_override(text, duration, settings, video_info):
+
+
+def _build_line_override(text, duration, settings, video_info, cue_start_ms=0, item_index=0):
     pos_x, pos_y = _compute_position(video_info, settings)
+
+    jitter_x = _pick_variant_offset(
+        settings.get("random_position_jitter"),
+        settings.get("position_jitter_x", 0),
+        cue_start_ms,
+        item_index,
+        settings.get("variation_seed", 0),
+        101,
+    )
+    jitter_y = _pick_variant_offset(
+        settings.get("random_position_jitter"),
+        settings.get("position_jitter_y", 0),
+        cue_start_ms,
+        item_index,
+        settings.get("variation_seed", 0),
+        151,
+    )
+
+    pos_x += jitter_x
+    pos_y += jitter_y
 
     intro_ms = max(0, min(duration, settings["intro_ms"]))
     outro_ms = max(0, min(duration, settings["outro_ms"]))
@@ -685,14 +1305,32 @@ def _build_line_override(text, duration, settings, video_info):
     end_x = pos_x + settings["out_offset_x"]
     end_y = pos_y + settings["out_offset_y"]
 
-    box_or_shadow_colour = settings["background_colour"] if settings.get("use_background") else settings["shadow_colour"]
+    primary_colour = _pick_variant_colour(
+        settings.get("primary_colour_mode", "fixed"),
+        settings["primary_colour"],
+        settings.get("primary_palette", ""),
+        cue_start_ms,
+        item_index,
+        settings.get("variation_seed", 0),
+        17,
+    )
+
+    box_or_shadow_colour = _pick_variant_colour(
+        settings.get("background_colour_mode", "fixed"),
+        settings["background_colour"],
+        settings.get("background_palette", ""),
+        cue_start_ms,
+        item_index,
+        settings.get("variation_seed", 0),
+        79,
+    ) if settings.get("use_background") else settings["shadow_colour"]
 
     tags = [
         rf"\an{settings['alignment']}",
         rf"\bord{settings['outline']:g}",
         rf"\shad{settings['shadow']:g}",
         rf"\blur{settings['blur']:g}",
-        rf"\1c{settings['primary_colour']}",
+        rf"\1c{primary_colour}",
         rf"\3c{settings['outline_colour']}",
         rf"\4c{box_or_shadow_colour}",
         rf"\fsp{settings['letter_spacing']:g}",
@@ -748,10 +1386,8 @@ def _build_line_override(text, duration, settings, video_info):
 
 
 
-
-
-# Build the final ASS file for SRT or VTT using one consistent text/background style path.
-# Keeps background color + alpha handling the same in both branches.
+# Build the final ASS file for SRT or VTT using one consistent variation path.
+# Color modes and deterministic jitter are applied in the per-line and per-word overrides.
 def srt_to_animated_ass(src, dst, settings, video_info):
     def ass_bgr_to_color(value, default="&H00FFFFFF"):
         value = (value or default).strip().upper()
@@ -811,13 +1447,7 @@ def srt_to_animated_ass(src, dst, settings, video_info):
                     pysubs2.SSAEvent(
                         start=cue["start"],
                         end=cue["end"],
-                        text=_build_vtt_word_reveal_text(
-                            cue,
-                            settings,
-                            video_info,
-                            [],
-                            cue["text"],
-                        ),
+                        text=_build_vtt_word_reveal_text(cue, settings, video_info, [], cue["text"]),
                         style="Default",
                     )
                 )
@@ -826,12 +1456,29 @@ def srt_to_animated_ass(src, dst, settings, video_info):
             past_words = []
 
             for index, item in enumerate(timed_words):
-                start_ms = max(cue["start"], item["start"] + reveal_offset_ms)
+                timing_jitter = _pick_variant_offset(
+                    settings.get("random_timing_jitter"),
+                    settings.get("timing_jitter_ms", 0),
+                    cue["start"],
+                    index,
+                    settings.get("variation_seed", 0),
+                    211,
+                )
+
+                start_ms = max(cue["start"], item["start"] + reveal_offset_ms + timing_jitter)
 
                 if index == len(timed_words) - 1:
                     end_ms = cue["end"]
                 else:
-                    end_ms = min(cue["end"], timed_words[index + 1]["start"] + reveal_offset_ms)
+                    next_jitter = _pick_variant_offset(
+                        settings.get("random_timing_jitter"),
+                        settings.get("timing_jitter_ms", 0),
+                        cue["start"],
+                        index + 1,
+                        settings.get("variation_seed", 0),
+                        211,
+                    )
+                    end_ms = min(cue["end"], timed_words[index + 1]["start"] + reveal_offset_ms + next_jitter)
 
                 if end_ms <= start_ms:
                     past_words.append(item["word"])
@@ -841,13 +1488,7 @@ def srt_to_animated_ass(src, dst, settings, video_info):
                     pysubs2.SSAEvent(
                         start=start_ms,
                         end=end_ms,
-                        text=_build_vtt_word_reveal_text(
-                            cue,
-                            settings,
-                            video_info,
-                            past_words,
-                            item["word"],
-                        ),
+                        text=_build_vtt_word_reveal_text(cue, settings, video_info, past_words, item["word"]),
                         style="Default",
                     )
                 )
@@ -884,14 +1525,19 @@ def srt_to_animated_ass(src, dst, settings, video_info):
     style.marginr = settings["margin_h"]
     subs.styles["Default"] = style
 
-    for line in subs:
+    for line_index, line in enumerate(subs):
         text = _escape_ass_text(line.text)
         duration = max(1, int(line.end) - int(line.start))
-        line.text = _build_line_override(text, duration, settings, video_info)
+        line.text = _build_line_override(
+            text,
+            duration,
+            settings,
+            video_info,
+            cue_start_ms=int(line.start),
+            item_index=line_index,
+        )
 
     subs.save(dst)
-
-
 
 
 # Trim and shift ASS events so preview renders start at local time zero while honoring preview_start.
@@ -1064,8 +1710,9 @@ def api_preview():
         if not video or not srt:
             return jsonify({"ok": False, "error": "Upload both video and subtitle file."}), 400
 
-        if not video.filename.lower().endswith((".mp4", ".mov", ".m4v")):
-            return jsonify({"ok": False, "error": "Video must be mp4, mov, or m4v."}), 400
+        # Accept source videos including WebM for preview rendering.
+        if not video.filename.lower().endswith((".mp4", ".mov", ".m4v", ".webm")):
+            return jsonify({"ok": False, "error": "Video must be mp4, mov, m4v, or webm."}), 400
 
         if not srt.filename.lower().endswith((".srt", ".vtt")):
             return jsonify({"ok": False, "error": "Subtitle file must be .srt or .vtt"}), 400
@@ -1112,6 +1759,10 @@ def api_preview():
             with open(srt_path, "wb") as f:
                 f.write(srt_bytes)
 
+
+
+
+
         settings = {
             "word_display_mode": request.form.get("word_display_mode", "phrase"),
             "font_name": request.form.get("font_name", "Arial"),
@@ -1125,17 +1776,33 @@ def api_preview():
             "bold": _safe_bool(request.form.get("bold", "0")),
             "italic": _safe_bool(request.form.get("italic", "0")),
             "all_caps": _safe_bool(request.form.get("all_caps", "0")),
+
             "primary_colour": _hex_to_ass_bgr(request.form.get("primary_colour", "#FFFFFF"), "00"),
+            "primary_colour_mode": request.form.get("primary_colour_mode", "fixed"),
+            "primary_palette": request.form.get("primary_palette", ""),
+
+            "active_word_colour": _hex_to_ass_bgr(request.form.get("active_word_colour", "#ff0000"), "00"),
+            "active_word_colour_mode": request.form.get("active_word_colour_mode", "fixed"),
+            "active_palette": request.form.get("active_palette", ""),
+            "active_word_lead_ms": _safe_int(request.form.get("active_word_lead_ms", 80), 80),
+
             "outline_colour": _hex_to_ass_bgr(request.form.get("outline_colour", "#000000"), "00"),
             "shadow_colour": _hex_to_ass_bgr(request.form.get("shadow_colour", "#000000"), "00"),
-            "use_background": _safe_bool(request.form.get("use_background", "0")),
-            "background_colour": _hex_to_ass_bgr(request.form.get("background_colour", "#000000"), "00"),
 
+            "background_colour": _hex_to_ass_bgr(request.form.get("background_colour", "#000000"), "00"),
+            "background_colour_mode": request.form.get("background_colour_mode", "fixed"),
+            "background_palette": request.form.get("background_palette", ""),
+            "use_background": _safe_bool(request.form.get("use_background", "0")),
             "background_alpha": _safe_float(request.form.get("background_alpha", 0.45), 0.45),
             "background_pad_x": _safe_int(request.form.get("background_pad_x", 10), 10),
-            "active_word_colour": _hex_to_ass_bgr(request.form.get("active_word_colour", "#ff0000"), "00"),
-            "active_word_lead_ms": _safe_int(request.form.get("active_word_lead_ms", 80), 80),
-            "reveal_offset_ms": _safe_int(request.form.get("reveal_offset_ms", 0), 0),
+
+            "random_position_jitter": _safe_bool(request.form.get("random_position_jitter", "0")),
+            "position_jitter_x": _safe_int(request.form.get("position_jitter_x", 0), 0),
+            "position_jitter_y": _safe_int(request.form.get("position_jitter_y", 0), 0),
+
+            "random_timing_jitter": _safe_bool(request.form.get("random_timing_jitter", "0")),
+            "timing_jitter_ms": _safe_int(request.form.get("timing_jitter_ms", 0), 0),
+            "variation_seed": _safe_int(request.form.get("variation_seed", 7), 7),
 
             "animation_type": request.form.get("animation_type", "fade"),
             "intro_ms": _safe_int(request.form.get("intro_ms", 180), 180),
@@ -1158,8 +1825,12 @@ def api_preview():
             "settle_ms": _safe_int(request.form.get("settle_ms", 90), 90),
             "rotation_z": _safe_float(request.form.get("rotation_z", 0), 0),
             "letter_spacing": _safe_float(request.form.get("letter_spacing", 0), 0),
+            "reveal_offset_ms": _safe_int(request.form.get("reveal_offset_ms", 0), 0),
             "out_mode": request.form.get("out_mode", "fade"),
         }
+
+
+
 
         JOBS[job_id] = {
             "status": "queued",
@@ -1183,6 +1854,139 @@ def api_preview():
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)}), 500
 
+
+# Start a silence-chop or speed-processing job for the current source video.
+# Preview mode reuses the same preview_start and preview_duration values as caption preview.
+@app.route("/api/process_video", methods=["POST"])
+def api_process_video():
+    try:
+        import hashlib
+
+        video = request.files.get("video")
+        if not video:
+            return jsonify({"ok": False, "error": "Upload a video first."}), 400
+
+        # Accept source videos including WebM for silence-chop and speed-processing jobs.
+        if not video.filename.lower().endswith((".mp4", ".mov", ".m4v", ".webm")):
+            return jsonify({"ok": False, "error": "Video must be mp4, mov, m4v, or webm."}), 400
+
+        process_kind = request.form.get("process_kind", "silence")
+        if process_kind not in ("silence", "speed"):
+            return jsonify({"ok": False, "error": "Invalid processing mode."}), 400
+
+        mode = request.form.get("mode", "preview")
+
+        preview_start = 0
+        preview_seconds = None
+        if mode == "preview":
+            preview_start = max(0, min(24 * 60 * 60, _safe_float(request.form.get("preview_start", 0), 0)))
+            preview_seconds = max(1, min(60, _safe_float(request.form.get("preview_duration", 8), 8)))
+
+        job_id = str(uuid.uuid4())[:8]
+
+        video_bytes = video.read()
+        video_hash = hashlib.sha1(video_bytes).hexdigest()[:16]
+        video_ext = os.path.splitext(secure_filename(video.filename))[1].lower() or ".mp4"
+        video_name = f"src_{video_hash}{video_ext}"
+
+        output_name = f"{job_id}_{process_kind}_{'preview' if mode == 'preview' else 'full'}.mp4"
+        video_path = os.path.join(UPLOAD_DIR, video_name)
+        output_path = os.path.join(OUTPUT_DIR, output_name)
+
+        if not os.path.exists(video_path):
+            with open(video_path, "wb") as f:
+                f.write(video_bytes)
+
+        settings = {
+            "silence_threshold": _safe_float(request.form.get("silence_threshold", -40), -40),
+            "min_silence_duration": _safe_float(request.form.get("min_silence_duration", 0.4), 0.4),
+            "silence_mode": request.form.get("silence_mode", "talk"),
+            "speed_factor": _safe_float(request.form.get("speed_factor", 1.25), 1.25),
+        }
+
+        JOBS[job_id] = {
+            "status": "queued",
+            "message": "Queued...",
+            "preview_file": None,
+            "ass_file": None,
+        }
+
+        threading.Thread(
+            target=process_video_job,
+            args=(job_id, video_path, output_path, process_kind, settings),
+            kwargs={
+                "preview_start": preview_start,
+                "preview_seconds": preview_seconds,
+            },
+            daemon=True,
+        ).start()
+
+        return jsonify({"ok": True, "job_id": job_id})
+
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+
+@app.route("/api/get_captions", methods=["POST"])
+def api_get_captions():
+    try:
+        import hashlib
+
+        video = request.files.get("video")
+        if not video:
+            return jsonify({"ok": False, "error": "Upload a video first."}), 400
+
+        # Accept source videos including WebM for caption extraction jobs.
+        if not video.filename.lower().endswith((".mp4", ".mov", ".m4v", ".webm")):
+            return jsonify({"ok": False, "error": "Video must be mp4, mov, m4v, or webm."}), 400
+
+        job_id = str(uuid.uuid4())[:8]
+
+        video_bytes = video.read()
+        video_hash = hashlib.sha1(video_bytes).hexdigest()[:16]
+        video_ext = os.path.splitext(secure_filename(video.filename))[1].lower() or ".mp4"
+
+        video_name = f"src_{video_hash}{video_ext}"
+        captions_name = f"{job_id}_captions.vtt"
+
+        video_path = os.path.join(UPLOAD_DIR, video_name)
+        captions_path = os.path.join(OUTPUT_DIR, captions_name)
+
+        if not os.path.exists(video_path):
+            with open(video_path, "wb") as handle:
+                handle.write(video_bytes)
+
+        settings = {
+            "caption_model": request.form.get("caption_model", "small"),
+            "caption_language": (request.form.get("caption_language", "") or "").strip(),
+            "caption_word_timestamps": _safe_bool(request.form.get("caption_word_timestamps", "1"), True),
+            "caption_vad_filter": _safe_bool(request.form.get("caption_vad_filter", "1"), True),
+        }
+
+        JOBS[job_id] = {
+            "status": "queued",
+            "message": "Queued...",
+            "preview_file": None,
+            "ass_file": None,
+            "captions_file": None,
+            "captions_text": None,
+        }
+
+        threading.Thread(
+            target=transcribe_captions_job,
+            args=(job_id, video_path, captions_path, settings),
+            daemon=True,
+        ).start()
+
+        return jsonify({"ok": True, "job_id": job_id})
+
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+
+
 @app.route("/api/status/<job_id>")
 def api_status(job_id):
     job = JOBS.get(job_id)
@@ -1195,6 +1999,9 @@ def api_status(job_id):
         "message": job["message"],
         "preview_url": f"/outputs/{job['preview_file']}" if job.get("preview_file") else None,
         "ass_url": f"/outputs/{job['ass_file']}" if job.get("ass_file") else None,
+        "captions_url": f"/outputs/{job['captions_file']}" if job.get("captions_file") else None,
+        "captions_filename": job.get("captions_file"),
+        "captions_text": job.get("captions_text"),
     })
 
 
