@@ -783,6 +783,13 @@ def _parse_vtt_cues(vtt_path):
 
 
 def _build_vtt_word_reveal_text(cue, settings, video_info, past_words, active_word):
+    """Build one ASS event for the current caption cue.
+
+    Browser preview shows the full phrase and changes only the active word colour.
+    The burned-in render must match that behavior exactly. Older versions used this
+    function as a word-reveal renderer, hiding future words or stopping at the
+    active word. That made the export look different from the WYSIWYG overlay.
+    """
     current_index = len([word for word in past_words if str(word).strip()])
 
     pos_x, pos_y = _compute_position(video_info, settings)
@@ -858,72 +865,13 @@ def _build_vtt_word_reveal_text(cue, settings, video_info, past_words, active_wo
 
         return prefix + "{" + rf"\1c{active_colour}" + "}" + current_word
 
-    shown_past = current_index
-    revealed_count = 0
-    active_done = False
+    # Phrase mode: always show the entire phrase. Only the active word changes colour.
+    # The active word is selected by timed-word index, not by string matching, so repeated
+    # words and punctuation are rendered consistently with the browser overlay.
     tokens = re.split(r"(\s+)", transformed_text)
-
-    if settings.get("use_background"):
-        visible_parts = []
-        pending_space = ""
-
-        for token in tokens:
-            if token == "":
-                continue
-
-            if token.isspace():
-                if visible_parts:
-                    pending_space = token.replace("\n", r"\N")
-                continue
-
-            escaped_word = _escape_ass_text(token)
-
-            if revealed_count < shown_past:
-                if pending_space:
-                    visible_parts.append(pending_space)
-                    pending_space = ""
-
-                word_colour = _pick_variant_colour(
-                    settings.get("primary_colour_mode", "fixed"),
-                    settings["primary_colour"],
-                    settings.get("primary_palette", ""),
-                    cue["start"],
-                    revealed_count,
-                    settings.get("variation_seed", 0),
-                    17,
-                )
-
-                visible_parts.append("{" + rf"\1c{word_colour}" + "}" + escaped_word)
-                revealed_count += 1
-                continue
-
-            if not active_done and transformed_active_word and token == transformed_active_word:
-                if pending_space:
-                    visible_parts.append(pending_space)
-                    pending_space = ""
-
-                active_colour = _pick_variant_colour(
-                    settings.get("active_word_colour_mode", "fixed"),
-                    settings["active_word_colour"],
-                    settings.get("active_palette", ""),
-                    cue["start"],
-                    revealed_count,
-                    settings.get("variation_seed", 0),
-                    31,
-                )
-
-                visible_parts.append("{" + rf"\1c{active_colour}" + "}" + escaped_word)
-                active_done = True
-                break
-
-            break
-
-        if not visible_parts:
-            return prefix
-
-        return prefix + hard_spaces + "".join(visible_parts) + hard_spaces
-
     parts = []
+    word_index = 0
+    has_active_word = bool(str(transformed_active_word or "").strip())
 
     for token in tokens:
         if token == "":
@@ -935,42 +883,31 @@ def _build_vtt_word_reveal_text(cue, settings, video_info, past_words, active_wo
 
         escaped_word = _escape_ass_text(token)
 
-        if revealed_count < shown_past:
-            word_colour = _pick_variant_colour(
-                settings.get("primary_colour_mode", "fixed"),
-                settings["primary_colour"],
-                settings.get("primary_palette", ""),
-                cue["start"],
-                revealed_count,
-                settings.get("variation_seed", 0),
-                17,
-            )
-
-            parts.append("{" + rf"\1c{word_colour}" + "}" + escaped_word)
-
-        elif not active_done and transformed_active_word and token == transformed_active_word:
-            active_colour = _pick_variant_colour(
+        if has_active_word and word_index == current_index:
+            colour = _pick_variant_colour(
                 settings.get("active_word_colour_mode", "fixed"),
                 settings["active_word_colour"],
                 settings.get("active_palette", ""),
                 cue["start"],
-                revealed_count,
+                word_index,
                 settings.get("variation_seed", 0),
                 31,
             )
-
-            parts.append("{" + rf"\1c{active_colour}" + "}" + escaped_word)
-            active_done = True
-
         else:
-            parts.append("{" + r"\alpha&HFF&" + "}" + escaped_word + "{" + r"\alpha&H00&" + "}")
+            colour = _pick_variant_colour(
+                settings.get("primary_colour_mode", "fixed"),
+                settings["primary_colour"],
+                settings.get("primary_palette", ""),
+                cue["start"],
+                word_index,
+                settings.get("variation_seed", 0),
+                17,
+            )
 
-        revealed_count += 1
+        parts.append("{" + rf"\1c{colour}" + "}" + escaped_word)
+        word_index += 1
 
-    return prefix + "".join(parts)
-
-
-
+    return prefix + hard_spaces + "".join(parts) + hard_spaces
 
 
 def get_video_info(video_path):
@@ -2475,6 +2412,179 @@ def _build_line_override(text, duration, settings, video_info, cue_start_ms=0, i
 
 
 
+# Split caption text into display words for estimated word timing when exact word timestamps are not available.
+def _caption_words_for_estimated_timing(text):
+    return re.findall(r"\S+", str(text or "").replace("\r", " ").replace("\n", " "))
+
+
+# Build a deterministic per-word timeline across a cue. This restores active-word colouring
+# for edited/SRT captions where the browser editor no longer has exact Whisper/VTT word timestamps.
+def _build_estimated_timed_words_for_cue(cue):
+    words = _caption_words_for_estimated_timing(cue.get("text", ""))
+    if not words:
+        return []
+
+    start = int(cue.get("start") or 0)
+    end = max(start + 1, int(cue.get("end") or start + 1))
+    duration = max(1, end - start)
+
+    timed_words = []
+    for index, word in enumerate(words):
+        word_start = start + int(round((duration * index) / len(words)))
+        timed_words.append({
+            "start": max(start, min(end - 1, word_start)),
+            "word": word,
+        })
+
+    return timed_words
+
+
+# Normalize exact word timings before building active-word ASS events.
+# Whisper/VTT cues that start at 00:00:00 can sometimes contain several words with the
+# same timestamp (often 0 ms). If we use those duplicated timestamps directly, all early
+# word windows collapse and the last word can stay highlighted for the whole first cue.
+def _normalise_timed_words_for_render(cue, timed_words):
+    cue_start = int(cue.get("start") or 0)
+    cue_end = max(cue_start + 1, int(cue.get("end") or cue_start + 1))
+
+    cleaned = []
+    for item in list(timed_words or []):
+        word = str(item.get("word", "") if isinstance(item, dict) else "").strip()
+        if not word:
+            continue
+
+        try:
+            # Do not use `or cue_start` here: an actual timestamp of 0 is valid.
+            raw_start = int(float(item.get("start"))) if item.get("start") is not None else cue_start
+        except Exception:
+            raw_start = cue_start
+
+        cleaned.append({
+            "start": max(cue_start, min(cue_end - 1, raw_start)),
+            "word": word,
+        })
+
+    if not cleaned:
+        return _build_estimated_timed_words_for_cue(cue)
+
+    if len(cleaned) == 1:
+        return cleaned
+
+    starts = [item["start"] for item in cleaned]
+    unique_starts = len(set(starts))
+    positive_steps = sum(1 for left, right in zip(starts, starts[1:]) if right > left)
+
+    # If the timing data is mostly flat/non-increasing, the render would collapse into
+    # one long event. Fall back to even timing across the cue so phrase-mode colouring
+    # still moves from word to word and matches the expected preview behaviour.
+    if unique_starts <= 1 or positive_steps < max(1, len(cleaned) // 3):
+        return _build_estimated_timed_words_for_cue({
+            **cue,
+            "text": " ".join(item["word"] for item in cleaned),
+        })
+
+    return cleaned
+
+
+# Build monotonic active-word windows for one caption cue.
+# This keeps phrase mode as a full visible phrase while changing only the active word.
+def _build_active_word_windows(cue, timed_words, settings):
+    cue_start = int(cue.get("start") or 0)
+    cue_end = max(cue_start + 1, int(cue.get("end") or cue_start + 1))
+    timed_words = _normalise_timed_words_for_render(cue, timed_words)
+
+    if not timed_words:
+        return []
+
+    if len(timed_words) == 1:
+        return [(cue_start, cue_end, 0, timed_words[0])]
+
+    reveal_offset_ms = int(settings.get("reveal_offset_ms", 0))
+    active_lead_ms = int(settings.get("active_word_lead_ms", 0))
+
+    def build_thresholds(use_active_lead):
+        thresholds = []
+        for index, item in enumerate(timed_words):
+            timing_jitter = _pick_variant_offset(
+                settings.get("random_timing_jitter"),
+                settings.get("timing_jitter_ms", 0),
+                cue_start,
+                index,
+                settings.get("variation_seed", 0),
+                211,
+            )
+            raw_start = int(item.get("start") if item.get("start") is not None else cue_start)
+            threshold = raw_start + reveal_offset_ms + timing_jitter
+
+            # The first word should own the beginning of the cue. Applying active lead
+            # before 00:00:00 is what caused first-cue windows to collapse.
+            if index > 0 and use_active_lead:
+                threshold -= active_lead_ms
+
+            if index == 0:
+                threshold = cue_start
+
+            thresholds.append(max(cue_start, min(cue_end - 1, int(threshold))))
+        return thresholds
+
+    thresholds = build_thresholds(True)
+
+    # If active lead/jitter makes the first cue or any dense cue non-monotonic, retry
+    # without active lead before falling back to evenly distributed windows.
+    if any(right <= left for left, right in zip(thresholds, thresholds[1:])):
+        thresholds = build_thresholds(False)
+
+    if any(right <= left for left, right in zip(thresholds, thresholds[1:])) or thresholds[-1] >= cue_end:
+        duration = max(1, cue_end - cue_start)
+        thresholds = [cue_start + int(round((duration * index) / len(timed_words))) for index in range(len(timed_words))]
+        thresholds[0] = cue_start
+
+    windows = []
+    for index, item in enumerate(timed_words):
+        start_ms = thresholds[index]
+        end_ms = thresholds[index + 1] if index + 1 < len(thresholds) else cue_end
+        start_ms = max(cue_start, min(cue_end - 1, start_ms))
+        end_ms = max(start_ms + 1, min(cue_end, end_ms))
+        windows.append((start_ms, end_ms, index, item))
+
+    return windows
+
+
+# Append one or more SSA events for a caption cue using exact word times when available,
+# or estimated equal word timing when the cue came from SRT/editor text.
+def _append_word_reveal_events(subs, cue, settings, video_info):
+    timed_words = list(cue.get("timed_words") or [])
+    windows = _build_active_word_windows(cue, timed_words, settings)
+
+    if not windows:
+        cue_start = int(cue.get("start") or 0)
+        cue_end = max(cue_start + 1, int(cue.get("end") or cue_start + 1))
+        subs.events.append(
+            pysubs2.SSAEvent(
+                start=cue_start,
+                end=cue_end,
+                text=_build_vtt_word_reveal_text(cue, settings, video_info, [], cue.get("text", "")),
+                style="Default",
+            )
+        )
+        return
+
+    words = [item.get("word", "") for _, _, _, item in windows]
+
+    for start_ms, end_ms, index, item in windows:
+        subs.events.append(
+            pysubs2.SSAEvent(
+                start=start_ms,
+                end=end_ms,
+                text=_build_vtt_word_reveal_text(cue, settings, video_info, words[:index], item.get("word", "")),
+                style="Default",
+            )
+        )
+
+
+
+
+
 
 # Build the final ASS file for SRT or VTT using one consistent variation path.
 # Color modes and deterministic jitter are applied in the per-line and per-word overrides.
@@ -2527,78 +2637,21 @@ def srt_to_animated_ass(src, dst, settings, video_info):
         style.marginr = settings["margin_h"]
         subs.styles["Default"] = style
 
-        reveal_offset_ms = int(settings.get("reveal_offset_ms", 0))
-
         for cue in _parse_vtt_cues(src):
-            timed_words = cue["timed_words"]
-
-            if not timed_words:
-                subs.events.append(
-                    pysubs2.SSAEvent(
-                        start=cue["start"],
-                        end=cue["end"],
-                        text=_build_vtt_word_reveal_text(cue, settings, video_info, [], cue["text"]),
-                        style="Default",
-                    )
-                )
-                continue
-
-            past_words = []
-
-            for index, item in enumerate(timed_words):
-                timing_jitter = _pick_variant_offset(
-                    settings.get("random_timing_jitter"),
-                    settings.get("timing_jitter_ms", 0),
-                    cue["start"],
-                    index,
-                    settings.get("variation_seed", 0),
-                    211,
-                )
-
-                start_ms = max(cue["start"], item["start"] + reveal_offset_ms + timing_jitter)
-
-                if index == len(timed_words) - 1:
-                    end_ms = cue["end"]
-                else:
-                    next_jitter = _pick_variant_offset(
-                        settings.get("random_timing_jitter"),
-                        settings.get("timing_jitter_ms", 0),
-                        cue["start"],
-                        index + 1,
-                        settings.get("variation_seed", 0),
-                        211,
-                    )
-                    end_ms = min(cue["end"], timed_words[index + 1]["start"] + reveal_offset_ms + next_jitter)
-
-                if end_ms <= start_ms:
-                    past_words.append(item["word"])
-                    continue
-
-                subs.events.append(
-                    pysubs2.SSAEvent(
-                        start=start_ms,
-                        end=end_ms,
-                        text=_build_vtt_word_reveal_text(cue, settings, video_info, past_words, item["word"]),
-                        style="Default",
-                    )
-                )
-
-                past_words.append(item["word"])
+            _append_word_reveal_events(subs, cue, settings, video_info)
 
         subs.save(dst)
         return
 
-    subs = pysubs2.load(src, encoding="utf-8")
+    source_subs = pysubs2.load(src, encoding="utf-8")
 
-    if "Default" not in subs.styles:
-        subs.styles["Default"] = pysubs2.SSAStyle()
-
+    subs = pysubs2.SSAFile()
     subs.info["PlayResX"] = str(video_info["width"])
     subs.info["PlayResY"] = str(video_info["height"])
     subs.info["ScaledBorderAndShadow"] = "yes"
     subs.info["WrapStyle"] = "0"
 
-    style = subs.styles["Default"]
+    style = pysubs2.SSAStyle()
     style.fontname = settings["font_name"]
     style.fontsize = settings["font_size"]
     style.primarycolor = ass_bgr_to_color(settings["primary_colour"], "&H00FFFFFF")
@@ -2615,17 +2668,17 @@ def srt_to_animated_ass(src, dst, settings, video_info):
     style.marginr = settings["margin_h"]
     subs.styles["Default"] = style
 
-    for line_index, line in enumerate(subs):
-        text = _escape_ass_text(line.text)
-        duration = max(1, int(line.end) - int(line.start))
-        line.text = _build_line_override(
-            text,
-            duration,
-            settings,
-            video_info,
-            cue_start_ms=int(line.start),
-            item_index=line_index,
-        )
+    for line_index, line in enumerate(source_subs):
+        raw_text = str(line.text or "").replace(r"\N", "\n")
+        # Remove any imported ASS override tags before rebuilding the final animated layer.
+        clean_text = re.sub(r"\{[^}]*\}", "", raw_text).strip()
+        cue = {
+            "start": int(line.start),
+            "end": int(line.end),
+            "text": clean_text,
+            "timed_words": [],
+        }
+        _append_word_reveal_events(subs, cue, settings, video_info)
 
     subs.save(dst)
 
