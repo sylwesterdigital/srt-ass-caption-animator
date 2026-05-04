@@ -25,6 +25,7 @@ from fontTools.ttLib import TTFont
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(APP_ROOT, "uploads")
 OUTPUT_DIR = os.path.join(APP_ROOT, "outputs")
+REVEAL_DIR = os.path.join(OUTPUT_DIR, "revealed_assets")
 TOOLS_DIR = os.path.join(APP_ROOT, "tools")
 REALESRGAN_DIR = os.path.join(TOOLS_DIR, "realesrgan")
 REALESRGAN_RELEASE = "v0.2.5.0"
@@ -66,6 +67,7 @@ ALLOWED_FONT_EXTENSIONS = {".ttf", ".otf", ".woff", ".woff2"}
 def ensure_dirs():
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(REVEAL_DIR, exist_ok=True)
     os.makedirs(FONTS_DIR, exist_ok=True)
     os.makedirs(TOOLS_DIR, exist_ok=True)
     os.makedirs(REALESRGAN_DIR, exist_ok=True)
@@ -1478,16 +1480,28 @@ def _resolve_realesrgan_backend(job_id=None):
 
 
 def process_upscale_video(video_path, output_path, upscale_factor=2, upscale_mode="traditional", preview_start=0, preview_seconds=None, job_id=None):
-    upscale_factor = 4 if int(upscale_factor or 2) >= 4 else 2
+    # Backwards-compatible wrapper. The UI now calls this "Video Scale" because
+    # FFmpeg/Lanczos can downscale as well as upscale. AI mode remains limited to
+    # Real-ESRGAN's supported integer upscales.
+    source_meta = get_video_stream_meta(video_path)
+    raw_factor = _safe_float(upscale_factor, 1.0)
+    scale_factor = max(0.05, min(8.0, raw_factor))
     upscale_mode = "ai" if str(upscale_mode or "traditional").lower() == "ai" else "traditional"
 
-    source_meta = get_video_stream_meta(video_path)
+    if upscale_mode == "ai":
+        if scale_factor < 1.5:
+            raise RuntimeError("AI scale only supports upscaling. Use FFmpeg Lanczos for 1x or downscaling.")
+        upscale_factor = 4 if scale_factor >= 3 else 2
+    else:
+        upscale_factor = scale_factor
+
     target_width = _even_size(source_meta["width"] * upscale_factor)
     target_height = _even_size(source_meta["height"] * upscale_factor)
 
     if upscale_mode == "traditional":
-        _set_job_progress(job_id, "rendering", f"Upscaling video {upscale_factor}x...")
-        vf_expr = f"scale={target_width}:{target_height}:flags=lanczos:param0=3"
+        direction = "Downscaling" if upscale_factor < 1 else "Scaling"
+        _set_job_progress(job_id, "rendering", f"{direction} video {upscale_factor:g}x...")
+        vf_expr = f"scale={target_width}:{target_height}:flags=lanczos:param0=3,setsar=1"
 
         cmd = [
             FFMPEG_BIN,
@@ -1520,7 +1534,7 @@ def process_upscale_video(video_path, output_path, upscale_factor=2, upscale_mod
 
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            raise RuntimeError(result.stderr.strip() or "Traditional upscale failed")
+            raise RuntimeError(result.stderr.strip() or "Video scale failed")
         return
 
     backend = _resolve_realesrgan_backend(job_id=job_id)
@@ -1675,7 +1689,7 @@ def process_upscale_video(video_path, output_path, upscale_factor=2, upscale_mod
         if not encoded_frames:
             raise RuntimeError('AI upscale produced no output frames')
 
-        _set_job_progress(job_id, "rendering", "Encoding upscaled video...", phase="encoding", current=None, total=None, eta_seconds=None)
+        _set_job_progress(job_id, "rendering", "Encoding scaled video...", phase="encoding", current=None, total=None, eta_seconds=None)
 
         encode_cmd = [
             FFMPEG_BIN,
@@ -1709,7 +1723,7 @@ def process_upscale_video(video_path, output_path, upscale_factor=2, upscale_mod
 
         encode_result = subprocess.run(encode_cmd, capture_output=True, text=True)
         if encode_result.returncode != 0:
-            raise RuntimeError(encode_result.stderr.strip() or 'Could not encode upscaled video')
+            raise RuntimeError(encode_result.stderr.strip() or 'Could not encode scaled video')
 
 
 # Analyze silence and render either talk-only or silence-only segments into one output video.
@@ -1936,6 +1950,105 @@ def process_aspect_ratio_video(video_path, output_path, aspect_settings, preview
         raise RuntimeError(result.stderr.strip() or "Aspect-ratio conversion failed")
 
 
+def _safe_crop_dimension(value, fallback=0):
+    size = _safe_int(value, fallback)
+    if size <= 0:
+        return 0
+    return _even_size(max(2, min(7680, size)))
+
+
+def _safe_crop_offset(value):
+    offset = _safe_int(value, 0)
+    if offset <= 0:
+        return 0
+    return _even_size(max(0, min(7680, offset)))
+
+
+def _safe_crop_anchor(value):
+    value = str(value or "center").strip().lower().replace("-", "_")
+    allowed = {"center", "top_left", "top_right", "bottom_right", "bottom_left", "custom"}
+    return value if value in allowed else "center"
+
+
+def _build_crop_settings_from_form(form):
+    return {
+        "width": _safe_crop_dimension(form.get("crop_width", 0), 0),
+        "height": _safe_crop_dimension(form.get("crop_height", 0), 0),
+        "x": _safe_crop_offset(form.get("crop_x", 0)),
+        "y": _safe_crop_offset(form.get("crop_y", 0)),
+        "anchor": _safe_crop_anchor(form.get("crop_anchor", "center")),
+    }
+
+
+def _resolve_crop_box(source_info, crop_settings):
+    source_w = _even_size(source_info.get("width", 2))
+    source_h = _even_size(source_info.get("height", 2))
+
+    crop_w = crop_settings.get("width") or source_w
+    crop_h = crop_settings.get("height") or source_h
+    crop_w = _even_size(max(2, min(source_w, crop_w)))
+    crop_h = _even_size(max(2, min(source_h, crop_h)))
+
+    anchor = _safe_crop_anchor(crop_settings.get("anchor", "center"))
+    if anchor == "top_left":
+        crop_x, crop_y = 0, 0
+    elif anchor == "top_right":
+        crop_x, crop_y = source_w - crop_w, 0
+    elif anchor == "bottom_right":
+        crop_x, crop_y = source_w - crop_w, source_h - crop_h
+    elif anchor == "bottom_left":
+        crop_x, crop_y = 0, source_h - crop_h
+    elif anchor == "custom":
+        crop_x = _even_size(crop_settings.get("x", 0))
+        crop_y = _even_size(crop_settings.get("y", 0))
+    else:
+        crop_x = _even_size((source_w - crop_w) / 2)
+        crop_y = _even_size((source_h - crop_h) / 2)
+
+    crop_x = _even_size(max(0, min(source_w - crop_w, crop_x)))
+    crop_y = _even_size(max(0, min(source_h - crop_h, crop_y)))
+    return crop_x, crop_y, crop_w, crop_h
+
+
+def process_crop_video(video_path, output_path, crop_settings, preview_start=0, preview_seconds=None):
+    source_info = get_video_info(video_path)
+    crop_x, crop_y, crop_w, crop_h = _resolve_crop_box(source_info, crop_settings)
+    vf_expr = f"crop={crop_w}:{crop_h}:{crop_x}:{crop_y},setsar=1"
+
+    cmd = [
+        FFMPEG_BIN,
+        "-y",
+        "-nostdin",
+        "-hwaccel", "none",
+    ]
+
+    if preview_start is not None and float(preview_start) > 0:
+        cmd += ["-ss", f"{float(preview_start):.6f}"]
+
+    cmd += ["-i", video_path]
+
+    if preview_seconds is not None:
+        cmd += ["-t", f"{max(0.1, float(preview_seconds)):.6f}"]
+
+    cmd += [
+        "-vf", vf_expr,
+        "-map", "0:v:0",
+        "-map", "0:a:0?",
+        "-c:v", "libx264",
+        "-crf", "18",
+        "-preset", "medium",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-movflags", "+faststart",
+        output_path,
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or "Video crop failed")
+
+
 # Run one post-processing job and publish the resulting video through the existing job polling flow.
 # Reuses the app’s preview_url player loading instead of inventing a second status system.
 def process_video_job(job_id, video_path, output_path, process_kind, settings, preview_start=0, preview_seconds=None):
@@ -1972,9 +2085,9 @@ def process_video_job(job_id, video_path, output_path, process_kind, settings, p
                 preview_start=preview_start,
                 preview_seconds=preview_seconds,
             )
-        elif process_kind == "upscale":
+        elif process_kind in ("upscale", "scale"):
             JOBS[job_id]["status"] = "preparing"
-            JOBS[job_id]["message"] = "Preparing video upscale..."
+            JOBS[job_id]["message"] = "Preparing video scale..."
             process_upscale_video(
                 video_path,
                 output_path,
@@ -1983,6 +2096,16 @@ def process_video_job(job_id, video_path, output_path, process_kind, settings, p
                 preview_start=preview_start,
                 preview_seconds=preview_seconds,
                 job_id=job_id,
+            )
+        elif process_kind == "crop":
+            JOBS[job_id]["status"] = "rendering"
+            JOBS[job_id]["message"] = "Cropping video..."
+            process_crop_video(
+                video_path,
+                output_path,
+                crop_settings=settings["crop"],
+                preview_start=preview_start,
+                preview_seconds=preview_seconds,
             )
         else:
             raise RuntimeError("Unsupported processing mode.")
@@ -2851,7 +2974,7 @@ def api_process_video():
             return jsonify({"ok": False, "error": "Video must be mp4, mov, m4v, or webm."}), 400
 
         process_kind = request.form.get("process_kind", "silence")
-        if process_kind not in ("silence", "speed", "upscale", "aspect"):
+        if process_kind not in ("silence", "speed", "upscale", "scale", "aspect", "crop"):
             return jsonify({"ok": False, "error": "Invalid processing mode."}), 400
 
         mode = request.form.get("mode", "preview")
@@ -2882,9 +3005,10 @@ def api_process_video():
             "min_silence_duration": _safe_float(request.form.get("min_silence_duration", 0.4), 0.4),
             "silence_mode": request.form.get("silence_mode", "talk"),
             "speed_factor": _safe_float(request.form.get("speed_factor", 1.25), 1.25),
-            "upscale_factor": 4 if int(_safe_float(request.form.get("upscale_factor", 2), 2)) >= 4 else 2,
-            "upscale_mode": "ai" if request.form.get("upscale_mode", "traditional") == "ai" else "traditional",
+            "upscale_factor": max(0.05, min(8.0, _safe_float(request.form.get("video_scale_factor", request.form.get("upscale_factor", 1)), 1))),
+            "upscale_mode": "ai" if request.form.get("video_scale_mode", request.form.get("upscale_mode", "traditional")) == "ai" else "traditional",
             "aspect": _build_aspect_settings_from_form(request.form),
+            "crop": _build_crop_settings_from_form(request.form),
             "overlay": _build_overlay_settings_from_form(request.form),
         }
 
@@ -3010,6 +3134,168 @@ def api_status(job_id):
         "captions_filename": job.get("captions_file"),
         "captions_text": job.get("captions_text"),
     })
+
+
+
+def _safe_output_path_from_filename(filename_value):
+    """Resolve an output filename or relative output path under OUTPUT_DIR only."""
+    raw = str(filename_value or "").strip().replace("\\", "/")
+    raw = raw.lstrip("/")
+    if raw.startswith("outputs/"):
+        raw = raw[len("outputs/"):]
+    if not raw:
+        raise ValueError("Missing output filename.")
+
+    parts = [secure_filename(part) for part in raw.split("/") if part not in ("", ".")]
+    if not parts or any(part in ("", "..") for part in parts):
+        raise ValueError("Unsafe output filename.")
+
+    output_path = os.path.abspath(os.path.join(OUTPUT_DIR, *parts))
+    output_root = os.path.abspath(OUTPUT_DIR)
+    if not output_path.startswith(output_root + os.sep):
+        raise ValueError("Unsafe output path.")
+    return output_path
+
+
+def _reveal_file_in_system_manager(file_path):
+    """Reveal an existing file in Finder / Explorer / system file manager."""
+    file_path = os.path.abspath(file_path)
+    system_name = platform.system()
+    manager_name = "file manager"
+
+    if system_name == "Darwin":
+        manager_name = "Finder"
+        subprocess.Popen(["open", "-R", file_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    elif system_name == "Windows":
+        manager_name = "File Explorer"
+        subprocess.Popen(["explorer", f"/select,{file_path}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        manager_name = "file manager"
+        subprocess.Popen(["xdg-open", os.path.dirname(file_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    return manager_name
+
+
+@app.route("/api/reveal_asset_file", methods=["POST"])
+def api_reveal_asset_file():
+    """Save the selected browser-side project asset into the app output folder and reveal it.
+
+    Browser projects keep videos as IndexedDB blobs, so there is no Finder path to reveal
+    until the selected asset is written back to the local Flask app's filesystem.
+    """
+    try:
+        ensure_dirs()
+
+        video = request.files.get("video")
+        if not video:
+            return jsonify({"ok": False, "error": "No video file was provided."}), 400
+
+        original_name = secure_filename(video.filename or "project-video.mp4")
+        base, ext = os.path.splitext(original_name)
+        ext = ext.lower() or ".mp4"
+
+        if ext not in (".mp4", ".mov", ".m4v", ".webm"):
+            return jsonify({"ok": False, "error": "Only mp4, mov, m4v, or webm assets can be revealed."}), 400
+
+        project_id = secure_filename(request.form.get("project_id", "project"))[:48] or "project"
+        asset_id = secure_filename(request.form.get("asset_id", "asset"))[:48] or "asset"
+        safe_base = (base or "project-video")[:120]
+        stamp = time.strftime("%Y%m%d_%H%M%S")
+        output_name = f"{stamp}_{project_id}_{asset_id}_{safe_base}{ext}"
+        output_path = os.path.abspath(os.path.join(REVEAL_DIR, output_name))
+
+        reveal_root = os.path.abspath(REVEAL_DIR)
+        if not output_path.startswith(reveal_root + os.sep):
+            return jsonify({"ok": False, "error": "Unsafe output path."}), 400
+
+        video.save(output_path)
+
+        try:
+            manager_name = _reveal_file_in_system_manager(output_path)
+        except FileNotFoundError:
+            return jsonify({
+                "ok": False,
+                "error": "Saved the asset copy, but could not open the system file manager.",
+                "path": output_path,
+            }), 500
+
+        rel_name = os.path.relpath(output_path, OUTPUT_DIR).replace(os.sep, "/")
+        return jsonify({
+            "ok": True,
+            "message": f"Saved a project copy and revealed it in {manager_name}.",
+            "manager": manager_name,
+            "filename": rel_name,
+            "path": output_path,
+        })
+
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+
+@app.route("/api/reveal_existing_output", methods=["POST"])
+def api_reveal_existing_output():
+    """Reveal an existing Flask output file without making another copy."""
+    try:
+        ensure_dirs()
+        payload = request.get_json(silent=True) or {}
+        filename = request.form.get("filename") or payload.get("filename")
+        output_path = _safe_output_path_from_filename(filename)
+
+        if not os.path.isfile(output_path):
+            return jsonify({"ok": False, "error": "The original output file is no longer on disk."}), 404
+
+        manager_name = _reveal_file_in_system_manager(output_path)
+        rel_name = os.path.relpath(output_path, OUTPUT_DIR).replace(os.sep, "/")
+        return jsonify({
+            "ok": True,
+            "message": f"Revealed original output in {manager_name}.",
+            "manager": manager_name,
+            "filename": rel_name,
+            "path": output_path,
+        })
+
+    except FileNotFoundError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.route("/api/delete_server_asset_file", methods=["POST"])
+def api_delete_server_asset_file():
+    """Delete a generated/revealed file that lives under the Flask outputs directory."""
+    try:
+        ensure_dirs()
+        payload = request.get_json(silent=True) or {}
+        filename = request.form.get("filename") or payload.get("filename")
+        output_path = _safe_output_path_from_filename(filename)
+
+        if not os.path.exists(output_path):
+            return jsonify({
+                "ok": True,
+                "deleted": False,
+                "message": "The disk file was already missing.",
+            })
+
+        if not os.path.isfile(output_path):
+            return jsonify({"ok": False, "error": "Refusing to delete a non-file path."}), 400
+
+        os.remove(output_path)
+        rel_name = os.path.relpath(output_path, OUTPUT_DIR).replace(os.sep, "/")
+        return jsonify({
+            "ok": True,
+            "deleted": True,
+            "message": "Deleted the disk file.",
+            "filename": rel_name,
+            "path": output_path,
+        })
+
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
 
 
 @app.route("/outputs/<path:filename>")

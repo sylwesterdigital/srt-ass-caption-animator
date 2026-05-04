@@ -224,8 +224,54 @@
       pointer-events: none;
     }
 
+    .crop-overlay {
+      position: absolute;
+      inset: 0;
+      display: none;
+      z-index: 18;
+      pointer-events: none;
+      overflow: hidden;
+      border-radius: inherit;
+    }
 
+    .crop-overlay.show {
+      display: block;
+    }
 
+    .crop-overlay.drawing-enabled {
+      pointer-events: auto;
+      cursor: crosshair;
+    }
+
+    .crop-rect {
+      position: absolute;
+      display: none;
+      border: 2px solid rgba(125, 211, 252, 0.98);
+      border-radius: 8px;
+      background: rgba(125, 211, 252, 0.08);
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(0,0,0,0.55) inset;
+      pointer-events: none;
+    }
+
+    .crop-rect.show {
+      display: block;
+    }
+
+    .crop-help {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      max-width: min(420px, calc(100% - 24px));
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: rgba(2, 6, 12, 0.72);
+      border: 1px solid rgba(125, 211, 252, 0.38);
+      color: #dbeafe;
+      font-size: 12px;
+      line-height: 1.35;
+      backdrop-filter: blur(10px);
+      pointer-events: none;
+    }
 
 
     .helper-caption {
@@ -680,8 +726,11 @@
 
     .project-meta {
       color: var(--muted);
-      font-size: 11px;
-      line-height: 1.35;
+      font-size: 10px;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .project-actions-row {
@@ -703,7 +752,9 @@
       min-height: 0;
       overflow: auto;
       display: grid;
-      gap: 10px;
+      grid-auto-rows: max-content;
+      align-content: start;
+      gap: 8px;
       padding-right: 2px;
     }
 
@@ -720,15 +771,17 @@
       appearance: none;
       width: 100%;
       border: 1px solid var(--line);
-      border-radius: 16px;
+      border-radius: 13px;
       background: rgba(255,255,255,0.04);
       color: var(--text);
-      padding: 8px;
+      padding: 6px;
       cursor: pointer;
       display: grid;
-      grid-template-columns: 72px minmax(0, 1fr);
-      gap: 10px;
+      grid-template-columns: 56px minmax(0, 1fr);
+      gap: 8px;
       text-align: left;
+      align-items: center;
+      min-height: 54px;
     }
 
     .asset-card:hover {
@@ -741,35 +794,101 @@
     }
 
     .asset-thumb {
-      width: 72px;
-      height: 50px;
-      border-radius: 10px;
+      width: 56px;
+      height: 38px;
+      border-radius: 8px;
       background: rgba(255,255,255,0.08);
       object-fit: cover;
       display: block;
     }
 
     .asset-title {
-      font-size: 12px;
-      line-height: 1.25;
+      font-size: 11px;
+      line-height: 1.2;
       font-weight: bold;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
 
     .asset-details {
       color: var(--muted);
-      font-size: 11px;
-      line-height: 1.35;
+      font-size: 10px;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .asset-lineage {
       color: #9fd3ff;
-      font-size: 10px;
-      line-height: 1.3;
+      font-size: 9px;
+      line-height: 1.2;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+
+    .asset-card-body {
+      min-width: 0;
+    }
+
+    .asset-actions {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
       margin-top: 4px;
+    }
+
+    .asset-mini-button {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 9px;
+      font-weight: bold;
+      line-height: 1;
+      padding: 5px 7px;
+    }
+
+    .asset-mini-button:hover {
+      background: rgba(255,255,255,0.14);
+    }
+
+    .asset-mini-button.danger {
+      border-color: rgba(248, 113, 113, 0.34);
+      color: #fecaca;
+      background: rgba(127, 29, 29, 0.24);
+    }
+
+    .asset-mini-button.danger:hover {
+      background: rgba(127, 29, 29, 0.38);
+    }
+
+    .app-modal-checkbox-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.035);
+    }
+
+    .app-modal-checkbox-row input {
+      margin-top: 2px;
+      accent-color: #f87171;
+    }
+
+    .app-modal-checkbox-copy {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
     }
 
     @media (max-width: 900px) {
@@ -939,8 +1058,11 @@
 
     .app-modal-hint {
       color: var(--muted);
-      font-size: 11px;
-      line-height: 1.35;
+      font-size: 10px;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .app-modal-error {
@@ -1127,6 +1249,11 @@
               </div>
 
             </div>
+
+            <div id="cropOverlay" class="crop-overlay" aria-hidden="true">
+              <div id="cropRect" class="crop-rect"></div>
+              <div id="cropHelp" class="crop-help">Draw a rectangle, then press Enter to confirm. Esc clears draft. Cmd/Ctrl+Z undo, Cmd/Ctrl+Shift+Z or Ctrl+Y redo.</div>
+            </div>
           </div>
         </div>
 
@@ -1204,6 +1331,9 @@
     const helperHandleBR = document.getElementById('helperHandleBR');
     const overlayHelper = document.getElementById('overlayHelper');
     const overlayHelperText = document.getElementById('overlayHelperText');
+    const cropOverlay = document.getElementById('cropOverlay');
+    const cropRect = document.getElementById('cropRect');
+    const cropHelp = document.getElementById('cropHelp');
     const presetSelect = document.getElementById('presetSelect');
     const savePresetBtn = document.getElementById('savePresetBtn');
     const saveAsPresetBtn = document.getElementById('saveAsPresetBtn');
@@ -1288,10 +1418,19 @@
     let fontNameController = null;
     let overlayFontNameController = null;
     let uploadedFontsController = null;
+    let speedFactorController = null;
+    let speedTargetDurationController = null;
+    let speedOriginalHmsController = null;
+    let speedTargetHmsController = null;
+    let speedReadoutController = null;
     let availableFonts = [];    
 /* Keep metadata for the last cached source video available across reloads. */
     let cachedVideoMeta = readCachedVideoMetaFromStorage();
     let showingRenderedOutput = false;
+    let cropDraft = null;
+    let cropDrawState = null;
+    const cropUndoStack = [];
+    const cropRedoStack = [];
 
 
 
@@ -1373,8 +1512,25 @@
       min_silence_duration: 0.4,
       silence_mode: 'talk',
       speed_factor: 1.25,
-      upscale_factor: 2,
+      speed_original_duration_seconds: 0,
+      speed_original_duration_hms: '00:00:00',
+      speed_target_duration_seconds: 0,
+      speed_target_duration_hms: '00:00:00',
+      speed_readout: 'Load a source video to calculate duration.',
+      upscale_factor: 1,
       upscale_mode: 'traditional',
+      video_scale_factor: 1,
+      video_scale_preset: 1,
+      video_scale_mode: 'traditional',
+
+      crop_width: 0,
+      crop_height: 0,
+      crop_x: 0,
+      crop_y: 0,
+      crop_anchor: 'center',
+      crop_overlay_enabled: false,
+      crop_draw_enabled: false,
+      crop_readout: 'Load a video to set a crop area.',
 
       aspect_enabled: true,
       aspect_live_preview: true,
@@ -1415,7 +1571,7 @@
       overlay_letter_spacing: 0,
 
       caption_model: 'small',
-      caption_language: '',
+      caption_language: 'en',
       caption_word_timestamps: true,
       caption_vad_filter: true      
 
@@ -1506,6 +1662,37 @@
     }
 
     function buildModalField(field) {
+      if (field.type === 'checkbox') {
+        const wrapper = document.createElement('label');
+        wrapper.className = 'app-modal-checkbox-row';
+
+        const control = document.createElement('input');
+        control.type = 'checkbox';
+        control.dataset.modalField = field.name;
+        control.name = field.name;
+        control.checked = Boolean(field.value);
+        control.disabled = Boolean(field.disabled);
+        wrapper.appendChild(control);
+
+        const copy = document.createElement('span');
+        copy.className = 'app-modal-checkbox-copy';
+
+        const label = document.createElement('span');
+        label.className = 'app-modal-label';
+        label.textContent = field.label || field.name || 'Option';
+        copy.appendChild(label);
+
+        if (field.hint) {
+          const hint = document.createElement('span');
+          hint.className = 'app-modal-hint';
+          hint.textContent = field.hint;
+          copy.appendChild(hint);
+        }
+
+        wrapper.appendChild(copy);
+        return wrapper;
+      }
+
       const wrapper = document.createElement('label');
       wrapper.className = 'app-modal-field';
 
@@ -1618,6 +1805,11 @@
           const values = {};
           for (const field of fields) {
             const input = appModalDialog.querySelector(`[data-modal-field="${field.name}"]`);
+            if (field.type === 'checkbox') {
+              values[field.name] = Boolean(input?.checked);
+              continue;
+            }
+
             const value = String(input?.value ?? '');
             const trimmed = value.trim();
 
@@ -1810,6 +2002,101 @@
       return `${minutes}:${seconds}`;
     }
 
+
+    function formatDurationPrecise(value) {
+      const total = Math.max(0, Number.isFinite(Number(value)) ? Number(value) : 0);
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const seconds = (total % 60).toFixed(1).padStart(4, '0');
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds}`;
+    }
+
+    function formatDurationClock(value) {
+      const total = Math.max(0, Math.round(Number.isFinite(Number(value)) ? Number(value) : 0));
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const seconds = total % 60;
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function getCurrentSourceDurationSeconds() {
+      const selectedAsset = getSelectedProjectAsset();
+      const assetDuration = Number(selectedAsset?.duration || 0);
+      if (Number.isFinite(assetDuration) && assetDuration > 0) return assetDuration;
+
+      const videoDuration = Number(previewVideo.duration || 0);
+      if (Number.isFinite(videoDuration) && videoDuration > 0) return videoDuration;
+
+      const storedDuration = Number(controls.speed_original_duration_seconds || 0);
+      return Number.isFinite(storedDuration) && storedDuration > 0 ? storedDuration : 0;
+    }
+
+    function clampSpeedFactor(value) {
+      return Math.max(0.05, Math.min(16, Number(value || 1)));
+    }
+
+    function clampSpeedDuration(value) {
+      return Math.max(0.1, Math.min(24 * 60 * 60, Number(value || 0.1)));
+    }
+
+    function updateSpeedReadout() {
+      const original = getCurrentSourceDurationSeconds();
+      controls.speed_original_duration_seconds = Number(original || 0);
+      controls.speed_original_duration_hms = original ? formatDurationClock(original) : '00:00:00';
+
+      if (!original) {
+        controls.speed_target_duration_hms = '00:00:00';
+        controls.speed_readout = 'Load a source video to calculate duration.';
+        if (speedOriginalHmsController) speedOriginalHmsController.updateDisplay();
+        if (speedTargetHmsController) speedTargetHmsController.updateDisplay();
+        if (speedReadoutController) speedReadoutController.updateDisplay();
+        return;
+      }
+
+      const factor = clampSpeedFactor(controls.speed_factor);
+      controls.speed_factor = factor;
+      const target = clampSpeedDuration(original / factor);
+      controls.speed_target_duration_seconds = Number(target.toFixed(2));
+      controls.speed_target_duration_hms = formatDurationClock(target);
+      controls.speed_readout = `Original ${formatDurationClock(original)} (${original.toFixed(2)}s) → new ${formatDurationClock(target)} (${target.toFixed(2)}s) · ${factor.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')}x`;
+
+      if (speedFactorController) speedFactorController.updateDisplay();
+      if (speedOriginalHmsController) speedOriginalHmsController.updateDisplay();
+      if (speedTargetDurationController) speedTargetDurationController.updateDisplay();
+      if (speedTargetHmsController) speedTargetHmsController.updateDisplay();
+      if (speedReadoutController) speedReadoutController.updateDisplay();
+    }
+
+    function updateSpeedFromFactor() {
+      const original = getCurrentSourceDurationSeconds();
+      controls.speed_factor = clampSpeedFactor(controls.speed_factor);
+      if (original) {
+        controls.speed_target_duration_seconds = Number((original / controls.speed_factor).toFixed(2));
+      }
+      updateSpeedReadout();
+    }
+
+    function updateSpeedFromTargetDuration() {
+      const original = getCurrentSourceDurationSeconds();
+      const target = clampSpeedDuration(controls.speed_target_duration_seconds);
+      controls.speed_target_duration_seconds = Number(target.toFixed(2));
+
+      if (original) {
+        controls.speed_factor = Number(clampSpeedFactor(original / target).toFixed(4));
+      }
+
+      updateSpeedReadout();
+    }
+
+    function syncSpeedCalculatorWithSource() {
+      const original = getCurrentSourceDurationSeconds();
+      controls.speed_original_duration_seconds = Number(original || 0);
+      if (original) {
+        controls.speed_target_duration_seconds = Number((original / clampSpeedFactor(controls.speed_factor)).toFixed(2));
+      }
+      updateSpeedReadout();
+    }
+
     function getProjectAsset(assetId) {
       if (!currentProject || !Array.isArray(currentProject.assets)) return null;
       return currentProject.assets.find(item => item.id === assetId) || null;
@@ -1871,6 +2158,17 @@
         tx.oncomplete = resolve;
         tx.onerror = () => reject(tx.error || new Error(`Could not save ${storeName}.`));
         tx.onabort = () => reject(tx.error || new Error(`Could not save ${storeName}.`));
+      });
+    }
+
+    async function dbDelete(storeName, key) {
+      const db = await openProjectDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).delete(key);
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error || new Error(`Could not delete from ${storeName}.`));
+        tx.onabort = () => reject(tx.error || new Error(`Could not delete from ${storeName}.`));
       });
     }
 
@@ -2080,7 +2378,8 @@
       if (type === 'caption_render') return 'Caption render';
       if (type === 'silence') return 'Silence chop';
       if (type === 'speed') return `Speed ${settings.speed_factor || controls.speed_factor || ''}x`.trim();
-      if (type === 'upscale') return `Upscale ${settings.upscale_factor || controls.upscale_factor || ''}x`.trim();
+      if (type === 'scale' || type === 'upscale') return `Scale ${settings.video_scale_factor || settings.upscale_factor || controls.video_scale_factor || controls.upscale_factor || ''}x`.trim();
+      if (type === 'crop') return `Crop ${settings.crop_width || controls.crop_width || ''}×${settings.crop_height || controls.crop_height || ''}`.trim();
       if (type === 'upload') return 'Original upload';
       return String(type || 'Video output');
     }
@@ -2113,7 +2412,10 @@
         createdAt: now,
         parentAssetId: options.parentAssetId || null,
         operationId: options.operationId || null,
-        operationType
+        operationType,
+        serverOutputFilename: options.serverOutputFilename || '',
+        serverOutputUrl: options.serverOutputUrl || '',
+        revealedOutputFilename: options.revealedOutputFilename || ''
       };
 
       currentProject.assets.push(asset);
@@ -2141,6 +2443,194 @@
       });
     }
 
+    function getOutputFilenameFromUrl(outputUrl) {
+      try {
+        const url = new URL(outputUrl, window.location.href);
+        const match = url.pathname.match(/\/outputs\/(.+)$/);
+        return match ? decodeURIComponent(match[1]) : '';
+      } catch {
+        const match = String(outputUrl || '').match(/\/outputs\/(.+)$/);
+        return match ? decodeURIComponent(match[1]) : '';
+      }
+    }
+
+    function getAssetDiskFilename(asset) {
+      return asset?.serverOutputFilename || asset?.revealedOutputFilename || '';
+    }
+
+    function assetHasDirectDiskFile(asset) {
+      return Boolean(asset?.serverOutputFilename);
+    }
+
+
+    async function revealProjectAssetInFinder(assetId) {
+      const asset = getProjectAsset(assetId);
+      if (!asset) {
+        showStatus('err', 'Project video could not be found.');
+        return;
+      }
+
+      if (asset.serverOutputFilename) {
+        try {
+          showStatus('info', 'Revealing the original generated output file...');
+          const formData = new FormData();
+          formData.append('filename', asset.serverOutputFilename);
+
+          const response = await fetch('/api/reveal_existing_output', {
+            method: 'POST',
+            body: formData
+          });
+
+          const data = await response.json();
+          if (!response.ok || !data.ok) {
+            throw new Error(data.error || 'Could not reveal the original output file.');
+          }
+
+          showStatus('ok', `${escapeHtml(data.message || 'File revealed.')} <strong>${escapeHtml(asset.name || '')}</strong>`);
+          return;
+        } catch (error) {
+          showStatus('err', `${escapeHtml(error.message || 'Could not reveal the original output file.')} The project copy is still available in IndexedDB.`);
+          return;
+        }
+      }
+
+      const file = await getProjectAssetFile(asset);
+      if (!file) {
+        showStatus('err', 'Could not read this project video from IndexedDB.');
+        return;
+      }
+
+      showStatus('info', 'This asset is browser-only, so the app must export a copy before it can reveal it in Finder / file manager...');
+
+      const formData = new FormData();
+      formData.append('video', file, file.name || asset.name || 'project-video.mp4');
+      formData.append('project_id', currentProject?.id || 'project');
+      formData.append('asset_id', asset.id || 'asset');
+
+      try {
+        const response = await fetch('/api/reveal_asset_file', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.ok) {
+          throw new Error(data.error || 'Could not reveal the file.');
+        }
+
+        asset.revealedOutputFilename = data.filename || asset.revealedOutputFilename || '';
+        await saveCurrentProject();
+        showStatus('ok', `${escapeHtml(data.message || 'File revealed.')} <strong>${escapeHtml(asset.name || '')}</strong>`);
+      } catch (error) {
+        showStatus('err', error.message || 'Could not reveal the selected video.');
+      }
+    }
+
+    async function deleteProjectAsset(assetId) {
+      if (!currentProject) return;
+      const asset = getProjectAsset(assetId);
+      if (!asset) {
+        showStatus('err', 'Project video could not be found.');
+        return;
+      }
+
+      const diskFilename = getAssetDiskFilename(asset);
+      const directDiskFile = assetHasDirectDiskFile(asset);
+      const hasChildren = currentProject.assets.some(item => item.parentAssetId === asset.id);
+      const selectedWillChange = currentProject.selectedAssetId === asset.id;
+
+      const descriptionParts = [
+        `Delete “${asset.name}” from this project.`,
+        hasChildren ? 'Derived videos that were created from it will stay, but their lineage will point to a missing parent.' : '',
+        directDiskFile
+          ? 'This video also has an original generated file in the Flask outputs folder. You can delete that disk file too.'
+          : 'The original file selected from Finder cannot be deleted by the browser because its real path is not exposed. Only the project copy can be removed here.'
+      ].filter(Boolean);
+
+      const result = await openAppModal({
+        title: 'Delete project video',
+        description: descriptionParts.join(' '),
+        icon: '!',
+        confirmText: 'Delete video',
+        danger: true,
+        closeOnBackdrop: false,
+        fields: [
+          {
+            name: 'deleteDisk',
+            type: 'checkbox',
+            label: directDiskFile ? 'Also delete the generated file from disk' : 'No generated disk file is available to delete',
+            value: false,
+            disabled: !diskFilename,
+            hint: directDiskFile
+              ? 'Deletes the actual file under the Flask outputs folder. This cannot be undone.'
+              : 'Browser-uploaded originals stay on your computer; the app only holds an IndexedDB project copy.'
+          },
+          {
+            name: 'confirmText',
+            label: 'Type DELETE to confirm',
+            placeholder: 'DELETE',
+            required: true,
+            maxLength: 12
+          }
+        ],
+        validator(values) {
+          if (String(values.confirmText || '').trim().toUpperCase() !== 'DELETE') {
+            return 'Type DELETE exactly to confirm.';
+          }
+          return '';
+        }
+      });
+
+      if (!result) return;
+
+      try {
+        if (result.deleteDisk && diskFilename) {
+          const formData = new FormData();
+          formData.append('filename', diskFilename);
+          const response = await fetch('/api/delete_server_asset_file', {
+            method: 'POST',
+            body: formData
+          });
+          const data = await response.json();
+          if (!response.ok || !data.ok) {
+            throw new Error(data.error || 'Could not delete the disk file.');
+          }
+        }
+
+        currentProject.assets = currentProject.assets.filter(item => item.id !== asset.id);
+        currentProject.operations = (currentProject.operations || []).filter(item => item.outputAssetId !== asset.id);
+
+        await Promise.all([
+          asset.blobId ? dbDelete(PROJECT_BLOB_STORE_NAME, asset.blobId) : Promise.resolve(),
+          asset.thumbnailBlobId ? dbDelete(PROJECT_BLOB_STORE_NAME, asset.thumbnailBlobId) : Promise.resolve()
+        ]);
+
+        if (selectedWillChange) {
+          currentProject.selectedAssetId = currentProject.assets.at(-1)?.id || '';
+        }
+
+        await saveCurrentProject();
+
+        if (currentProject.selectedAssetId) {
+          await selectProjectAsset(currentProject.selectedAssetId, { silent: true });
+        } else {
+          videoInput.value = '';
+          previewVideo.removeAttribute('src');
+          previewVideo.load();
+          previewVideo.style.display = 'none';
+          setCustomControlsVisible(false);
+          helperLayer.style.display = 'none';
+          placeholder.style.display = 'block';
+          selectionMeta.textContent = 'No source video selected.';
+          refreshGui();
+        }
+
+        showStatus('ok', `Deleted project video: <strong>${escapeHtml(asset.name)}</strong>`);
+      } catch (error) {
+        showStatus('err', error.message || 'Could not delete this project video.');
+      }
+    }
+
     async function selectProjectAsset(assetId, options = {}) {
       if (!currentProject) return;
       const asset = getProjectAsset(assetId);
@@ -2159,6 +2649,7 @@
 
       setFileInput(videoInput, file);
       await loadSourceVideoPreview(file);
+      deactivateCropOverlay();
       updateMeta();
       refreshGui();
 
@@ -2170,6 +2661,7 @@
     async function addRenderedOutputToProject(outputUrl, context = {}) {
       if (!currentProject || !context.sourceAssetId || !outputUrl) return null;
 
+      const serverOutputFilename = getOutputFilenameFromUrl(outputUrl);
       const response = await fetch(outputUrl, { cache: 'no-store' });
       if (!response.ok) throw new Error('Rendered output was ready, but could not be copied into the project.');
       const blob = await response.blob();
@@ -2197,7 +2689,9 @@
         parentAssetId: context.sourceAssetId,
         operationId: opId,
         operationType,
-        operation
+        operation,
+        serverOutputFilename,
+        serverOutputUrl: outputUrl
       });
 
       if (asset) {
@@ -2261,10 +2755,11 @@
 
       projectAssetList.innerHTML = '';
       for (const asset of currentProject.assets.slice().sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0))) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = `asset-card${asset.id === currentProject.selectedAssetId ? ' selected' : ''}`;
-        button.dataset.assetId = asset.id;
+        const card = document.createElement('div');
+        card.className = `asset-card${asset.id === currentProject.selectedAssetId ? ' selected' : ''}`;
+        card.dataset.assetId = asset.id;
+        card.role = 'button';
+        card.tabIndex = 0;
 
         const img = document.createElement('img');
         img.className = 'asset-thumb';
@@ -2273,6 +2768,7 @@
         img.dataset.thumbBlobId = asset.thumbnailBlobId || '';
 
         const body = document.createElement('div');
+        body.className = 'asset-card-body';
         const title = document.createElement('div');
         title.className = 'asset-title';
         title.textContent = asset.role === 'root' ? `Root · ${asset.name}` : asset.name;
@@ -2282,11 +2778,48 @@
         const lineage = document.createElement('div');
         lineage.className = 'asset-lineage';
         const parent = asset.parentAssetId ? getProjectAsset(asset.parentAssetId) : null;
-        lineage.textContent = parent ? `from ${parent.name} · ${createOperationLabel(asset.operationType)}` : 'original uploaded source';
-        body.append(title, details, lineage);
-        button.append(img, body);
-        button.addEventListener('click', () => selectProjectAsset(asset.id));
-        projectAssetList.appendChild(button);
+        lineage.textContent = parent
+          ? `from ${parent.name} · ${createOperationLabel(asset.operationType)}`
+          : (asset.parentAssetId ? `from deleted project video · ${createOperationLabel(asset.operationType)}` : 'original uploaded source');
+
+        const actions = document.createElement('div');
+        actions.className = 'asset-actions';
+        const revealButton = document.createElement('button');
+        revealButton.type = 'button';
+        revealButton.className = 'asset-mini-button';
+        revealButton.textContent = asset.serverOutputFilename ? 'Reveal' : 'Export copy';
+        revealButton.title = asset.serverOutputFilename
+          ? 'Reveal the original generated output file in Finder / file manager'
+          : 'Browser-only project asset: export a copy to the app output folder, then reveal it';
+        revealButton.addEventListener('click', event => {
+          event.preventDefault();
+          event.stopPropagation();
+          revealProjectAssetInFinder(asset.id);
+        });
+        actions.append(revealButton);
+
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'asset-mini-button danger';
+        deleteButton.textContent = 'Delete';
+        deleteButton.title = 'Delete this video from the project, with optional disk-file deletion for generated outputs';
+        deleteButton.addEventListener('click', event => {
+          event.preventDefault();
+          event.stopPropagation();
+          deleteProjectAsset(asset.id);
+        });
+        actions.append(deleteButton);
+
+        body.append(title, details, lineage, actions);
+        card.append(img, body);
+        card.addEventListener('click', () => selectProjectAsset(asset.id));
+        card.addEventListener('keydown', event => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            selectProjectAsset(asset.id);
+          }
+        });
+        projectAssetList.appendChild(card);
 
         if (asset.thumbnailBlobId) {
           getProjectBlob(asset.thumbnailBlobId).then(blob => {
@@ -2692,6 +3225,7 @@
 
       setFileInput(videoInput, file);
       await loadSourceVideoPreview(file);
+      deactivateCropOverlay();
       updateMeta();
       refreshGui();
       return file;
@@ -2887,6 +3421,360 @@
     applyHelperPreview();
   }
 
+  function clampNumber(value, min, max) {
+    return Math.max(min, Math.min(max, Number(value) || 0));
+  }
+
+  function getCropSourceSize() {
+    return {
+      width: Number(previewVideo.videoWidth || 0),
+      height: Number(previewVideo.videoHeight || 0)
+    };
+  }
+
+  function getDisplayCropRectFromControls() {
+    const source = getCropSourceSize();
+    const videoRect = previewVideo.getBoundingClientRect();
+    const frameRect = mediaFrame.getBoundingClientRect();
+
+    if (!source.width || !source.height || !videoRect.width || !videoRect.height || !frameRect.width || !frameRect.height) {
+      return null;
+    }
+
+    const crop = resolveCropBoxFromControls();
+    const scaleX = videoRect.width / source.width;
+    const scaleY = videoRect.height / source.height;
+
+    return {
+      left: (videoRect.left - frameRect.left) + crop.x * scaleX,
+      top: (videoRect.top - frameRect.top) + crop.y * scaleY,
+      width: crop.width * scaleX,
+      height: crop.height * scaleY,
+      crop
+    };
+  }
+
+  function resolveCropBoxFromControls() {
+    const source = getCropSourceSize();
+    const sourceWidth = Math.max(2, source.width || Number(controls.crop_width || 2));
+    const sourceHeight = Math.max(2, source.height || Number(controls.crop_height || 2));
+
+    const width = evenPixel(clampNumber(controls.crop_width || sourceWidth, 2, sourceWidth));
+    const height = evenPixel(clampNumber(controls.crop_height || sourceHeight, 2, sourceHeight));
+    const anchor = String(controls.crop_anchor || 'center');
+
+    let x = 0;
+    let y = 0;
+
+    if (anchor === 'top_left') {
+      x = 0;
+      y = 0;
+    } else if (anchor === 'top_right') {
+      x = sourceWidth - width;
+      y = 0;
+    } else if (anchor === 'bottom_right') {
+      x = sourceWidth - width;
+      y = sourceHeight - height;
+    } else if (anchor === 'bottom_left') {
+      x = 0;
+      y = sourceHeight - height;
+    } else if (anchor === 'custom') {
+      x = clampNumber(controls.crop_x, 0, sourceWidth - width);
+      y = clampNumber(controls.crop_y, 0, sourceHeight - height);
+    } else {
+      x = (sourceWidth - width) / 2;
+      y = (sourceHeight - height) / 2;
+    }
+
+    return {
+      x: evenPixel(clampNumber(x, 0, sourceWidth - width)),
+      y: evenPixel(clampNumber(y, 0, sourceHeight - height)),
+      width: evenPixel(width),
+      height: evenPixel(height),
+      sourceWidth,
+      sourceHeight,
+      anchor
+    };
+  }
+
+  function setCropControlsFromBox(box, pushUndo = true) {
+    if (!box) return;
+
+    if (pushUndo) {
+      pushCropUndoState();
+    }
+
+    controls.crop_width = evenPixel(box.width);
+    controls.crop_height = evenPixel(box.height);
+    controls.crop_x = evenPixel(box.x);
+    controls.crop_y = evenPixel(box.y);
+    controls.crop_anchor = box.anchor || 'custom';
+    controls.crop_overlay_enabled = true;
+    cropRedoStack.length = 0;
+    updateCropPreview();
+    refreshGui();
+  }
+
+  function pushCropUndoState() {
+    cropUndoStack.push({
+      width: controls.crop_width,
+      height: controls.crop_height,
+      x: controls.crop_x,
+      y: controls.crop_y,
+      anchor: controls.crop_anchor
+    });
+
+    if (cropUndoStack.length > 80) {
+      cropUndoStack.shift();
+    }
+  }
+
+  function restoreCropState(state) {
+    if (!state) return;
+    controls.crop_width = state.width;
+    controls.crop_height = state.height;
+    controls.crop_x = state.x;
+    controls.crop_y = state.y;
+    controls.crop_anchor = state.anchor;
+    cropDraft = null;
+    updateCropPreview();
+    refreshGui();
+  }
+
+  function undoCrop() {
+    const previous = cropUndoStack.pop();
+    if (!previous) {
+      showStatus('info', 'No crop change to undo.');
+      return;
+    }
+
+    cropRedoStack.push({
+      width: controls.crop_width,
+      height: controls.crop_height,
+      x: controls.crop_x,
+      y: controls.crop_y,
+      anchor: controls.crop_anchor
+    });
+    restoreCropState(previous);
+  }
+
+  function redoCrop() {
+    const next = cropRedoStack.pop();
+    if (!next) {
+      showStatus('info', 'No crop change to redo.');
+      return;
+    }
+
+    pushCropUndoState();
+    restoreCropState(next);
+  }
+
+  function setCropToFullSource() {
+    const source = getCropSourceSize();
+    if (!source.width || !source.height) {
+      showStatus('info', 'Load a video before setting crop to full source.');
+      return;
+    }
+
+    setCropControlsFromBox({ x: 0, y: 0, width: source.width, height: source.height, anchor: 'custom' });
+  }
+
+  function setCropToHalfCenter() {
+    const source = getCropSourceSize();
+    if (!source.width || !source.height) {
+      showStatus('info', 'Load a video before setting a crop.');
+      return;
+    }
+
+    const width = evenPixel(source.width / 2);
+    const height = evenPixel(source.height / 2);
+    setCropControlsFromBox({
+      x: evenPixel((source.width - width) / 2),
+      y: evenPixel((source.height - height) / 2),
+      width,
+      height,
+      anchor: 'custom'
+    });
+  }
+
+  function updateCropControlsFromAnchor() {
+    const crop = resolveCropBoxFromControls();
+    controls.crop_width = crop.width;
+    controls.crop_height = crop.height;
+    controls.crop_x = crop.x;
+    controls.crop_y = crop.y;
+    updateCropPreview();
+    refreshGui();
+  }
+
+  function updateCropReadout(box = resolveCropBoxFromControls()) {
+    if (!box || !box.sourceWidth || !box.sourceHeight) {
+      controls.crop_readout = 'Load a video to set a crop area.';
+      return;
+    }
+
+    const pctW = ((box.width / box.sourceWidth) * 100).toFixed(1);
+    const pctH = ((box.height / box.sourceHeight) * 100).toFixed(1);
+    controls.crop_readout = `crop ${box.width}×${box.height} at x${box.x} y${box.y} · ${pctW}%w ${pctH}%h of ${box.sourceWidth}×${box.sourceHeight}`;
+  }
+
+  function updateCropPreview() {
+    if (!cropOverlay || !cropRect) return;
+
+    const shouldShow = previewVideo.style.display !== 'none'
+      && Boolean(controls.crop_overlay_enabled || controls.crop_draw_enabled || cropDraft);
+
+    cropOverlay.classList.toggle('show', Boolean(shouldShow));
+    cropOverlay.classList.toggle('drawing-enabled', Boolean(controls.crop_draw_enabled));
+    cropOverlay.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+    cropHelp.style.display = controls.crop_draw_enabled ? 'block' : 'none';
+
+    let displayBox = null;
+
+    if (cropDraft) {
+      displayBox = cropDraft.display;
+      updateCropReadout(cropDraft.source);
+    } else {
+      displayBox = getDisplayCropRectFromControls();
+      updateCropReadout(displayBox?.crop);
+    }
+
+    if (!shouldShow || !displayBox || displayBox.width < 2 || displayBox.height < 2) {
+      cropRect.classList.remove('show');
+      return;
+    }
+
+    cropRect.style.left = `${displayBox.left}px`;
+    cropRect.style.top = `${displayBox.top}px`;
+    cropRect.style.width = `${displayBox.width}px`;
+    cropRect.style.height = `${displayBox.height}px`;
+    cropRect.classList.add('show');
+  }
+
+  function sourcePointFromPointerEvent(event) {
+    const source = getCropSourceSize();
+    const videoRect = previewVideo.getBoundingClientRect();
+    const frameRect = mediaFrame.getBoundingClientRect();
+
+    if (!source.width || !source.height || !videoRect.width || !videoRect.height) {
+      return null;
+    }
+
+    const clientX = clampNumber(event.clientX, videoRect.left, videoRect.right);
+    const clientY = clampNumber(event.clientY, videoRect.top, videoRect.bottom);
+    const displayLeft = clientX - frameRect.left;
+    const displayTop = clientY - frameRect.top;
+    const sourceX = ((clientX - videoRect.left) / videoRect.width) * source.width;
+    const sourceY = ((clientY - videoRect.top) / videoRect.height) * source.height;
+
+    return {
+      sourceX,
+      sourceY,
+      displayLeft,
+      displayTop,
+      sourceWidth: source.width,
+      sourceHeight: source.height
+    };
+  }
+
+  function updateCropDraftFromPoints(start, end) {
+    if (!start || !end) return;
+
+    const sx = Math.min(start.sourceX, end.sourceX);
+    const sy = Math.min(start.sourceY, end.sourceY);
+    const ex = Math.max(start.sourceX, end.sourceX);
+    const ey = Math.max(start.sourceY, end.sourceY);
+    const dl = Math.min(start.displayLeft, end.displayLeft);
+    const dt = Math.min(start.displayTop, end.displayTop);
+    const dr = Math.max(start.displayLeft, end.displayLeft);
+    const db = Math.max(start.displayTop, end.displayTop);
+
+    const sourceBox = {
+      x: evenPixel(sx),
+      y: evenPixel(sy),
+      width: evenPixel(Math.max(2, ex - sx)),
+      height: evenPixel(Math.max(2, ey - sy)),
+      sourceWidth: start.sourceWidth,
+      sourceHeight: start.sourceHeight,
+      anchor: 'custom'
+    };
+
+    sourceBox.x = evenPixel(clampNumber(sourceBox.x, 0, sourceBox.sourceWidth - sourceBox.width));
+    sourceBox.y = evenPixel(clampNumber(sourceBox.y, 0, sourceBox.sourceHeight - sourceBox.height));
+
+    cropDraft = {
+      source: sourceBox,
+      display: {
+        left: dl,
+        top: dt,
+        width: Math.max(2, dr - dl),
+        height: Math.max(2, db - dt)
+      }
+    };
+
+    updateCropPreview();
+  }
+
+  function confirmCropDraft() {
+    if (!cropDraft) {
+      showStatus('info', 'Draw a crop rectangle first.');
+      return;
+    }
+
+    setCropControlsFromBox(cropDraft.source);
+    cropDraft = null;
+    controls.crop_draw_enabled = false;
+    controls.crop_overlay_enabled = true;
+    updateCropPreview();
+    refreshGui();
+    showStatus('ok', 'Crop rectangle confirmed. Use Crop preview or Crop full to render it.');
+  }
+
+  function clearCropDraft() {
+    cropDraft = null;
+    updateCropPreview();
+  }
+
+  function deactivateCropOverlay() {
+    controls.crop_overlay_enabled = false;
+    controls.crop_draw_enabled = false;
+    cropDraft = null;
+    cropDrawState = null;
+    updateCropPreview();
+    refreshGui();
+  }
+
+  function syncCropControlsToCurrentSource() {
+    if (!previewVideo.videoWidth || !previewVideo.videoHeight) {
+      return;
+    }
+
+    controls.crop_width = evenPixel(previewVideo.videoWidth);
+    controls.crop_height = evenPixel(previewVideo.videoHeight);
+    controls.crop_x = 0;
+    controls.crop_y = 0;
+    controls.crop_anchor = 'custom';
+    cropDraft = null;
+    cropDrawState = null;
+    updateCropPreview();
+    refreshGui();
+  }
+
+  function syncScalePresetToFactor() {
+    controls.video_scale_factor = Number(controls.video_scale_preset || controls.video_scale_factor || 1);
+    controls.upscale_factor = controls.video_scale_factor;
+    controls.upscale_mode = controls.video_scale_mode;
+    refreshGui();
+  }
+
+  function syncCustomScaleFactor() {
+    controls.video_scale_factor = Number(controls.video_scale_factor || 1);
+    controls.video_scale_factor = Math.max(0.05, Math.min(8, controls.video_scale_factor));
+    controls.upscale_factor = controls.video_scale_factor;
+    controls.upscale_mode = controls.video_scale_mode;
+    refreshGui();
+  }
+
   function applyAspectCanvasPreview() {
     if (!controls.aspect_live_preview || showingRenderedOutput) {
       updateAspectReadout();
@@ -2948,6 +3836,7 @@
       helperLayer.style.top = '0px';
       helperLayer.style.width = '100%';
       helperLayer.style.height = '100%';
+      updateCropPreview();
       return;
     }
 
@@ -2968,6 +3857,7 @@
     helperLayer.style.top = '0px';
     helperLayer.style.width = '100%';
     helperLayer.style.height = '100%';
+    updateCropPreview();
   }
 
     /* Show or hide helper overlay. */
@@ -4230,6 +5120,7 @@ async function loadSourceVideoPreview(file) {
   previewVideo.load();
 
   updateMeta();
+  syncSpeedCalculatorWithSource();
   updateTransportControls();
 }
 
@@ -4336,12 +5227,24 @@ async function processVideo(processKind, mode) {
       full: 'Starting speed processing...'
     },
     upscale: {
-      preview: controls.upscale_mode === 'ai'
+      preview: controls.video_scale_mode === 'ai'
         ? 'Starting Real-ESRGAN preview...'
-        : 'Starting traditional upscale preview...',
-      full: controls.upscale_mode === 'ai'
+        : 'Starting FFmpeg video scale preview...',
+      full: controls.video_scale_mode === 'ai'
         ? 'Starting Real-ESRGAN full upscale...'
-        : 'Starting traditional full upscale...'
+        : 'Starting FFmpeg full video scale...'
+    },
+    scale: {
+      preview: controls.video_scale_mode === 'ai'
+        ? 'Starting Real-ESRGAN preview...'
+        : 'Starting FFmpeg video scale preview...',
+      full: controls.video_scale_mode === 'ai'
+        ? 'Starting Real-ESRGAN full upscale...'
+        : 'Starting FFmpeg full video scale...'
+    },
+    crop: {
+      preview: 'Starting crop preview...',
+      full: 'Starting crop render...'
     },
     aspect: {
       preview: 'Starting aspect-ratio preview...',
@@ -5225,40 +6128,127 @@ silenceFolder.close();
 
 /* Group speed-processing controls and reuse the global preview window for partial processing. */
 const speedFolder = gui.addFolder('Video Speed');
-speedFolder.add(controls, 'speed_factor', 0.25, 4, 0.05).name('speed factor');
+speedFactorController = speedFolder.add(controls, 'speed_factor', 0.05, 16, 0.01).name('speed factor').onChange(updateSpeedFromFactor);
+speedFolder.add(controls, 'speed_original_duration_seconds').name('original seconds').listen().disable?.();
+speedOriginalHmsController = speedFolder.add(controls, 'speed_original_duration_hms').name('original HH:MM:SS').listen();
+if (speedOriginalHmsController.disable) {
+  speedOriginalHmsController.disable();
+}
+speedTargetDurationController = speedFolder.add(controls, 'speed_target_duration_seconds', 0.1, 86400, 0.1).name('target duration s').onChange(updateSpeedFromTargetDuration);
+speedTargetHmsController = speedFolder.add(controls, 'speed_target_duration_hms').name('target HH:MM:SS').listen();
+if (speedTargetHmsController.disable) {
+  speedTargetHmsController.disable();
+}
+speedReadoutController = speedFolder.add(controls, 'speed_readout').name('duration calculator').listen();
+if (speedReadoutController.disable) {
+  speedReadoutController.disable();
+}
+speedFolder.add({
+  sync_from_source() {
+    syncSpeedCalculatorWithSource();
+  }
+}, 'sync_from_source').name('Refresh duration');
 speedFolder.add({
   process_preview() {
+    updateSpeedFromFactor();
     return processVideo('speed', 'preview');
   }
 }, 'process_preview').name('Process preview');
 speedFolder.add({
   process_full() {
+    updateSpeedFromFactor();
     return processVideo('speed', 'full');
   }
 }, 'process_full').name('Process full');
 speedFolder.close();
 
-/* Group video-upscaling controls and reuse the existing preview/full processing workflow. */
-const upscaleFolder = gui.addFolder('Video Upscale');
-upscaleFolder.add(controls, 'upscale_mode', {
-  'Real-ESRGAN AI': 'ai',
-  'Traditional (Lanczos)': 'traditional'
-}).name('mode');
-upscaleFolder.add(controls, 'upscale_factor', {
-  '2x': 2,
-  '4x': 4
-}).name('scale');
-upscaleFolder.add({
+/* Scale controls support FFmpeg up/down-scale plus optional AI upscale. */
+const scaleFolder = gui.addFolder('Video Scale');
+scaleFolder.add(controls, 'video_scale_mode', {
+  'FFmpeg Lanczos — up/down scale': 'traditional',
+  'Real-ESRGAN AI — upscale only': 'ai'
+}).name('mode').onChange(value => {
+  controls.upscale_mode = value;
+  if (value === 'ai' && Number(controls.video_scale_factor || 1) < 1.5) {
+    controls.video_scale_factor = 2;
+    controls.video_scale_preset = 2;
+    showStatus('info', 'AI scale only supports upscaling. Scale was set to 2x.');
+  }
+  syncCustomScaleFactor();
+});
+scaleFolder.add(controls, 'video_scale_preset', {
+  '25% / 0.25x': 0.25,
+  '50% / 0.5x': 0.5,
+  '53% / 0.53x': 0.53,
+  '75% / 0.75x': 0.75,
+  'Original / 1x': 1,
+  '125% / 1.25x': 1.25,
+  '150% / 1.5x': 1.5,
+  '200% / 2x': 2,
+  '400% / 4x': 4
+}).name('preset').onChange(syncScalePresetToFactor);
+scaleFolder.add(controls, 'video_scale_factor', 0.05, 8, 0.01).name('custom factor').onChange(syncCustomScaleFactor);
+scaleFolder.add({
   process_preview() {
-    return processVideo('upscale', 'preview');
+    syncCustomScaleFactor();
+    return processVideo('scale', 'preview');
   }
-}, 'process_preview').name('Upscale preview');
-upscaleFolder.add({
+}, 'process_preview').name('Scale preview');
+scaleFolder.add({
   process_full() {
-    return processVideo('upscale', 'full');
+    syncCustomScaleFactor();
+    return processVideo('scale', 'full');
   }
-}, 'process_full').name('Upscale full');
-upscaleFolder.close();
+}, 'process_full').name('Scale full');
+scaleFolder.close();
+
+
+/* Crop source video by dimensions, anchor, or a drawn rectangle on the preview. */
+const cropFolder = gui.addFolder('Crop Video');
+cropFolder.add(controls, 'crop_width', 0, 7680, 2).name('crop width px').onChange(updateCropControlsFromAnchor);
+cropFolder.add(controls, 'crop_height', 0, 7680, 2).name('crop height px').onChange(updateCropControlsFromAnchor);
+cropFolder.add(controls, 'crop_anchor', {
+  'Middle / center': 'center',
+  'Top left': 'top_left',
+  'Top right': 'top_right',
+  'Bottom right': 'bottom_right',
+  'Bottom left': 'bottom_left',
+  'Custom / drawn': 'custom'
+}).name('anchor').onChange(updateCropControlsFromAnchor);
+cropFolder.add(controls, 'crop_x', 0, 7680, 2).name('x from left').onChange(() => { controls.crop_anchor = 'custom'; updateCropControlsFromAnchor(); });
+cropFolder.add(controls, 'crop_y', 0, 7680, 2).name('y from top').onChange(() => { controls.crop_anchor = 'custom'; updateCropControlsFromAnchor(); });
+cropFolder.add(controls, 'crop_overlay_enabled').name('show crop overlay').onChange(updateCropPreview);
+cropFolder.add(controls, 'crop_draw_enabled').name('draw rectangle').onChange(value => {
+  if (value) {
+    controls.aspect_live_preview = false;
+    showStatus('info', 'Draw on the video. Press Enter to confirm, Esc to clear draft, Cmd/Ctrl+Z to undo.');
+  } else {
+    cropDraft = null;
+    cropDrawState = null;
+  }
+  refreshGui();
+  updateCropPreview();
+});
+const cropReadoutController = cropFolder.add(controls, 'crop_readout').name('crop box').listen();
+if (cropReadoutController.disable) {
+  cropReadoutController.disable();
+}
+cropFolder.add({ set_full_source: setCropToFullSource }, 'set_full_source').name('Set full source');
+cropFolder.add({ set_half_center: setCropToHalfCenter }, 'set_half_center').name('Set half center');
+cropFolder.add({ confirm_drawn_rectangle: confirmCropDraft }, 'confirm_drawn_rectangle').name('Confirm drawn rectangle');
+cropFolder.add({ undo_crop: undoCrop }, 'undo_crop').name('Undo crop');
+cropFolder.add({ redo_crop: redoCrop }, 'redo_crop').name('Redo crop');
+cropFolder.add({
+  crop_preview() {
+    return processVideo('crop', 'preview');
+  }
+}, 'crop_preview').name('Crop preview');
+cropFolder.add({
+  crop_full() {
+    return processVideo('crop', 'full');
+  }
+}, 'crop_full').name('Crop full');
+cropFolder.close();
 
 
 const captionsFolder = gui.addFolder('Captions');
@@ -5269,7 +6259,24 @@ captionsFolder.add(controls, 'caption_model', {
   'Medium': 'medium'
 }).name('model');
 
-captionsFolder.add(controls, 'caption_language').name('language');
+captionsFolder.add(controls, 'caption_language', {
+  'English': 'en',
+  'Auto detect': '',
+  'Spanish': 'es',
+  'French': 'fr',
+  'German': 'de',
+  'Italian': 'it',
+  'Portuguese': 'pt',
+  'Dutch': 'nl',
+  'Polish': 'pl',
+  'Ukrainian': 'uk',
+  'Russian': 'ru',
+  'Arabic': 'ar',
+  'Hindi': 'hi',
+  'Chinese': 'zh',
+  'Japanese': 'ja',
+  'Korean': 'ko'
+}).name('language');
 captionsFolder.add(controls, 'caption_word_timestamps').name('word timestamps');
 captionsFolder.add(controls, 'caption_vad_filter').name('vad filter');
 
@@ -5528,8 +6535,54 @@ fullscreenBtn.addEventListener('click', async () => {
   }
 });
 
+if (cropOverlay) {
+  cropOverlay.addEventListener('pointerdown', event => {
+    if (!controls.crop_draw_enabled || previewVideo.style.display === 'none') return;
+
+    const point = sourcePointFromPointerEvent(event);
+    if (!point) return;
+
+    event.preventDefault();
+    cropDrawState = { start: point, current: point };
+    cropOverlay.setPointerCapture?.(event.pointerId);
+    updateCropDraftFromPoints(point, point);
+  });
+
+  cropOverlay.addEventListener('pointermove', event => {
+    if (!cropDrawState || !controls.crop_draw_enabled) return;
+
+    const point = sourcePointFromPointerEvent(event);
+    if (!point) return;
+
+    event.preventDefault();
+    cropDrawState.current = point;
+    updateCropDraftFromPoints(cropDrawState.start, point);
+  });
+
+  cropOverlay.addEventListener('pointerup', event => {
+    if (!cropDrawState) return;
+    event.preventDefault();
+
+    const point = sourcePointFromPointerEvent(event) || cropDrawState.current;
+    updateCropDraftFromPoints(cropDrawState.start, point);
+    cropDrawState = null;
+    cropOverlay.releasePointerCapture?.(event.pointerId);
+  });
+
+  cropOverlay.addEventListener('pointercancel', event => {
+    cropDrawState = null;
+    cropOverlay.releasePointerCapture?.(event.pointerId);
+  });
+}
+
 previewVideo.addEventListener('loadedmetadata', () => {
+  syncSpeedCalculatorWithSource();
   updateTransportControls();
+  if (!showingRenderedOutput) {
+    syncCropControlsToCurrentSource();
+  } else {
+    updateCropPreview();
+  }
   requestAnimationFrame(() => {
     if (!showingRenderedOutput) {
       syncAspectDimensionsFromRatio();
@@ -5593,7 +6646,37 @@ window.addEventListener('resize', () => {
 document.addEventListener('keydown', event => {
   if (event.target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)) return;
 
-  if (event.key.toLowerCase() === 'h') {
+  const key = event.key.toLowerCase();
+
+  if ((event.metaKey || event.ctrlKey) && key === 'z') {
+    event.preventDefault();
+    if (event.shiftKey) {
+      redoCrop();
+    } else {
+      undoCrop();
+    }
+    return;
+  }
+
+  if ((event.metaKey || event.ctrlKey) && key === 'y') {
+    event.preventDefault();
+    redoCrop();
+    return;
+  }
+
+  if (controls.crop_draw_enabled && event.key === 'Enter') {
+    event.preventDefault();
+    confirmCropDraft();
+    return;
+  }
+
+  if (controls.crop_draw_enabled && event.key === 'Escape') {
+    event.preventDefault();
+    clearCropDraft();
+    return;
+  }
+
+  if (key === 'h') {
     helpersVisible = !helpersVisible;
     applyHelpersVisibility();
   }
