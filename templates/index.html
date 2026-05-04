@@ -180,7 +180,48 @@
       cursor: nwse-resize;
     }
 
+    .overlay-helper {
+      position: absolute;
+      left: 50%;
+      top: 18%;
+      transform: translate(-50%, -50%);
+      transform-origin: center center;
+      max-width: 78%;
+      min-width: 96px;
+      min-height: 36px;
+      text-align: center;
+      white-space: pre-wrap;
+      line-height: 1.15;
+      user-select: none;
+      cursor: grab;
+      pointer-events: auto;
+      padding: 0.12em 0.26em;
+      border-radius: 10px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
 
+    .overlay-helper.is-dragging {
+      cursor: grabbing;
+    }
+
+    .overlay-helper::after {
+      content: "";
+      position: absolute;
+      inset: -8px;
+      border: 1px dashed rgba(125, 211, 252, 0.6);
+      border-radius: 12px;
+      pointer-events: none;
+    }
+
+    .overlay-helper-text {
+      display: block;
+      width: 100%;
+      text-align: inherit;
+      white-space: pre-wrap;
+      line-height: inherit;
+    }
 
 
     .topbar {
@@ -512,6 +553,10 @@
                 <div class="helper-handle helper-handle-br" id="helperHandleBR"></div>
               </div>
 
+              <div class="overlay-helper" id="overlayHelper">
+                <span id="overlayHelperText" class="overlay-helper-text">Overlay text</span>
+              </div>
+
             </div>
           </div>
         </div>
@@ -548,6 +593,8 @@
     const helperCaptionText = document.getElementById('helperCaptionText');
     const helperHandleTL = document.getElementById('helperHandleTL');
     const helperHandleBR = document.getElementById('helperHandleBR');
+    const overlayHelper = document.getElementById('overlayHelper');
+    const overlayHelperText = document.getElementById('overlayHelperText');
     const presetSelect = document.getElementById('presetSelect');
     const savePresetBtn = document.getElementById('savePresetBtn');
     const saveAsPresetBtn = document.getElementById('saveAsPresetBtn');
@@ -591,12 +638,14 @@
     let nativeCaptionPreviewEnabled = true;
 
     let dragState = null;
+    let overlayDragState = null;
     let resizeState = null;
     let presetDb = null;
     let presetsCache = {};
     let helpersVisible = true;
     let customFontsCache = [];
     let fontNameController = null;
+    let overlayFontNameController = null;
     let uploadedFontsController = null;
     let availableFonts = [];    
 /* Keep metadata for the last cached source video available across reloads. */
@@ -684,6 +733,33 @@
       speed_factor: 1.25,
       upscale_factor: 2,
       upscale_mode: 'traditional',
+
+      overlay_enabled: false,
+      overlay_text: '',
+      overlay_font_name: 'Arial',
+      overlay_font_size: 36,
+      overlay_bold: false,
+      overlay_italic: false,
+      overlay_all_caps: false,
+      overlay_colour: '#ffffff',
+      overlay_outline_colour: '#000000',
+      overlay_shadow_colour: '#000000',
+      overlay_background_colour: '#000000',
+      overlay_use_background: false,
+      overlay_background_alpha: 0.35,
+      overlay_background_pad_x: 8,
+      overlay_outline: 2,
+      overlay_shadow: 0,
+      overlay_blur: 0.8,
+      overlay_alignment: 5,
+      overlay_margin_v: 40,
+      overlay_margin_h: 40,
+      overlay_anchor_x: 0.5,
+      overlay_anchor_y: 0.18,
+      overlay_offset_x: 0,
+      overlay_offset_y: 0,
+      overlay_rotation_z: 0,
+      overlay_letter_spacing: 0,
 
       caption_model: 'small',
       caption_language: '',
@@ -808,12 +884,12 @@
         uploadedFontsController.updateDisplay();
       }
 
-      if (fontNameController) {
-        const options = {};
-        availableFonts.forEach(name => {
-          options[name] = name;
-        });
+      const options = {};
+      availableFonts.forEach(name => {
+        options[name] = name;
+      });
 
+      if (fontNameController) {
         fontNameController.options(options);
 
         if (!availableFonts.includes(controls.font_name) && availableFonts.length) {
@@ -821,6 +897,16 @@
         }
 
         fontNameController.updateDisplay();
+      }
+
+      if (overlayFontNameController) {
+        overlayFontNameController.options(options);
+
+        if (!availableFonts.includes(controls.overlay_font_name) && availableFonts.length) {
+          controls.overlay_font_name = availableFonts[0];
+        }
+
+        overlayFontNameController.updateDisplay();
       }
 
       renderFontGallery();
@@ -863,13 +949,19 @@
         uploadedFontsController.updateDisplay();
       }
 
+      const options = {};
+      availableFonts.forEach(name => {
+        options[name] = name;
+      });
+
       if (fontNameController) {
-        const options = {};
-        availableFonts.forEach(name => {
-          options[name] = name;
-        });
         fontNameController.options(options);
         fontNameController.updateDisplay();
+      }
+
+      if (overlayFontNameController) {
+        overlayFontNameController.options(options);
+        overlayFontNameController.updateDisplay();
       }
 
       renderFontGallery();
@@ -1135,6 +1227,7 @@
       helperLayer.style.display = 'block';
     } else {
       helperLayer.classList.add('hidden');
+      overlayHelper.style.display = 'none';
     }
   }
 
@@ -1289,6 +1382,7 @@
 
   syncOverlayToVideo();
   applyHelpersVisibility();
+  applyOverlayHelperPreview();
 }
 
 
@@ -1311,7 +1405,55 @@ function getHelperTranslateForAlignment(alignment) {
   return '-50%, -100%';
 }
 
+function getTextAlignForAlignment(alignment) {
+  const a = Number(alignment);
+  if ([1, 4, 7].includes(a)) return 'left';
+  if ([3, 6, 9].includes(a)) return 'right';
+  return 'center';
+}
 
+function applyOverlayHelperPreview() {
+  const hasPreview = previewVideo.style.display !== 'none';
+  const overlayTextRaw = String(controls.overlay_text || '');
+  const overlayText = controls.overlay_all_caps ? overlayTextRaw.toUpperCase() : overlayTextRaw;
+
+  if (!helpersVisible || !hasPreview || !controls.overlay_enabled || !overlayText.trim()) {
+    overlayHelper.style.display = 'none';
+    return;
+  }
+
+  const scale = getPreviewScaleFactor();
+  const helperFontSize = Math.max(10, controls.overlay_font_size * scale);
+  const helperTranslate = getHelperTranslateForAlignment(controls.overlay_alignment);
+  const bgHex = String(controls.overlay_background_colour || '#000000').replace('#', '');
+  const rr = parseInt(bgHex.slice(0, 2) || '00', 16);
+  const gg = parseInt(bgHex.slice(2, 4) || '00', 16);
+  const bb = parseInt(bgHex.slice(4, 6) || '00', 16);
+  const helperPadY = controls.overlay_use_background ? Math.max(3, helperFontSize * 0.2) : Math.max(1, helperFontSize * 0.08);
+  const helperPadX = controls.overlay_use_background
+    ? Math.max(6, helperFontSize * 0.32 + (controls.overlay_background_pad_x * scale))
+    : Math.max(3, helperFontSize * 0.18);
+
+  overlayHelperText.textContent = overlayText;
+  overlayHelper.style.display = 'flex';
+  overlayHelper.style.fontFamily = `"${controls.overlay_font_name}", Arial, sans-serif`;
+  overlayHelper.style.fontSize = `${helperFontSize}px`;
+  overlayHelper.style.fontWeight = controls.overlay_bold ? '700' : '400';
+  overlayHelper.style.fontStyle = controls.overlay_italic ? 'italic' : 'normal';
+  overlayHelper.style.color = controls.overlay_colour;
+  overlayHelper.style.textAlign = getTextAlignForAlignment(controls.overlay_alignment);
+  overlayHelper.style.justifyContent = 'center';
+  overlayHelper.style.alignItems = 'center';
+  overlayHelper.style.backgroundColor = controls.overlay_use_background
+    ? `rgba(${rr}, ${gg}, ${bb}, ${controls.overlay_background_alpha})`
+    : 'transparent';
+  overlayHelper.style.padding = `${helperPadY}px ${helperPadX}px`;
+  overlayHelper.style.letterSpacing = `${controls.overlay_letter_spacing * scale}px`;
+  overlayHelper.style.textShadow = `${controls.overlay_outline * scale}px 0 ${controls.overlay_outline_colour}, ${-controls.overlay_outline * scale}px 0 ${controls.overlay_outline_colour}, 0 ${controls.overlay_outline * scale}px ${controls.overlay_outline_colour}, 0 ${-controls.overlay_outline * scale}px ${controls.overlay_outline_colour}, ${controls.overlay_shadow * scale}px ${controls.overlay_shadow * scale}px ${controls.overlay_shadow_colour}`;
+  overlayHelper.style.left = `${controls.overlay_anchor_x * 100}%`;
+  overlayHelper.style.top = `${controls.overlay_anchor_y * 100}%`;
+  overlayHelper.style.transform = `translate(${helperTranslate}) translate(${controls.overlay_offset_x * scale}px, ${controls.overlay_offset_y * scale}px) rotate(${-controls.overlay_rotation_z}deg)`;
+}
 
 
 /* Resize helper box around center; width maps directly to render width via margin_h. */
@@ -2563,6 +2705,49 @@ helperCaption.addEventListener('pointercancel', () => {
   helperCaption.classList.remove('is-dragging');
 });
 
+function updateOverlayFromDrag(clientX, clientY) {
+  const rect = helperLayer.getBoundingClientRect();
+  const boxRect = overlayHelper.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+
+  const halfW = Math.min(boxRect.width / 2, rect.width / 2);
+  const halfH = Math.min(boxRect.height / 2, rect.height / 2);
+
+  const clampedX = Math.max(rect.left + halfW, Math.min(rect.right - halfW, clientX));
+  const clampedY = Math.max(rect.top + halfH, Math.min(rect.bottom - halfH, clientY));
+
+  controls.overlay_anchor_x = Number(((clampedX - rect.left) / rect.width).toFixed(4));
+  controls.overlay_anchor_y = Number(((clampedY - rect.top) / rect.height).toFixed(4));
+  controls.overlay_offset_x = 0;
+  controls.overlay_offset_y = 0;
+
+  refreshGui();
+  applyHelperPreview();
+}
+
+overlayHelper.addEventListener('pointerdown', event => {
+  if (overlayHelper.style.display === 'none') return;
+  overlayDragState = true;
+  overlayHelper.classList.add('is-dragging');
+  overlayHelper.setPointerCapture(event.pointerId);
+});
+
+overlayHelper.addEventListener('pointermove', event => {
+  if (!overlayDragState) return;
+  updateOverlayFromDrag(event.clientX, event.clientY);
+});
+
+overlayHelper.addEventListener('pointerup', event => {
+  overlayDragState = null;
+  overlayHelper.classList.remove('is-dragging');
+  overlayHelper.releasePointerCapture(event.pointerId);
+});
+
+overlayHelper.addEventListener('pointercancel', () => {
+  overlayDragState = null;
+  overlayHelper.classList.remove('is-dragging');
+});
+
 
 /* Restore required control keys before lil-gui binds to them so missing saved-state fields do not crash the UI. */
 Object.assign(controls, {
@@ -2937,6 +3122,43 @@ typeFolder.open();
 refreshFontsFromServer().catch(error => {
   showStatus('err', error.message || 'Could not load fonts.');
 });
+
+const overlayFolder = gui.addFolder('Overlay Layer');
+overlayFolder.add(controls, 'overlay_enabled').name('enabled').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_text').name('text').onFinishChange(applyHelperPreview);
+overlayFontNameController = overlayFolder.add(controls, 'overlay_font_name', { Arial: 'Arial' }).name('font').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_font_size', 8, 256, 1).name('font size').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_alignment', {
+  'Bottom Left': 1,
+  'Bottom Center': 2,
+  'Bottom Right': 3,
+  'Middle Left': 4,
+  'Middle Center': 5,
+  'Middle Right': 6,
+  'Top Left': 7,
+  'Top Center': 8,
+  'Top Right': 9
+}).name('alignment').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_anchor_x', 0, 1, 0.001).name('x').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_anchor_y', 0, 1, 0.001).name('y').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_offset_x', -800, 800, 1).name('offset x').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_offset_y', -800, 800, 1).name('offset y').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_rotation_z', -90, 90, 0.1).name('rotation').onChange(applyHelperPreview);
+overlayFolder.addColor(controls, 'overlay_colour').name('text colour').onChange(applyHelperPreview);
+overlayFolder.addColor(controls, 'overlay_outline_colour').name('outline colour').onChange(applyHelperPreview);
+overlayFolder.addColor(controls, 'overlay_shadow_colour').name('shadow colour').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_outline', 0, 12, 0.5).name('outline').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_shadow', 0, 12, 0.5).name('shadow').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_blur', 0, 8, 0.1).name('blur').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_use_background').name('background').onChange(applyHelperPreview);
+overlayFolder.addColor(controls, 'overlay_background_colour').name('bg colour').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_background_alpha', 0, 1, 0.01).name('bg alpha').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_background_pad_x', 0, 40, 1).name('bg pad x').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_bold').name('bold').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_italic').name('italic').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_all_caps').name('all caps').onChange(applyHelperPreview);
+overlayFolder.add(controls, 'overlay_letter_spacing', -10, 30, 0.1).name('letter spacing').onChange(applyHelperPreview);
+overlayFolder.close();
 
 
 

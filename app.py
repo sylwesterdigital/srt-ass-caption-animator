@@ -486,6 +486,174 @@ def _apply_text_case(text, settings):
     return value.upper() if settings.get("all_caps") else value
 
 
+
+# Convert ASS BGR strings into pysubs2 color objects for reusable overlay styling.
+def _ass_bgr_to_pysubs2_color(value, default="&H00FFFFFF"):
+    value = (value or default).strip().upper()
+    if value.startswith("&H"):
+        value = value[2:]
+    value = value.rjust(8, "0")[-8:]
+
+    aa = int(value[0:2], 16)
+    bb = int(value[2:4], 16)
+    gg = int(value[4:6], 16)
+    rr = int(value[6:8], 16)
+
+    return pysubs2.Color(rr, gg, bb, aa)
+
+
+# Parse the standalone text-overlay layer settings shared by caption renders and video-processing jobs.
+def _build_overlay_settings_from_form(form):
+    return {
+        "enabled": _safe_bool(form.get("overlay_enabled", "0")),
+        "text": str(form.get("overlay_text", "") or ""),
+        "font_name": form.get("overlay_font_name", form.get("font_name", "Arial")),
+        "font_size": _safe_int(form.get("overlay_font_size", 36), 36),
+        "bold": _safe_bool(form.get("overlay_bold", "0")),
+        "italic": _safe_bool(form.get("overlay_italic", "0")),
+        "all_caps": _safe_bool(form.get("overlay_all_caps", "0")),
+        "primary_colour": _hex_to_ass_bgr(form.get("overlay_colour", "#FFFFFF"), "00"),
+        "outline_colour": _hex_to_ass_bgr(form.get("overlay_outline_colour", "#000000"), "00"),
+        "shadow_colour": _hex_to_ass_bgr(form.get("overlay_shadow_colour", "#000000"), "00"),
+        "background_colour": _hex_to_ass_bgr(form.get("overlay_background_colour", "#000000"), "00"),
+        "use_background": _safe_bool(form.get("overlay_use_background", "0")),
+        "background_alpha": _safe_float(form.get("overlay_background_alpha", 0.35), 0.35),
+        "background_pad_x": _safe_int(form.get("overlay_background_pad_x", 8), 8),
+        "outline": _safe_float(form.get("overlay_outline", 2), 2),
+        "shadow": _safe_float(form.get("overlay_shadow", 0), 0),
+        "blur": _safe_float(form.get("overlay_blur", 0.8), 0.8),
+        "alignment": _safe_int(form.get("overlay_alignment", 5), 5),
+        "margin_v": _safe_int(form.get("overlay_margin_v", 40), 40),
+        "margin_h": _safe_int(form.get("overlay_margin_h", 40), 40),
+        "anchor_x": _safe_float(form.get("overlay_anchor_x", 0.5), 0.5),
+        "anchor_y": _safe_float(form.get("overlay_anchor_y", 0.18), 0.18),
+        "offset_x": _safe_int(form.get("overlay_offset_x", 0), 0),
+        "offset_y": _safe_int(form.get("overlay_offset_y", 0), 0),
+        "rotation_z": _safe_float(form.get("overlay_rotation_z", 0), 0),
+        "letter_spacing": _safe_float(form.get("overlay_letter_spacing", 0), 0),
+    }
+
+
+# Return True only when the extra burnt-in text layer should actually be emitted.
+def _overlay_layer_enabled(overlay_settings):
+    if not overlay_settings:
+        return False
+
+    if not overlay_settings.get("enabled"):
+        return False
+
+    return bool(str(overlay_settings.get("text", "") or "").strip())
+
+
+# Apply the text-overlay layer style into an SSA file so it can be burnt in by libass.
+def _ensure_overlay_style(subs, overlay_settings, style_name="OverlayLayer"):
+    bg_alpha_hex = f"{max(0, min(255, round((1 - overlay_settings['background_alpha']) * 255))):02X}"
+    bg_value = str(overlay_settings.get("background_colour", "&H00000000")).strip().upper()
+    if bg_value.startswith("&H"):
+        bg_value = bg_value[2:]
+    bg_value = bg_value.rjust(8, "0")[-8:]
+
+    box_color = _ass_bgr_to_pysubs2_color(f"&H{bg_alpha_hex}{bg_value[2:]}")
+    borderstyle = 4 if overlay_settings.get("use_background") else 1
+
+    style = subs.styles.get(style_name, pysubs2.SSAStyle())
+    style.fontname = overlay_settings["font_name"]
+    style.fontsize = overlay_settings["font_size"]
+    style.primarycolor = _ass_bgr_to_pysubs2_color(overlay_settings["primary_colour"], "&H00FFFFFF")
+    style.outlinecolor = _ass_bgr_to_pysubs2_color(overlay_settings["outline_colour"], "&H00000000")
+    style.backcolor = box_color
+    style.bold = overlay_settings["bold"]
+    style.italic = overlay_settings["italic"]
+    style.borderstyle = borderstyle
+    style.outline = overlay_settings["outline"]
+    style.shadow = overlay_settings["shadow"]
+    style.alignment = overlay_settings["alignment"]
+    style.marginv = overlay_settings["margin_v"]
+    style.marginl = overlay_settings["margin_h"]
+    style.marginr = overlay_settings["margin_h"]
+    subs.styles[style_name] = style
+    return style_name
+
+
+# Build the override text used by the extra static overlay layer.
+def _build_overlay_text_override(overlay_settings, video_info):
+    pos_x, pos_y = _compute_position(video_info, overlay_settings)
+    box_or_shadow_colour = overlay_settings["background_colour"] if overlay_settings.get("use_background") else overlay_settings["shadow_colour"]
+
+    tags = [
+        rf"\an{overlay_settings['alignment']}",
+        rf"\pos({pos_x},{pos_y})",
+        rf"\bord{overlay_settings['outline']:g}",
+        rf"\shad{overlay_settings['shadow']:g}",
+        rf"\blur{overlay_settings['blur']:g}",
+        rf"\1c{overlay_settings['primary_colour']}",
+        rf"\3c{overlay_settings['outline_colour']}",
+        rf"\4c{box_or_shadow_colour}",
+        rf"\fsp{overlay_settings['letter_spacing']:g}",
+        rf"\frz{overlay_settings['rotation_z']:g}",
+    ]
+
+    overlay_text = _apply_text_case(str(overlay_settings.get("text", "") or ""), overlay_settings)
+    overlay_text = _escape_ass_text(overlay_text)
+
+    if overlay_settings.get("use_background") and int(overlay_settings.get("background_pad_x", 0)) > 0:
+        hard_spaces = r"\h" * int(overlay_settings["background_pad_x"])
+        overlay_text = f"{hard_spaces}{overlay_text}{hard_spaces}"
+
+    return "{" + "".join(tags) + "}" + overlay_text
+
+
+# Append the extra text-overlay layer to an existing ASS subtitle file so both burn in together.
+def append_text_overlay_to_ass(ass_path, overlay_settings, video_info, duration_seconds):
+    if not _overlay_layer_enabled(overlay_settings):
+        return False
+
+    subs = pysubs2.load(ass_path, encoding="utf-8")
+    subs.info["PlayResX"] = str(video_info["width"])
+    subs.info["PlayResY"] = str(video_info["height"])
+    subs.info["ScaledBorderAndShadow"] = "yes"
+    subs.info["WrapStyle"] = "0"
+
+    style_name = _ensure_overlay_style(subs, overlay_settings)
+    duration_ms = max(1, int(round(float(duration_seconds or 0) * 1000)))
+
+    event = pysubs2.SSAEvent(
+        start=0,
+        end=duration_ms,
+        text=_build_overlay_text_override(overlay_settings, video_info),
+        style=style_name,
+    )
+    event.layer = 50
+    subs.events.append(event)
+    subs.save(ass_path)
+    return True
+
+
+# Generate a standalone ASS file for the extra text-overlay layer.
+def create_text_overlay_ass(dst, overlay_settings, video_info, duration_seconds):
+    if not _overlay_layer_enabled(overlay_settings):
+        return False
+
+    subs = pysubs2.SSAFile()
+    subs.info["PlayResX"] = str(video_info["width"])
+    subs.info["PlayResY"] = str(video_info["height"])
+    subs.info["ScaledBorderAndShadow"] = "yes"
+    subs.info["WrapStyle"] = "0"
+
+    style_name = _ensure_overlay_style(subs, overlay_settings)
+    duration_ms = max(1, int(round(float(duration_seconds or 0) * 1000)))
+
+    event = pysubs2.SSAEvent(
+        start=0,
+        end=duration_ms,
+        text=_build_overlay_text_override(overlay_settings, video_info),
+        style=style_name,
+    )
+    event.layer = 50
+    subs.events.append(event)
+    subs.save(dst)
+    return True
+
 def _ts_to_ms(ts):
     hh, mm, rest = ts.split(":")
     ss, ms = rest.split(".")
@@ -1605,10 +1773,27 @@ def process_video_job(job_id, video_path, output_path, process_kind, settings, p
         else:
             raise RuntimeError("Unsupported processing mode.")
 
+        overlay_ass_name = None
+        overlay_settings = settings.get("overlay")
+
+        if _overlay_layer_enabled(overlay_settings):
+            JOBS[job_id]["status"] = "rendering"
+            JOBS[job_id]["message"] = "Burning text overlay..."
+
+            overlay_ass_path = os.path.join(OUTPUT_DIR, f"{job_id}_{process_kind}_overlay.ass")
+            final_output_path = os.path.join(OUTPUT_DIR, f"{job_id}_{process_kind}_with_overlay.mp4")
+            processed_video_info = get_video_info(output_path)
+            processed_duration = get_video_duration(output_path)
+
+            create_text_overlay_ass(overlay_ass_path, overlay_settings, processed_video_info, processed_duration)
+            render_preview(output_path, overlay_ass_path, final_output_path, preview_start=0, preview_seconds=None)
+            os.replace(final_output_path, output_path)
+            overlay_ass_name = os.path.basename(overlay_ass_path)
+
         JOBS[job_id]["status"] = "done"
         JOBS[job_id]["message"] = "Processed video ready."
         JOBS[job_id]["preview_file"] = os.path.basename(output_path)
-        JOBS[job_id]["ass_file"] = None
+        JOBS[job_id]["ass_file"] = overlay_ass_name
 
     except Exception as exc:
         JOBS[job_id]["status"] = "error"
@@ -2151,10 +2336,14 @@ def process_preview(job_id, video_path, srt_path, ass_path, preview_path, settin
         JOBS[job_id]["status"] = "preparing"
         JOBS[job_id]["message"] = "Reading video resolution..."
         video_info = get_video_info(video_path)
+        source_duration = get_video_duration(video_path)
 
         JOBS[job_id]["status"] = "preparing"
         JOBS[job_id]["message"] = "Generating animated ASS..."
         srt_to_animated_ass(srt_path, ass_path, settings, video_info)
+
+        if append_text_overlay_to_ass(ass_path, settings.get("overlay"), video_info, source_duration):
+            JOBS[job_id]["message"] = "Adding text overlay layer..."
 
         if preview_start or preview_seconds is not None:
             shift_ass_for_preview(ass_path, preview_start=preview_start, preview_seconds=preview_seconds)
@@ -2395,6 +2584,7 @@ def api_preview():
             "letter_spacing": _safe_float(request.form.get("letter_spacing", 0), 0),
             "reveal_offset_ms": _safe_int(request.form.get("reveal_offset_ms", 0), 0),
             "out_mode": request.form.get("out_mode", "fade"),
+            "overlay": _build_overlay_settings_from_form(request.form),
         }
 
 
@@ -2476,6 +2666,7 @@ def api_process_video():
             "speed_factor": _safe_float(request.form.get("speed_factor", 1.25), 1.25),
             "upscale_factor": 4 if int(_safe_float(request.form.get("upscale_factor", 2), 2)) >= 4 else 2,
             "upscale_mode": "ai" if request.form.get("upscale_mode", "traditional") == "ai" else "traditional",
+            "overlay": _build_overlay_settings_from_form(request.form),
         }
 
         JOBS[job_id] = {
