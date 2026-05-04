@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>Caption Animator</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     :root {
@@ -14,6 +15,31 @@
       --ok: #17391d;
       --err: #5a1717;
       --info: #19304e;
+      --sidebar-bg: rgba(10, 13, 19, 0.96);
+      --card-bg: rgba(255,255,255,0.045);
+      --button-bg: rgba(255,255,255,0.07);
+      --button-text: #f3f4f6;
+      --button-primary-bg: #ffffff;
+      --button-primary-text: #000000;
+      --accent: #7dd3fc;
+    }
+
+    body[data-theme="light"] {
+      --bg: #f4f7fb;
+      --panel: rgba(255, 255, 255, 0.88);
+      --line: rgba(15, 23, 42, 0.12);
+      --text: #111827;
+      --muted: #64748b;
+      --ok: #dcfce7;
+      --err: #fee2e2;
+      --info: #dbeafe;
+      --sidebar-bg: rgba(248, 250, 252, 0.98);
+      --card-bg: rgba(15, 23, 42, 0.035);
+      --button-bg: rgba(15, 23, 42, 0.06);
+      --button-text: #111827;
+      --button-primary-bg: #111827;
+      --button-primary-text: #ffffff;
+      --accent: #0369a1;
     }
 
     * { box-sizing: border-box; }
@@ -146,9 +172,9 @@
     }
 
     .transport-button.primary {
-      background: #ffffff;
-      color: #000000;
-      border-color: #ffffff;
+      background: var(--button-primary-bg);
+      color: var(--button-primary-text);
+      border-color: var(--button-primary-bg);
     }
 
     .transport-time {
@@ -206,9 +232,157 @@
       line-height: 1.5;
     }
 
+    .global-colour-overlay {
+      position: absolute;
+      inset: 0;
+      display: none;
+      z-index: 8;
+      pointer-events: none;
+      border-radius: inherit;
+      opacity: 1;
+    }
+
+    .global-colour-overlay.show {
+      display: block;
+    }
+
+
+    .gradient-stops-editor {
+      display: grid;
+      gap: 8px;
+      padding: 8px;
+      margin: 8px 4px 6px;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      background: var(--card-bg);
+      font-family: Arial, sans-serif;
+    }
+
+    .gradient-stops-editor[hidden] {
+      display: none;
+    }
+
+    .gradient-stops-header,
+    .gradient-stop-row-top,
+    .gradient-stop-row-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .gradient-stops-header {
+      justify-content: space-between;
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .gradient-stops-help {
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.35;
+    }
+
+    .gradient-strip-preview {
+      height: 20px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.16);
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18);
+    }
+
+    .gradient-stops-list {
+      display: grid;
+      gap: 7px;
+      max-height: 360px;
+      overflow: auto;
+      padding-right: 2px;
+    }
+
+    .gradient-stop-row {
+      display: grid;
+      gap: 7px;
+      padding: 8px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      background: rgba(0,0,0,0.16);
+    }
+
+    .gradient-stop-row.is-selected {
+      border-color: rgba(125, 211, 252, 0.65);
+      box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.14);
+      background: rgba(14, 116, 144, 0.14);
+    }
+
+    .gradient-stop-label {
+      min-width: 52px;
+      color: var(--text);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .gradient-stop-chip {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.32);
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2);
+    }
+
+    .gradient-stop-row input[type="range"] {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .gradient-stop-row input[type="number"] {
+      width: 58px;
+      height: 26px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 7px;
+      background: var(--button-bg);
+      color: var(--button-text);
+      font-size: 11px;
+      padding: 0 6px;
+    }
+
+    .gradient-stop-row input[type="color"] {
+      width: 30px;
+      height: 26px;
+      padding: 0;
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 7px;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .gradient-stop-mini-button {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      min-height: 24px;
+      padding: 0 7px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .gradient-stop-mini-button:hover {
+      background: rgba(255,255,255,0.14);
+    }
+
+    .gradient-stop-mini-button.danger {
+      color: #fecaca;
+      border-color: rgba(248, 113, 113, 0.28);
+      background: rgba(127, 29, 29, 0.26);
+    }
+
     .helper-layer {
       position: absolute;
       inset: 0;
+      z-index: 20;
       pointer-events: none;
     }
 
@@ -643,7 +817,7 @@
       height: 100vh;
       min-height: 0;
       border-right: 1px solid var(--line);
-      background: rgba(10, 13, 19, 0.96);
+      background: var(--sidebar-bg);
       padding: 14px;
       display: flex;
       flex-direction: column;
@@ -701,7 +875,7 @@
     .project-card {
       border: 1px solid var(--line);
       border-radius: 16px;
-      background: rgba(255,255,255,0.045);
+      background: var(--card-bg);
       padding: 12px;
       display: grid;
       gap: 8px;
@@ -868,6 +1042,232 @@
 
     .asset-mini-button.danger:hover {
       background: rgba(127, 29, 29, 0.38);
+    }
+
+
+    /* Side-panel tabs: project video sources and per-source captions editor. */
+    .sidebar-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.035);
+    }
+
+    .sidebar-tab-button {
+      appearance: none;
+      border: 0;
+      border-radius: 10px;
+      min-height: 32px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .sidebar-tab-button.active {
+      background: rgba(255,255,255,0.12);
+      color: var(--text);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+
+    .sidebar-tab-panel {
+      display: none;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .sidebar-tab-panel.active {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .caption-editor-panel {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .caption-editor-header {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--card-bg);
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .caption-editor-title {
+      font-size: 12px;
+      font-weight: bold;
+      line-height: 1.25;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .caption-editor-meta {
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.35;
+    }
+
+    .caption-editor-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .caption-editor-actions .project-button {
+      min-height: 32px;
+      padding: 6px 8px;
+    }
+
+    .caption-editor-follow-row {
+      display: grid;
+      grid-template-columns: auto auto 1fr;
+      align-items: center;
+      gap: 6px;
+      margin-top: 2px;
+    }
+
+    .caption-editor-follow-row .asset-mini-button {
+      min-height: 28px;
+      padding: 5px 8px;
+      font-size: 10px;
+    }
+
+    .caption-editor-follow-row .asset-mini-button.is-on {
+      background: rgba(125, 211, 252, 0.18);
+      border-color: rgba(125, 211, 252, 0.46);
+      color: #d9f3ff;
+    }
+
+    .caption-editor-active-meta {
+      min-width: 0;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: right;
+    }
+
+    .caption-editor-list {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+      padding-right: 2px;
+    }
+
+    .caption-empty {
+      border: 1px dashed var(--line);
+      border-radius: 16px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      padding: 14px;
+    }
+
+    .caption-row {
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.04);
+      padding: 8px;
+      display: grid;
+      gap: 7px;
+    }
+
+    .caption-row.is-active {
+      border-color: rgba(125, 211, 252, 0.78);
+      box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.38) inset;
+    }
+
+    .caption-row:focus-within {
+      border-color: rgba(255, 255, 255, 0.28);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14);
+    }
+
+    .caption-row-top {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .caption-index {
+      min-width: 26px;
+      color: #9fd3ff;
+      font-size: 10px;
+      font-weight: bold;
+      text-align: right;
+    }
+
+    .caption-time-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+    }
+
+    .caption-time-input,
+    .caption-textarea {
+      width: 100%;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 9px;
+      background: rgba(0,0,0,0.22);
+      color: var(--text);
+      font-family: Arial, sans-serif;
+      font-size: 10px;
+      outline: none;
+    }
+
+    .caption-time-input {
+      min-height: 28px;
+      padding: 5px 6px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .caption-textarea {
+      min-height: 58px;
+      resize: vertical;
+      line-height: 1.3;
+      padding: 8px;
+    }
+
+    .caption-row-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 5px;
+    }
+
+    .caption-editor-dirty {
+      color: #ffd54f;
+    }
+
+    .asset-caption-badge {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      margin-top: 3px;
+      padding: 2px 5px;
+      border: 1px solid rgba(125, 211, 252, 0.32);
+      border-radius: 999px;
+      color: #9fd3ff;
+      background: rgba(14, 116, 144, 0.18);
+      font-size: 9px;
+      line-height: 1;
+      font-weight: bold;
     }
 
     .app-modal-checkbox-row {
@@ -1137,17 +1537,186 @@
 
 
 
+    /* App chrome and mode controls. */
+    .brand-lockup {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .brand-logo {
+      width: 28px;
+      height: 28px;
+      flex: 0 0 auto;
+      border-radius: 9px;
+      display: block;
+    }
+
+    .project-header-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex: 0 0 auto;
+    }
+
+    .project-button.icon {
+      min-width: 36px;
+      width: 36px;
+      padding: 0;
+      font-size: 15px;
+    }
+
+    .easy-toolbar {
+      pointer-events: auto;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 16px 42px rgba(0,0,0,0.22);
+    }
+
+    body[data-ui-mode="easy"] .easy-toolbar {
+      display: inline-flex;
+      flex-wrap: wrap;
+    }
+
+    body[data-ui-mode="easy"] .lil-gui.root {
+      display: none !important;
+    }
+
+    .easy-toolbar-button,
+    .easy-toolbar-input,
+    .easy-toolbar-color {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      min-height: 34px;
+      background: var(--button-bg);
+      color: var(--button-text);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .easy-toolbar-button {
+      padding: 0 10px;
+      cursor: pointer;
+    }
+
+    .easy-toolbar-button.primary {
+      background: var(--button-primary-bg);
+      color: var(--button-primary-text);
+      border-color: var(--button-primary-bg);
+    }
+
+    .easy-toolbar-input {
+      width: 78px;
+      padding: 0 8px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .easy-toolbar-color {
+      width: 40px;
+      padding: 2px;
+      cursor: pointer;
+    }
+
+    .config-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 130;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(2, 6, 12, 0.68);
+      backdrop-filter: blur(18px) saturate(140%);
+    }
+
+    .config-overlay.open {
+      display: flex;
+    }
+
+    .config-panel {
+      width: min(460px, calc(100vw - 28px));
+      display: grid;
+      gap: 16px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: var(--panel);
+      color: var(--text);
+      padding: 20px;
+      box-shadow: 0 40px 110px rgba(0,0,0,0.52);
+    }
+
+    .config-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .config-panel-title {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.2;
+    }
+
+    .config-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .config-field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .config-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .config-select {
+      width: 100%;
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: var(--button-bg);
+      color: var(--button-text);
+      padding: 0 12px;
+      font-size: 13px;
+    }
+
+    .config-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+
 
   </style>
 </head>
-<body>
+<body data-theme="dark" data-ui-mode="pro">
   <div class="app">
 
 
     <aside class="project-sidebar" id="projectSidebar">
       <div class="project-sidebar-header">
-        <div class="project-sidebar-title">Projects</div>
-        <button id="newProjectBtn" type="button" class="project-button primary">New</button>
+        <div class="brand-lockup">
+          <img class="brand-logo" src="/assets/images/icons/logo.svg" alt="Caption Animator">
+          <div class="project-sidebar-title">Projects</div>
+        </div>
+        <div class="project-header-actions">
+          <button id="configButton" type="button" class="project-button icon" aria-label="Open app settings">⚙</button>
+          <button id="newProjectBtn" type="button" class="project-button primary">New</button>
+        </div>
       </div>
 
       <select id="projectSelect" class="project-select" title="Continue project">
@@ -1164,9 +1733,40 @@
         </div>
       </div>
 
-      <div class="project-assets-title">Project videos</div>
-      <div id="projectAssetList" class="project-assets">
-        <div class="project-empty">No videos yet. Add a root video to start the project.</div>
+      <div class="sidebar-tabs" role="tablist" aria-label="Project side panels">
+        <button id="videosTabBtn" type="button" class="sidebar-tab-button active" role="tab" aria-selected="true" aria-controls="videosSidePanel">Videos</button>
+        <button id="captionsTabBtn" type="button" class="sidebar-tab-button" role="tab" aria-selected="false" aria-controls="captionsSidePanel">Captions</button>
+      </div>
+
+      <div id="videosSidePanel" class="sidebar-tab-panel active" role="tabpanel" aria-labelledby="videosTabBtn">
+        <div class="project-assets-title">Project videos</div>
+        <div id="projectAssetList" class="project-assets">
+          <div class="project-empty">No videos yet. Add a root video to start the project.</div>
+        </div>
+      </div>
+
+      <div id="captionsSidePanel" class="sidebar-tab-panel" role="tabpanel" aria-labelledby="captionsTabBtn">
+        <div class="project-assets-title">Captions editor</div>
+        <div class="caption-editor-panel">
+          <div class="caption-editor-header">
+            <div id="captionEditorTitle" class="caption-editor-title">No source selected</div>
+            <div id="captionEditorMeta" class="caption-editor-meta">Load or generate captions for the selected project video.</div>
+            <div class="caption-editor-actions">
+              <button id="captionEditorLoadBtn" type="button" class="project-button">Load file</button>
+              <button id="captionEditorSaveBtn" type="button" class="project-button primary">Save to video</button>
+              <button id="captionEditorAddCueBtn" type="button" class="project-button ghost">Add cue</button>
+              <button id="captionEditorDownloadBtn" type="button" class="project-button ghost">Download SRT</button>
+            </div>
+            <div class="caption-editor-follow-row">
+              <button id="captionEditorFollowBtn" type="button" class="asset-mini-button is-on" aria-pressed="true">Follow playhead</button>
+              <button id="captionEditorCurrentBtn" type="button" class="asset-mini-button">Show current cue</button>
+              <div id="captionEditorActiveMeta" class="caption-editor-active-meta">No active cue</div>
+            </div>
+          </div>
+          <div id="captionEditorList" class="caption-editor-list">
+            <div class="caption-empty">No captions loaded for the selected project video.</div>
+          </div>
+        </div>
       </div>
     </aside>
 
@@ -1188,6 +1788,15 @@
     <div class="stage">
       <div class="topbar">
         <div class="badge" id="selectionMeta">No files selected.</div>
+
+        <div id="easyToolbar" class="easy-toolbar" aria-label="Easy mode controls">
+          <button id="easyGetCaptionsBtn" type="button" class="easy-toolbar-button primary">Get captions</button>
+          <button id="easyRenderPreviewBtn" type="button" class="easy-toolbar-button">Preview</button>
+          <button id="easyRenderFullBtn" type="button" class="easy-toolbar-button">Render full</button>
+          <button id="easyFontGalleryBtn" type="button" class="easy-toolbar-button">Fonts</button>
+          <input id="easyFontSizeInput" class="easy-toolbar-input" type="number" min="8" max="512" step="1" value="24" aria-label="Caption font size">
+          <input id="easyTextColourInput" class="easy-toolbar-color" type="color" value="#ffffff" aria-label="Caption text colour">
+        </div>
 
 
         <!-- Keep only backend bridge elements required by the current JavaScript while moving visible controls to lil-gui. -->
@@ -1234,6 +1843,7 @@
             </div>
 
             <video id="previewVideo" playsinline preload="metadata"></video>
+            <div id="globalColourOverlay" class="global-colour-overlay" aria-hidden="true"></div>
 
             <div class="helper-layer" id="helperLayer" style="display:none;">
               <div class="helper-safe-area"></div>
@@ -1278,6 +1888,35 @@
   </div>
 
 
+
+    <div id="configOverlay" class="config-overlay" aria-hidden="true">
+      <section class="config-panel" role="dialog" aria-modal="true" aria-labelledby="configTitle" tabindex="-1">
+        <div class="config-panel-header">
+          <h2 id="configTitle" class="config-panel-title">App settings</h2>
+          <button id="configCloseBtn" type="button" class="project-button icon" aria-label="Close app settings">×</button>
+        </div>
+        <div class="config-grid">
+          <label class="config-field">
+            <span class="config-label">Mode</span>
+            <select id="configModeSelect" class="config-select">
+              <option value="pro">Pro mode</option>
+              <option value="easy">Easy mode</option>
+            </select>
+          </label>
+          <label class="config-field">
+            <span class="config-label">Theme</span>
+            <select id="configThemeSelect" class="config-select">
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+            </select>
+          </label>
+        </div>
+        <div class="config-actions">
+          <button id="configDoneBtn" type="button" class="project-button primary">Done</button>
+        </div>
+      </section>
+    </div>
+
     <div id="appModalOverlay" class="app-modal-overlay" aria-hidden="true">
       <section id="appModalDialog" class="app-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="appModalTitle" aria-describedby="appModalDescription" tabindex="-1">
         <header class="app-modal-header">
@@ -1309,6 +1948,10 @@
     const renderFullBtn = document.getElementById('renderFullBtn');
     const resetBtn = document.getElementById('resetBtn');
     const previewVideo = document.getElementById('previewVideo');
+    const globalColourOverlay = document.getElementById('globalColourOverlay');
+    let globalOverlayStopsPanel = null;
+    let globalOverlayStopsFolder = null;
+    let globalOverlayStopFolders = [];
     const customVideoControls = document.getElementById('customVideoControls');
     const playPauseBtn = document.getElementById('playPauseBtn');
     const transportCurrent = document.getElementById('transportCurrent');
@@ -1347,6 +1990,18 @@
     const fontGalleryClose = document.getElementById('fontGalleryClose');
 
     const projectSidebar = document.getElementById('projectSidebar');
+    const configButton = document.getElementById('configButton');
+    const configOverlay = document.getElementById('configOverlay');
+    const configModeSelect = document.getElementById('configModeSelect');
+    const configThemeSelect = document.getElementById('configThemeSelect');
+    const configCloseBtn = document.getElementById('configCloseBtn');
+    const configDoneBtn = document.getElementById('configDoneBtn');
+    const easyGetCaptionsBtn = document.getElementById('easyGetCaptionsBtn');
+    const easyRenderPreviewBtn = document.getElementById('easyRenderPreviewBtn');
+    const easyRenderFullBtn = document.getElementById('easyRenderFullBtn');
+    const easyFontGalleryBtn = document.getElementById('easyFontGalleryBtn');
+    const easyFontSizeInput = document.getElementById('easyFontSizeInput');
+    const easyTextColourInput = document.getElementById('easyTextColourInput');
     const newProjectBtn = document.getElementById('newProjectBtn');
     const projectSelect = document.getElementById('projectSelect');
     const editProjectBtn = document.getElementById('editProjectBtn');
@@ -1355,6 +2010,20 @@
     const projectDescriptionEl = document.getElementById('projectDescription');
     const projectMetaEl = document.getElementById('projectMeta');
     const projectAssetList = document.getElementById('projectAssetList');
+    const videosTabBtn = document.getElementById('videosTabBtn');
+    const captionsTabBtn = document.getElementById('captionsTabBtn');
+    const videosSidePanel = document.getElementById('videosSidePanel');
+    const captionsSidePanel = document.getElementById('captionsSidePanel');
+    const captionEditorTitle = document.getElementById('captionEditorTitle');
+    const captionEditorMeta = document.getElementById('captionEditorMeta');
+    const captionEditorList = document.getElementById('captionEditorList');
+    const captionEditorLoadBtn = document.getElementById('captionEditorLoadBtn');
+    const captionEditorSaveBtn = document.getElementById('captionEditorSaveBtn');
+    const captionEditorAddCueBtn = document.getElementById('captionEditorAddCueBtn');
+    const captionEditorDownloadBtn = document.getElementById('captionEditorDownloadBtn');
+    const captionEditorFollowBtn = document.getElementById('captionEditorFollowBtn');
+    const captionEditorCurrentBtn = document.getElementById('captionEditorCurrentBtn');
+    const captionEditorActiveMeta = document.getElementById('captionEditorActiveMeta');
 
     const appModalOverlay = document.getElementById('appModalOverlay');
     const appModalDialog = document.getElementById('appModalDialog');
@@ -1391,11 +2060,13 @@
     const PROJECT_STORE_NAME = 'projects';
     const PROJECT_BLOB_STORE_NAME = 'blobs';
     const PROJECT_LAST_KEY = 'captionAnimatorLastProjectId';
+    const APP_SETTINGS_LOCAL_KEY = 'captionAnimatorAppSettings';
 
     let projectDb = null;
     let currentProject = null;
     let projectListCache = [];
     let pendingOutputContext = null;
+    let pendingVideoImportIntent = 'prompt';
 
     let pollTimer = null;
     let sourceObjectUrl = null;
@@ -1404,6 +2075,15 @@
 
 /* Store parsed subtitle cues for native in-browser preview playback. */
     let subtitleCues = [];
+    let captionsDirty = false;
+    let captionsEditorFilename = 'captions.srt';
+    let captionsEditorSourceAssetId = null;
+    let captionsRenderQueued = null;
+    let captionsAutoFollowEnabled = true;
+    let lastActiveCaptionIndex = -1;
+    let captionsManualScrollPauseUntil = 0;
+    let captionsEditorFocusSeekUntil = 0;
+    let captionsEditorFocusSeekIndex = -1;
 
 /* Track whether the local preview should follow subtitle timing on the source video. */
     let nativeCaptionPreviewEnabled = true;
@@ -1532,8 +2212,8 @@
       crop_draw_enabled: false,
       crop_readout: 'Load a video to set a crop area.',
 
-      aspect_enabled: true,
-      aspect_live_preview: true,
+      aspect_enabled: false,
+      aspect_live_preview: false,
       aspect_ratio: '9:16',
       aspect_border_colour: '#000000',
       aspect_size_mode: 'none',
@@ -1570,15 +2250,274 @@
       overlay_rotation_z: 0,
       overlay_letter_spacing: 0,
 
+      global_overlay_enabled: false,
+      global_overlay_kind: 'solid',
+      global_overlay_solid_colour: '#000000',
+      global_overlay_opacity: 0.25,
+      global_overlay_blend_mode: 'normal',
+      global_overlay_angle: 0,
+      global_overlay_radial_x: 0.5,
+      global_overlay_radial_y: 0.5,
+      global_overlay_stops_json: JSON.stringify([
+        { position: 0, colour: '#000000' },
+        { position: 1, colour: '#FFFFFF' }
+      ]),
+      global_overlay_selected_stop: 0,
+      global_overlay_stop_position: 0,
+      global_overlay_stop_colour: '#000000',
+      global_overlay_readout: 'Global overlay disabled.',
+
       caption_model: 'small',
       caption_language: 'en',
       caption_word_timestamps: true,
-      caption_vad_filter: true      
+      caption_vad_filter: true,
+      caption_chunk_max_words: 4,
+      caption_chunk_min_words: 1,
+      caption_chunk_max_seconds: 2.2,
+      caption_chunk_min_seconds: 0.25,
+      caption_chunk_max_chars: 42,
+      caption_chunk_split_at_punctuation: true,
+      caption_chunk_punctuation: '.?!…',
+      caption_chunk_split_on_gap: true,
+      caption_chunk_gap_seconds: 0.55,
+      caption_chunk_words_per_line: 0,
+      caption_chunk_max_lines: 2,
+      caption_chunking_readout: '4 words · 2.2s · 42 chars'      
 
     };
 
 
     const controls = { ...defaultControls };
+
+
+    /* Persist project-scoped caption look: Typography + Placement only.
+       Large media stays in IndexedDB blobs; this tiny settings mirror also goes to localStorage so refreshes keep the latest edits. */
+    const PROJECT_VISUAL_SETTINGS_VERSION = 1;
+    const PROJECT_VISUAL_SETTINGS_LOCAL_PREFIX = 'captionAnimatorProjectVisualSettings:';
+    const PROJECT_VISUAL_SETTING_KEYS = [
+      'font_name', 'font_size', 'helper_font_scale', 'bold', 'italic', 'all_caps',
+      'primary_colour', 'primary_colour_mode', 'primary_palette',
+      'active_word_colour', 'active_word_colour_mode', 'active_palette',
+      'active_word_lead_ms', 'reveal_offset_ms',
+      'outline_colour', 'shadow_colour',
+      'background_colour', 'background_colour_mode', 'background_palette',
+      'use_background', 'background_alpha', 'background_pad_x',
+      'random_position_jitter', 'position_jitter_x', 'position_jitter_y',
+      'random_timing_jitter', 'timing_jitter_ms', 'variation_seed',
+      'outline', 'shadow', 'blur', 'word_display_mode', 'font_gallery_preview_text',
+      'alignment', 'margin_v', 'margin_h', 'anchor_x', 'anchor_y',
+      'offset_x', 'offset_y', 'rotation_z', 'letter_spacing',
+      'global_overlay_enabled', 'global_overlay_kind', 'global_overlay_solid_colour',
+      'global_overlay_opacity', 'global_overlay_blend_mode', 'global_overlay_angle',
+      'global_overlay_radial_x', 'global_overlay_radial_y', 'global_overlay_stops_json',
+      'global_overlay_selected_stop', 'global_overlay_stop_position', 'global_overlay_stop_colour'
+    ];
+
+    let projectVisualSettingsSaveTimer = null;
+    let projectVisualSettingsPending = null;
+    let lastProjectVisualSettingsJson = '';
+    let suppressProjectVisualSettingsSave = false;
+
+    function projectVisualSettingsStorageKey(projectId) {
+      return `${PROJECT_VISUAL_SETTINGS_LOCAL_PREFIX}${projectId || 'none'}`;
+    }
+
+    function getProjectVisualSettings() {
+      const settings = {};
+
+      for (const key of PROJECT_VISUAL_SETTING_KEYS) {
+        if (Object.prototype.hasOwnProperty.call(controls, key)) {
+          settings[key] = controls[key];
+        }
+      }
+
+      return settings;
+    }
+
+    function normalizeProjectVisualSettingsPayload(value) {
+      if (!value || typeof value !== 'object') return null;
+
+      const rawSettings = value.settings && typeof value.settings === 'object'
+        ? value.settings
+        : value;
+
+      const settings = {};
+      for (const key of PROJECT_VISUAL_SETTING_KEYS) {
+        if (Object.prototype.hasOwnProperty.call(rawSettings, key)) {
+          settings[key] = rawSettings[key];
+        }
+      }
+
+      if (!Object.keys(settings).length) return null;
+
+      return {
+        version: Number(value.version || PROJECT_VISUAL_SETTINGS_VERSION),
+        updatedAt: Number(value.updatedAt || value.savedAt || 0),
+        settings
+      };
+    }
+
+    function readLocalProjectVisualSettings(projectId) {
+      if (!projectId) return null;
+
+      try {
+        const raw = localStorage.getItem(projectVisualSettingsStorageKey(projectId));
+        if (!raw) return null;
+        return normalizeProjectVisualSettingsPayload(JSON.parse(raw));
+      } catch {
+        return null;
+      }
+    }
+
+    function resolveProjectVisualSettingsPayload(project) {
+      if (!project) return null;
+
+      const stored = normalizeProjectVisualSettingsPayload({
+        version: project.visualSettingsVersion || PROJECT_VISUAL_SETTINGS_VERSION,
+        updatedAt: project.visualSettingsUpdatedAt || 0,
+        settings: project.visualSettings || project.captionStyleSettings
+      });
+      const mirrored = readLocalProjectVisualSettings(project.id);
+
+      if (stored && mirrored) {
+        return Number(mirrored.updatedAt || 0) >= Number(stored.updatedAt || 0) ? mirrored : stored;
+      }
+
+      return mirrored || stored;
+    }
+
+    function applyProjectVisualSettings(project) {
+      const payload = resolveProjectVisualSettingsPayload(project);
+
+      suppressProjectVisualSettingsSave = true;
+      try {
+        if (payload?.settings) {
+          Object.assign(controls, payload.settings);
+
+          if (project) {
+            project.visualSettingsVersion = PROJECT_VISUAL_SETTINGS_VERSION;
+            project.visualSettingsUpdatedAt = payload.updatedAt || project.visualSettingsUpdatedAt || Date.now();
+            project.visualSettings = getProjectVisualSettings();
+            project.captionStyleSettings = project.visualSettings;
+          }
+
+          lastProjectVisualSettingsJson = JSON.stringify(getProjectVisualSettings());
+        } else {
+          lastProjectVisualSettingsJson = JSON.stringify(getProjectVisualSettings());
+        }
+      } finally {
+        suppressProjectVisualSettingsSave = false;
+      }
+    }
+
+    function mirrorProjectVisualSettingsLocally(projectId, payload) {
+      if (!projectId || !payload?.settings) return;
+
+      try {
+        localStorage.setItem(projectVisualSettingsStorageKey(projectId), JSON.stringify(payload));
+      } catch {
+        /* localStorage can be unavailable or full; IndexedDB persistence still runs below. */
+      }
+    }
+
+    async function saveProjectVisualSettingsNow(projectId, payload) {
+      if (!projectId || !payload?.settings) return;
+
+      const existing = currentProject?.id === projectId
+        ? currentProject
+        : await dbGet(PROJECT_STORE_NAME, projectId);
+
+      if (!existing) return;
+
+      const nextProject = {
+        ...existing,
+        visualSettingsVersion: PROJECT_VISUAL_SETTINGS_VERSION,
+        visualSettingsUpdatedAt: payload.updatedAt || Date.now(),
+        visualSettings: payload.settings,
+        captionStyleSettings: payload.settings,
+        updatedAt: Date.now()
+      };
+
+      if (currentProject?.id === projectId) {
+        currentProject.visualSettingsVersion = nextProject.visualSettingsVersion;
+        currentProject.visualSettingsUpdatedAt = nextProject.visualSettingsUpdatedAt;
+        currentProject.visualSettings = nextProject.visualSettings;
+        currentProject.captionStyleSettings = nextProject.captionStyleSettings;
+        currentProject.updatedAt = nextProject.updatedAt;
+      }
+
+      await dbPut(PROJECT_STORE_NAME, nextProject);
+    }
+
+    function scheduleProjectVisualSettingsSave() {
+      if (suppressProjectVisualSettingsSave || !currentProject?.id) return;
+
+      const settings = getProjectVisualSettings();
+      const settingsJson = JSON.stringify(settings);
+      if (settingsJson === lastProjectVisualSettingsJson) return;
+
+      lastProjectVisualSettingsJson = settingsJson;
+
+      const projectId = currentProject.id;
+      const payload = {
+        version: PROJECT_VISUAL_SETTINGS_VERSION,
+        updatedAt: Date.now(),
+        settings
+      };
+
+      currentProject.visualSettingsVersion = PROJECT_VISUAL_SETTINGS_VERSION;
+      currentProject.visualSettingsUpdatedAt = payload.updatedAt;
+      currentProject.visualSettings = settings;
+      currentProject.captionStyleSettings = settings;
+      mirrorProjectVisualSettingsLocally(projectId, payload);
+
+      projectVisualSettingsPending = { projectId, payload };
+      clearTimeout(projectVisualSettingsSaveTimer);
+      projectVisualSettingsSaveTimer = setTimeout(async () => {
+        const pending = projectVisualSettingsPending;
+        projectVisualSettingsPending = null;
+        projectVisualSettingsSaveTimer = null;
+
+        try {
+          await saveProjectVisualSettingsNow(pending.projectId, pending.payload);
+          await refreshProjectList(currentProject?.id || pending.projectId);
+        } catch (error) {
+          console.warn('Could not save project typography/placement settings.', error);
+        }
+      }, 450);
+    }
+
+    async function flushProjectVisualSettingsSave() {
+      if (!projectVisualSettingsPending) return;
+
+      clearTimeout(projectVisualSettingsSaveTimer);
+      projectVisualSettingsSaveTimer = null;
+
+      const pending = projectVisualSettingsPending;
+      projectVisualSettingsPending = null;
+
+      try {
+        await saveProjectVisualSettingsNow(pending.projectId, pending.payload);
+      } catch (error) {
+        console.warn('Could not flush project typography/placement settings.', error);
+      }
+    }
+
+    function persistProjectVisualSettingsBeforeUnload() {
+      if (!currentProject?.id) return;
+
+      const settings = getProjectVisualSettings();
+      const settingsJson = JSON.stringify(settings);
+      if (settingsJson === lastProjectVisualSettingsJson) return;
+
+      lastProjectVisualSettingsJson = settingsJson;
+      mirrorProjectVisualSettingsLocally(currentProject.id, {
+        version: PROJECT_VISUAL_SETTINGS_VERSION,
+        updatedAt: Date.now(),
+        settings
+      });
+    }
+
 
 
     /* Show status panel with current state or error. */
@@ -1913,6 +2852,61 @@
       }).then(result => Boolean(result));
     }
 
+    /* Store app-wide UI mode and theme without touching project assets or render settings. */
+    function readAppSettings() {
+      try {
+        const raw = localStorage.getItem(APP_SETTINGS_LOCAL_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        return {
+          mode: ['pro', 'easy'].includes(parsed.mode) ? parsed.mode : 'pro',
+          theme: ['dark', 'light'].includes(parsed.theme) ? parsed.theme : 'dark'
+        };
+      } catch {
+        return { mode: 'pro', theme: 'dark' };
+      }
+    }
+
+    /* Apply app-wide visual preferences and keep the config controls synchronized. */
+    function applyAppSettings(settings = readAppSettings()) {
+      const next = {
+        mode: ['pro', 'easy'].includes(settings.mode) ? settings.mode : 'pro',
+        theme: ['dark', 'light'].includes(settings.theme) ? settings.theme : 'dark'
+      };
+
+      document.body.dataset.uiMode = next.mode;
+      document.body.dataset.theme = next.theme;
+
+      if (configModeSelect) configModeSelect.value = next.mode;
+      if (configThemeSelect) configThemeSelect.value = next.theme;
+      localStorage.setItem(APP_SETTINGS_LOCAL_KEY, JSON.stringify(next));
+      syncEasyToolbarControls();
+    }
+
+    /* Open the app settings overlay for theme and easy/pro mode. */
+    function openConfigOverlay() {
+      if (!configOverlay) return;
+      applyAppSettings(readAppSettings());
+      configOverlay.setAttribute('aria-hidden', 'false');
+      configOverlay.classList.add('open');
+      requestAnimationFrame(() => configModeSelect?.focus({ preventScroll: true }));
+    }
+
+    /* Close the app settings overlay and preserve the chosen app settings. */
+    function closeConfigOverlay() {
+      if (!configOverlay) return;
+      configOverlay.setAttribute('aria-hidden', 'true');
+      configOverlay.classList.remove('open');
+      configButton?.focus({ preventScroll: true });
+    }
+
+    /* Keep easy-mode typography controls aligned with the active caption controls. */
+    function syncEasyToolbarControls() {
+      if (easyFontSizeInput) easyFontSizeInput.value = String(Math.round(Number(controls.font_size || 24)));
+      if (easyTextColourInput) easyTextColourInput.value = /^#[0-9a-fA-F]{6}$/.test(String(controls.primary_colour || ''))
+        ? controls.primary_colour
+        : '#ffffff';
+    }
+
 
     function formatTransportTime(value) {
       const total = Math.max(0, Number.isFinite(Number(value)) ? Number(value) : 0);
@@ -2174,7 +3168,17 @@
 
     async function saveCurrentProject() {
       if (!currentProject) return;
+      const visualSettings = getProjectVisualSettings();
+      currentProject.visualSettingsVersion = PROJECT_VISUAL_SETTINGS_VERSION;
+      currentProject.visualSettingsUpdatedAt = currentProject.visualSettingsUpdatedAt || Date.now();
+      currentProject.visualSettings = visualSettings;
+      currentProject.captionStyleSettings = visualSettings;
       currentProject.updatedAt = Date.now();
+      mirrorProjectVisualSettingsLocally(currentProject.id, {
+        version: PROJECT_VISUAL_SETTINGS_VERSION,
+        updatedAt: currentProject.visualSettingsUpdatedAt,
+        settings: visualSettings
+      });
       await dbPut(PROJECT_STORE_NAME, currentProject);
       localStorage.setItem(PROJECT_LAST_KEY, currentProject.id);
       await refreshProjectList(currentProject.id);
@@ -2202,6 +3206,8 @@
     }
 
     async function loadProject(projectId, options = {}) {
+      await flushProjectVisualSettingsSave();
+
       const project = await dbGet(PROJECT_STORE_NAME, projectId);
       if (!project) throw new Error('Project could not be found in IndexedDB.');
 
@@ -2210,6 +3216,8 @@
         assets: Array.isArray(project.assets) ? project.assets : [],
         operations: Array.isArray(project.operations) ? project.operations : []
       };
+
+      applyProjectVisualSettings(currentProject);
 
       if (!currentProject.selectedAssetId && currentProject.assets.length) {
         currentProject.selectedAssetId = currentProject.assets[0].id;
@@ -2227,7 +3235,9 @@
       refreshGui();
     }
 
-    async function createProject({ name, description } = {}) {
+    async function createProject({ name, description } = {}, options = {}) {
+      await flushProjectVisualSettingsSave();
+
       let projectName = String(name || '').trim();
       let projectDescription = String(description || '').trim();
 
@@ -2240,6 +3250,7 @@
 
       if (!projectName) return null;
       const now = Date.now();
+      const visualSettings = getProjectVisualSettings();
 
       currentProject = {
         id: makeProjectId('project'),
@@ -2247,14 +3258,31 @@
         description: projectDescription,
         thumbnailBlobId: null,
         selectedAssetId: null,
+        visualSettingsVersion: PROJECT_VISUAL_SETTINGS_VERSION,
+        visualSettingsUpdatedAt: now,
+        visualSettings,
+        captionStyleSettings: visualSettings,
         createdAt: now,
         updatedAt: now,
         assets: [],
         operations: []
       };
 
+      lastProjectVisualSettingsJson = JSON.stringify(visualSettings);
+      mirrorProjectVisualSettingsLocally(currentProject.id, {
+        version: PROJECT_VISUAL_SETTINGS_VERSION,
+        updatedAt: now,
+        settings: visualSettings
+      });
+
+      if (options.clearWorkspace !== false) {
+        clearProjectWorkspaceState();
+      }
+
       await saveCurrentProject();
-      showStatus('ok', `Project created: <strong>${escapeHtml(projectName)}</strong>`);
+      if (!options.silent) {
+        showStatus('ok', `Project created: <strong>${escapeHtml(projectName)}</strong>`);
+      }
       return currentProject;
     }
 
@@ -2367,10 +3395,157 @@
       return record?.blob instanceof Blob ? record.blob : null;
     }
 
+    /* Reset transient media state when starting an empty project so no previous source is inherited. */
+    function clearProjectWorkspaceState() {
+      if (sourceObjectUrl) {
+        URL.revokeObjectURL(sourceObjectUrl);
+        sourceObjectUrl = null;
+      }
+
+      videoInput.value = '';
+      srtInput.value = '';
+      subtitleCues = [];
+      captionsDirty = false;
+      captionsEditorFilename = 'captions.srt';
+      captionsEditorSourceAssetId = null;
+      srtPreviewText = 'Preview caption will appear here';
+      showingRenderedOutput = false;
+      controls.aspect_live_preview = false;
+      controls.crop_overlay_enabled = false;
+      controls.crop_draw_enabled = false;
+      cropDraft = null;
+      cropDrawState = null;
+      cropUndoStack.length = 0;
+      cropRedoStack.length = 0;
+
+      previewVideo.pause();
+      previewVideo.removeAttribute('src');
+      previewVideo.load();
+      previewVideo.style.display = 'none';
+      setCustomControlsVisible(false);
+      placeholder.style.display = 'block';
+      helperLayer.style.display = 'none';
+      deactivateCropOverlay();
+      resetPreviewFrameToRealVideo();
+      renderCaptionsEditor();
+      updateMeta();
+      syncEasyToolbarControls();
+      refreshGui();
+    }
+
     async function ensureProjectForFile(file) {
       if (currentProject) return currentProject;
       const base = String(file?.name || 'New project').replace(/\.[^.]+$/, '').trim() || 'New project';
-      return createProject({ name: base, description: 'Created from the first imported video.' });
+      return createProject({ name: base, description: 'Created from the first imported video.' }, { clearWorkspace: false, silent: true });
+    }
+
+    /* Import a video as either a new empty project root asset or a new asset in the open project. */
+    async function importVideoFileToProject(file, options = {}) {
+      if (!file) return null;
+
+      const baseName = String(file.name || 'New project').replace(/\.[^.]+$/, '').trim() || 'New project';
+      const forceAdd = options.forceAdd === true;
+      const autoCaptionsDefault = options.defaultAutoCaptions !== undefined
+        ? Boolean(options.defaultAutoCaptions)
+        : options.source === 'drop';
+      let targetMode = currentProject && forceAdd ? 'add' : '';
+      let shouldGenerateCaptions = false;
+
+      if (!targetMode && currentProject) {
+        const values = await openAppModal({
+          title: 'Import video',
+          description: `Choose how to use “${file.name || 'video'}”.`,
+          icon: '+',
+          confirmText: 'Import video',
+          fields: [
+            {
+              name: 'createNew',
+              type: 'checkbox',
+              label: 'Create a new project with this video',
+              value: false,
+              hint: 'Leave unchecked to add this video to the current project.'
+            },
+            {
+              name: 'autoCaptions',
+              type: 'checkbox',
+              label: 'Get captions after import',
+              value: autoCaptionsDefault,
+              hint: 'Uses the current default caption settings after the video is added.'
+            },
+            {
+              name: 'projectName',
+              label: 'New project name',
+              value: baseName,
+              maxLength: 96,
+              hint: 'Used only when creating a new project.'
+            }
+          ]
+        });
+
+        if (!values) return null;
+        targetMode = values.createNew ? 'new' : 'add';
+        shouldGenerateCaptions = Boolean(values.autoCaptions);
+
+        if (targetMode === 'new') {
+          await createProject({
+            name: String(values.projectName || baseName).trim() || baseName,
+            description: 'Created from imported video.'
+          }, { clearWorkspace: true, silent: true });
+        }
+      }
+
+      if (!currentProject) {
+        const values = await openAppModal({
+          title: 'Create project',
+          description: `Create a project for “${file.name || 'video'}”.`,
+          icon: '+',
+          confirmText: 'Create project',
+          fields: [
+            {
+              name: 'name',
+              label: 'Project name',
+              value: baseName,
+              placeholder: 'TikTok captions test',
+              required: true,
+              maxLength: 96
+            },
+            {
+              name: 'description',
+              label: 'Description',
+              type: 'textarea',
+              value: 'Created from imported video.',
+              placeholder: 'What this project is for, notes, client, format, etc.',
+              rows: 5,
+              maxLength: 600,
+              trim: true
+            },
+            {
+              name: 'autoCaptions',
+              type: 'checkbox',
+              label: 'Get captions after import',
+              value: autoCaptionsDefault,
+              hint: 'Uses the current default caption settings after the video is added.'
+            }
+          ]
+        });
+
+        if (!values) return null;
+        shouldGenerateCaptions = Boolean(values.autoCaptions);
+        await createProject({
+          name: String(values.name || baseName).trim() || baseName,
+          description: String(values.description || '').trim()
+        }, { clearWorkspace: true, silent: true });
+      }
+
+      const role = currentProject.assets.length ? 'derived' : 'root';
+      const asset = await addVideoAssetToProject(file, { role, operationType: 'upload' });
+
+      if (asset && shouldGenerateCaptions) {
+        setSidebarTab('captions');
+        await generateCaptions();
+      }
+
+      return asset;
     }
 
     function createOperationLabel(type, settings = {}) {
@@ -2415,7 +3590,8 @@
         operationType,
         serverOutputFilename: options.serverOutputFilename || '',
         serverOutputUrl: options.serverOutputUrl || '',
-        revealedOutputFilename: options.revealedOutputFilename || ''
+        revealedOutputFilename: options.revealedOutputFilename || '',
+        captions: options.captions || null
       };
 
       currentProject.assets.push(asset);
@@ -2633,6 +3809,7 @@
 
     async function selectProjectAsset(assetId, options = {}) {
       if (!currentProject) return;
+      await saveDirtyCaptionsBeforeAssetChange();
       const asset = getProjectAsset(assetId);
       if (!asset) return;
 
@@ -2649,6 +3826,7 @@
 
       setFileInput(videoInput, file);
       await loadSourceVideoPreview(file);
+      await loadCaptionsForSelectedAsset();
       deactivateCropOverlay();
       updateMeta();
       refreshGui();
@@ -2691,7 +3869,8 @@
         operationType,
         operation,
         serverOutputFilename,
-        serverOutputUrl: outputUrl
+        serverOutputUrl: outputUrl,
+        captions: sourceAsset?.captions || null
       });
 
       if (asset) {
@@ -2737,6 +3916,7 @@
         projectDescriptionEl.textContent = 'Create a project first. Videos and rendered results will be kept in browser IndexedDB.';
         projectMetaEl.textContent = 'No selected source asset.';
         projectAssetList.innerHTML = '<div class="project-empty">No videos yet. Add a root video to start the project.</div>';
+        renderCaptionsEditor();
         return;
       }
 
@@ -2750,6 +3930,7 @@
 
       if (!currentProject.assets.length) {
         projectAssetList.innerHTML = '<div class="project-empty">No videos yet. Add a root video to start the project.</div>';
+        renderCaptionsEditor();
         return;
       }
 
@@ -2782,6 +3963,11 @@
           ? `from ${parent.name} · ${createOperationLabel(asset.operationType)}`
           : (asset.parentAssetId ? `from deleted project video · ${createOperationLabel(asset.operationType)}` : 'original uploaded source');
 
+        const captionBadge = document.createElement('div');
+        captionBadge.className = 'asset-caption-badge';
+        captionBadge.textContent = asset.captions?.cueCount ? `${asset.captions.cueCount} captions` : '';
+        captionBadge.style.display = asset.captions?.cueCount ? 'inline-flex' : 'none';
+
         const actions = document.createElement('div');
         actions.className = 'asset-actions';
         const revealButton = document.createElement('button');
@@ -2810,7 +3996,7 @@
         });
         actions.append(deleteButton);
 
-        body.append(title, details, lineage, actions);
+        body.append(title, details, lineage, captionBadge, actions);
         card.append(img, body);
         card.addEventListener('click', () => selectProjectAsset(asset.id));
         card.addEventListener('keydown', event => {
@@ -3837,6 +5023,7 @@
       helperLayer.style.width = '100%';
       helperLayer.style.height = '100%';
       updateCropPreview();
+      applyGlobalColourOverlayPreview();
       return;
     }
 
@@ -3858,6 +5045,7 @@
     helperLayer.style.width = '100%';
     helperLayer.style.height = '100%';
     updateCropPreview();
+    applyGlobalColourOverlayPreview();
   }
 
     /* Show or hide helper overlay. */
@@ -3945,6 +5133,285 @@
 
 
 
+  function normaliseGlobalOverlayStops(rawValue) {
+    let parsed = [];
+
+    try {
+      parsed = JSON.parse(String(rawValue || '[]'));
+    } catch {
+      parsed = [];
+    }
+
+    if (!Array.isArray(parsed)) {
+      parsed = [];
+    }
+
+    const stops = parsed
+      .filter(item => item && typeof item === 'object')
+      .map(item => ({
+        position: Math.max(0, Math.min(1, Number(item.position || 0))),
+        colour: /^#[0-9a-fA-F]{6}$/.test(String(item.colour || item.color || ''))
+          ? String(item.colour || item.color).toUpperCase()
+          : '#000000'
+      }))
+      .sort((a, b) => a.position - b.position)
+      .slice(0, 16);
+
+    if (!stops.length) {
+      stops.push({ position: 0, colour: '#000000' }, { position: 1, colour: '#FFFFFF' });
+    }
+
+    if (stops.length === 1) {
+      stops.push({ position: stops[0].position >= 0.5 ? 0 : 1, colour: stops[0].colour });
+      stops.sort((a, b) => a.position - b.position);
+    }
+
+    return stops;
+  }
+
+  function saveGlobalOverlayStops(stops) {
+    controls.global_overlay_stops_json = JSON.stringify(normaliseGlobalOverlayStops(JSON.stringify(stops)));
+  }
+
+  function getGlobalOverlayStops() {
+    return normaliseGlobalOverlayStops(controls.global_overlay_stops_json);
+  }
+
+
+
+  function globalOverlaySelectedStopIndex(stops = getGlobalOverlayStops()) {
+    return Math.max(0, Math.min(stops.length - 1, Math.round(Number(controls.global_overlay_selected_stop || 0))));
+  }
+
+  function updateGlobalOverlayStopAt(index, patch) {
+    const stops = getGlobalOverlayStops();
+    const safeIndex = Math.max(0, Math.min(stops.length - 1, Math.round(Number(index || 0))));
+    const current = stops[safeIndex] || { position: 0, colour: '#000000' };
+    const updated = {
+      position: Math.max(0, Math.min(1, Number(
+        patch && Object.prototype.hasOwnProperty.call(patch, 'position') ? patch.position : current.position
+      ))),
+      colour: /^#[0-9a-fA-F]{6}$/.test(String(patch?.colour || patch?.color || current.colour || ''))
+        ? String(patch?.colour || patch?.color || current.colour).toUpperCase()
+        : '#000000'
+    };
+
+    stops[safeIndex] = updated;
+    stops.sort((a, b) => a.position - b.position);
+    saveGlobalOverlayStops(stops);
+    controls.global_overlay_selected_stop = Math.max(0, stops.findIndex(item => item.position === updated.position && item.colour === updated.colour));
+    syncGlobalOverlaySelectedStopFields();
+    applyGlobalColourOverlayPreview();
+    scheduleProjectVisualSettingsSave();
+  }
+
+  function addGlobalOverlayStopNear(index = controls.global_overlay_selected_stop) {
+    const stops = getGlobalOverlayStops();
+    const selectedIndex = Math.max(0, Math.min(stops.length - 1, Math.round(Number(index || 0))));
+    const selected = stops[selectedIndex] || stops[0] || { position: 0, colour: '#FFFFFF' };
+    const before = stops[selectedIndex - 1];
+    const after = stops[selectedIndex + 1];
+    let nextPosition;
+
+    if (after) {
+      nextPosition = (Number(selected.position || 0) + Number(after.position || 1)) / 2;
+    } else if (before) {
+      nextPosition = (Number(before.position || 0) + Number(selected.position || 1)) / 2;
+    } else {
+      nextPosition = Math.min(1, Number(selected.position || 0) + 0.1);
+    }
+
+    if (Math.abs(nextPosition - Number(selected.position || 0)) < 0.005) {
+      nextPosition = Math.max(0, Math.min(1, Number(selected.position || 0) + (after ? 0.025 : -0.025)));
+    }
+
+    const colour = selected.colour || '#FFFFFF';
+    stops.push({ position: nextPosition, colour });
+    stops.sort((a, b) => a.position - b.position);
+    saveGlobalOverlayStops(stops);
+    controls.global_overlay_selected_stop = Math.max(0, stops.findIndex(item => item.position === nextPosition && item.colour === colour));
+    syncGlobalOverlaySelectedStopFields();
+    applyGlobalColourOverlayPreview();
+    scheduleProjectVisualSettingsSave();
+    refreshGui();
+  }
+
+  function removeGlobalOverlayStopAt(index) {
+    const stops = getGlobalOverlayStops();
+    if (stops.length <= 2) {
+      showStatus('info', 'Keep at least two gradient stops.');
+      return;
+    }
+
+    const safeIndex = Math.max(0, Math.min(stops.length - 1, Math.round(Number(index || 0))));
+    stops.splice(safeIndex, 1);
+    saveGlobalOverlayStops(stops);
+    controls.global_overlay_selected_stop = Math.max(0, Math.min(safeIndex, stops.length - 1));
+    syncGlobalOverlaySelectedStopFields();
+    applyGlobalColourOverlayPreview();
+    scheduleProjectVisualSettingsSave();
+    refreshGui();
+  }
+
+  function destroyGlobalOverlayStopFolders() {
+    globalOverlayStopFolders.forEach(folder => {
+      try { folder.destroy(); } catch {}
+    });
+    globalOverlayStopFolders = [];
+  }
+
+  function rebuildGlobalOverlayStopsGui() {
+    if (!globalOverlayStopsFolder) return;
+
+    destroyGlobalOverlayStopFolders();
+
+    const stops = getGlobalOverlayStops();
+    if (controls.global_overlay_kind === 'solid') {
+      globalOverlayStopsFolder.hide();
+      return;
+    }
+
+    globalOverlayStopsFolder.show();
+
+    stops.forEach((stop, index) => {
+      const stopProxy = {
+        colour: stop.colour,
+        position_percent: Number((stop.position * 100).toFixed(1)),
+        add_after: () => addGlobalOverlayStopNear(index),
+        remove: () => removeGlobalOverlayStopAt(index),
+      };
+
+      const folder = globalOverlayStopsFolder.addFolder(`Stop ${index + 1} · ${(stop.position * 100).toFixed(1)}%`);
+      folder.addColor(stopProxy, 'colour').name('colour').onChange(value => {
+        updateGlobalOverlayStopAt(index, { colour: value });
+      });
+      folder.add(stopProxy, 'position_percent', 0, 100, 0.1).name('position %').onChange(value => {
+        updateGlobalOverlayStopAt(index, { position: Number(value || 0) / 100 });
+      }).onFinishChange(() => {
+        rebuildGlobalOverlayStopsGui();
+      });
+      folder.add(stopProxy, 'add_after').name('+ add stop after');
+      if (stops.length > 2) {
+        folder.add(stopProxy, 'remove').name('remove stop');
+      }
+      folder.close();
+      globalOverlayStopFolders.push(folder);
+    });
+  }
+
+  function renderGlobalOverlayStopsPanel() {
+    updateGlobalOverlayReadout();
+    rebuildGlobalOverlayStopsGui();
+  }
+
+  function syncGlobalOverlaySelectedStopFields() {
+    const stops = getGlobalOverlayStops();
+    const index = Math.max(0, Math.min(stops.length - 1, Math.round(Number(controls.global_overlay_selected_stop || 0))));
+    controls.global_overlay_selected_stop = index;
+    controls.global_overlay_stop_position = Number(stops[index].position.toFixed(3));
+    controls.global_overlay_stop_colour = stops[index].colour;
+    updateGlobalOverlayReadout(stops);
+  }
+
+  function updateGlobalOverlaySelectedStop() {
+    const stops = getGlobalOverlayStops();
+    const index = Math.max(0, Math.min(stops.length - 1, Math.round(Number(controls.global_overlay_selected_stop || 0))));
+    const updated = {
+      position: Math.max(0, Math.min(1, Number(controls.global_overlay_stop_position || 0))),
+      colour: /^#[0-9a-fA-F]{6}$/.test(String(controls.global_overlay_stop_colour || ''))
+        ? String(controls.global_overlay_stop_colour).toUpperCase()
+        : '#000000'
+    };
+    stops[index] = updated;
+    stops.sort((a, b) => a.position - b.position);
+    saveGlobalOverlayStops(stops);
+    controls.global_overlay_selected_stop = Math.max(0, stops.findIndex(item => item === updated));
+    syncGlobalOverlaySelectedStopFields();
+    applyGlobalColourOverlayPreview();
+    refreshGui();
+  }
+
+  function addGlobalOverlayStop() {
+    addGlobalOverlayStopNear(controls.global_overlay_selected_stop);
+  }
+
+  function removeGlobalOverlayStop() {
+    removeGlobalOverlayStopAt(controls.global_overlay_selected_stop);
+  }
+
+  function reverseGlobalOverlayStops() {
+    const stops = getGlobalOverlayStops().map(item => ({
+      position: 1 - item.position,
+      colour: item.colour
+    })).sort((a, b) => a.position - b.position);
+    saveGlobalOverlayStops(stops);
+    controls.global_overlay_selected_stop = 0;
+    syncGlobalOverlaySelectedStopFields();
+    applyGlobalColourOverlayPreview();
+    refreshGui();
+  }
+
+  function cssGlobalOverlayGradient(stops) {
+    const stopText = stops
+      .map(item => `${item.colour} ${(item.position * 100).toFixed(1)}%`)
+      .join(', ');
+
+    if (controls.global_overlay_kind === 'radial') {
+      return `radial-gradient(circle at ${(Number(controls.global_overlay_radial_x || 0.5) * 100).toFixed(1)}% ${(Number(controls.global_overlay_radial_y || 0.5) * 100).toFixed(1)}%, ${stopText})`;
+    }
+
+    if (controls.global_overlay_kind === 'linear') {
+      return `linear-gradient(${Number(controls.global_overlay_angle || 0)}deg, ${stopText})`;
+    }
+
+    return controls.global_overlay_solid_colour || '#000000';
+  }
+
+  function updateGlobalOverlayReadout(stops = getGlobalOverlayStops()) {
+    if (!controls.global_overlay_enabled) {
+      controls.global_overlay_readout = 'Global overlay disabled.';
+      return;
+    }
+
+    const stopText = controls.global_overlay_kind === 'solid'
+      ? controls.global_overlay_solid_colour
+      : stops.map(item => `${Math.round(item.position * 100)}% ${item.colour}`).join(' · ');
+
+    controls.global_overlay_readout = `${controls.global_overlay_kind} · ${Math.round(Number(controls.global_overlay_opacity || 0) * 100)}% · ${controls.global_overlay_blend_mode} · ${stopText}`;
+  }
+
+  function applyGlobalColourOverlayPreview() {
+    if (!globalColourOverlay) return;
+
+    updateGlobalOverlayReadout();
+
+    const hasPreview = previewVideo.style.display !== 'none';
+    const opacity = Math.max(0, Math.min(1, Number(controls.global_overlay_opacity || 0)));
+
+    if (!hasPreview || !controls.global_overlay_enabled || opacity <= 0) {
+      globalColourOverlay.classList.remove('show');
+      globalColourOverlay.style.background = '';
+      globalColourOverlay.style.opacity = '1';
+      globalColourOverlay.style.mixBlendMode = 'normal';
+      return;
+    }
+
+    const stops = getGlobalOverlayStops();
+    globalColourOverlay.style.background = cssGlobalOverlayGradient(stops);
+    globalColourOverlay.style.opacity = String(opacity);
+    const cssBlendModeMap = {
+      softlight: 'soft-light',
+      hardlight: 'hard-light',
+      addition: 'plus-lighter'
+    };
+    const requestedBlendMode = String(controls.global_overlay_blend_mode || 'normal');
+    globalColourOverlay.style.mixBlendMode = controls.global_overlay_blend_mode === 'normal'
+      ? 'normal'
+      : (cssBlendModeMap[requestedBlendMode] || requestedBlendMode);
+    globalColourOverlay.classList.add('show');
+    updateGlobalOverlayReadout(stops);
+  }
+
   function applyHelperPreview() {
     syncOverlayToVideo();
     const scale = getPreviewScaleFactor();
@@ -4023,6 +5490,8 @@
 
   applyHelpersVisibility();
   applyOverlayHelperPreview();
+  applyGlobalColourOverlayPreview();
+  scheduleProjectVisualSettingsSave();
 }
 
 
@@ -4171,17 +5640,16 @@ document.addEventListener('pointercancel', () => {
 
     /* Append current control values to render request. */
 function shouldExportAspectCanvasWithCaptions() {
-  return Boolean(controls.aspect_enabled || controls.aspect_live_preview);
+  return Boolean(controls.aspect_enabled);
 }
 
 function collectSettings(formData, options = {}) {
   const values = { ...controls };
 
-  /* Keep the caption render aligned with the canvas the user is editing on.
-     If the live aspect preview is visible, captions should render on that same canvas. */
-  if (options.forCaptionRender && controls.aspect_live_preview) {
-    values.aspect_enabled = true;
-  }
+  /* Critical rule: live browser previews must not silently change export size.
+     Aspect Canvas is exported only when the explicit `aspect_enabled` checkbox is on
+     or when the current operation itself is the Aspect Canvas operation. */
+  values.aspect_enabled = Boolean(controls.aspect_enabled);
 
   Object.entries(values).forEach(([key, value]) => {
     formData.append(key, String(value));
@@ -4191,6 +5659,7 @@ function collectSettings(formData, options = {}) {
     /* Refresh all lil-gui controller values from current controls object. */
 function refreshGui() {
   gui.controllersRecursive().forEach(c => c.updateDisplay());
+  renderGlobalOverlayStopsPanel();
 }
 
     /* Build a serializable preset object from current controls. */
@@ -4207,7 +5676,9 @@ function applyPresetObject(presetObject) {
   if (!presetObject || !presetObject.controls) return;
   Object.assign(controls, defaultControls, presetObject.controls);
   refreshGui();
+  syncEasyToolbarControls();
   applyHelperPreview();
+  scheduleProjectVisualSettingsSave();
 }
 
     /* Mirror preset cache into localStorage. */
@@ -4531,6 +6002,7 @@ function resetUI() {
   refreshGui();
   updateMeta();
   applyHelperPreview();
+  scheduleProjectVisualSettingsSave();
 }
 
 
@@ -4602,9 +6074,12 @@ async function startPolling(jobId) {
 
           setFileInput(srtInput, subtitleFile);
           await readSrtPreview(subtitleFile);
+          captionsDirty = true;
+          await saveCurrentCaptionsToSelectedAsset({ silent: true, source: 'generated' });
+          setSidebarTab('captions');
           updateMeta();
           refreshGui();
-          showStatus('ok', 'Captions ready.');
+          showStatus('ok', 'Captions ready and saved to the selected project video.');
           return;
         }
 
@@ -4622,6 +6097,12 @@ async function startPolling(jobId) {
         openAss.href = data.ass_url || '#';
         openPreview.style.display = 'inline-flex';
         openAss.style.display = data.ass_url ? 'inline-flex' : 'none';
+
+        if (pendingOutputContext?.jobId === jobId && pendingOutputContext.mode === 'preview' && currentProject && pendingOutputContext.sourceAssetId) {
+          currentProject.selectedAssetId = pendingOutputContext.sourceAssetId;
+          await dbPut(PROJECT_STORE_NAME, { ...currentProject, updatedAt: Date.now() });
+          renderProjectPanel();
+        }
 
         previewBtn.disabled = false;
         renderFullBtn.disabled = false;
@@ -4689,16 +6170,20 @@ async function startPolling(jobId) {
 async function readSrtPreview(file) {
   try {
     const text = await file.text();
-    subtitleCues = parseSubtitleCues(text, file.name);
+    subtitleCues = normalizeEditorCues(parseSubtitleCues(text, file.name));
+    captionsEditorFilename = file.name || captionsEditorFilename || 'captions.srt';
+    captionsEditorSourceAssetId = currentProject?.selectedAssetId || captionsEditorSourceAssetId;
 
     srtPreviewText = subtitleCues[0]?.text || 'Preview caption will appear here';
     syncNativeCaptionPreview();
     applyHelperPreview();
+    renderCaptionsEditor();
   } catch {
     subtitleCues = [];
     srtPreviewText = 'Preview caption will appear here';
     syncNativeCaptionPreview();
     applyHelperPreview();
+    renderCaptionsEditor();
   }
 }
 
@@ -4733,6 +6218,45 @@ function formatCueTimeToSrt(ms) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')},${String(millis).padStart(3, '0')}`;
 }
 
+function formatCueTimeToVtt(ms) {
+  return formatCueTimeToSrt(ms).replace(',', '.');
+}
+
+function cueHasWordTimings(cue) {
+  return Array.isArray(cue?.timed_words) && cue.timed_words.some(item => String(item?.word || '').trim());
+}
+
+function escapeVttPayloadText(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function cuesToVttText(cues = subtitleCues) {
+  const normalized = normalizeEditorCues(cues);
+  const blocks = normalized.map((cue, index) => {
+    let payload = String(cue.text || '').trim();
+
+    if (cueHasWordTimings(cue)) {
+      payload = cue.timed_words
+        .filter(item => String(item?.word || '').trim())
+        .map(item => `<${formatCueTimeToVtt(item.start)}><c>${escapeVttPayloadText(item.word)}</c>`)
+        .join(' ');
+    } else {
+      payload = escapeVttPayloadText(payload);
+    }
+
+    return `${index + 1}\n${formatCueTimeToVtt(cue.start)} --> ${formatCueTimeToVtt(cue.end)}\n${payload}`;
+  });
+
+  return `WEBVTT\n\n${blocks.join('\n\n')}${blocks.length ? '\n' : ''}`;
+}
+
+function shouldRenderCaptionsAsVtt() {
+  return subtitleCues.some(cueHasWordTimings);
+}
+
 
 /* Save plain text content as a downloaded file. */
 /* Reuses the same object URL slot as the existing caption save flow. */
@@ -4753,6 +6277,338 @@ function saveTextDownload(filename, content, mimeType = 'text/plain;charset=utf-
   link.remove();
 }
 
+
+
+/* Side tab switching for the compact project workspace. */
+function setSidebarTab(tabName) {
+  const useCaptions = tabName === 'captions';
+  videosTabBtn?.classList.toggle('active', !useCaptions);
+  captionsTabBtn?.classList.toggle('active', useCaptions);
+  videosSidePanel?.classList.toggle('active', !useCaptions);
+  captionsSidePanel?.classList.toggle('active', useCaptions);
+  videosTabBtn?.setAttribute('aria-selected', useCaptions ? 'false' : 'true');
+  captionsTabBtn?.setAttribute('aria-selected', useCaptions ? 'true' : 'false');
+
+  if (useCaptions) {
+    requestAnimationFrame(() => renderCaptionsEditor({ followActive: true, force: true, instant: true }));
+  }
+}
+
+function formatCueTimeForEditor(ms) {
+  const total = Math.max(0, Math.floor(Number(ms || 0)));
+  const hours = Math.floor(total / 3600000);
+  const minutes = Math.floor((total % 3600000) / 60000);
+  const seconds = Math.floor((total % 60000) / 1000);
+  const millis = total % 1000;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+}
+
+function parseEditorCueTimeToMs(value) {
+  return parseCueTimeToMs(String(value || '').trim().replace(',', '.'));
+}
+
+function normalizeEditorCues(cues) {
+  return (Array.isArray(cues) ? cues : [])
+    .map(cue => ({
+      ...cue,
+      start: Math.max(0, Math.floor(Number(cue.start || 0))),
+      end: Math.max(0, Math.floor(Number(cue.end || 0))),
+      text: String(cue.text || '').replace(/\r/g, '').trim()
+    }))
+    .filter(cue => cue.text && cue.end > cue.start)
+    .sort((a, b) => Number(a.start || 0) - Number(b.start || 0));
+}
+
+function cuesToSrtText(cues = subtitleCues) {
+  return normalizeEditorCues(cues).map((cue, index) => {
+    return `${index + 1}\n${formatCueTimeToSrt(cue.start)} --> ${formatCueTimeToSrt(cue.end)}\n${String(cue.text || '').trim()}`;
+  }).join('\n\n') + (cues.length ? '\n' : '');
+}
+
+function cuesToPlainText(cues = subtitleCues) {
+  return normalizeEditorCues(cues).map(cue => String(cue.text || '').trim()).filter(Boolean).join('\n');
+}
+
+function syncEditedCaptionsToSubtitleInput(filename = captionsEditorFilename || 'edited_captions.srt') {
+  const safeName = String(filename || 'edited_captions.srt').replace(/\.(vtt|srt)$/i, '') || 'edited_captions';
+  const useVtt = shouldRenderCaptionsAsVtt();
+  const captionText = useVtt ? cuesToVttText(subtitleCues) : cuesToSrtText(subtitleCues);
+  captionsEditorFilename = `${safeName}.${useVtt ? 'vtt' : 'srt'}`;
+  const subtitleFile = new File([captionText], captionsEditorFilename, {
+    type: useVtt ? 'text/vtt' : 'application/x-subrip'
+  });
+  setFileInput(srtInput, subtitleFile);
+  srtPreviewText = subtitleCues[0]?.text || 'Preview caption will appear here';
+  syncNativeCaptionPreview();
+  applyHelperPreview();
+  updateMeta();
+  return captionText;
+}
+
+function updateCaptionsEditorMeta() {
+  const selectedAsset = getSelectedProjectAsset();
+  const cueCount = subtitleCues.length;
+  const dirtyText = captionsDirty ? ' · unsaved edits' : '';
+  const assetName = selectedAsset?.name || 'No selected project video';
+
+  if (captionEditorTitle) {
+    captionEditorTitle.textContent = selectedAsset ? assetName : 'No source selected';
+  }
+
+  if (captionEditorMeta) {
+    captionEditorMeta.innerHTML = selectedAsset
+      ? `${cueCount} cue${cueCount === 1 ? '' : 's'} for selected source${dirtyText ? `<span class="caption-editor-dirty">${dirtyText}</span>` : ''}`
+      : 'Select a project video, then load or generate captions.';
+  }
+}
+
+function markCaptionsDirty() {
+  captionsDirty = true;
+  captionsEditorSourceAssetId = currentProject?.selectedAssetId || captionsEditorSourceAssetId;
+  syncEditedCaptionsToSubtitleInput();
+  updateCaptionsEditorMeta();
+}
+
+function renderCaptionsEditor(options = {}) {
+  if (!captionEditorList) return;
+
+  updateCaptionsEditorMeta();
+
+  if (!currentProject?.selectedAssetId) {
+    captionEditorList.innerHTML = '<div class="caption-empty">Select a project video first.</div>';
+    updateCaptionEditorFollowControls(-1);
+    return;
+  }
+
+  if (!subtitleCues.length) {
+    captionEditorList.innerHTML = '<div class="caption-empty">No captions loaded for this video yet. Load a .srt/.vtt file or generate captions, then edit them here.</div>';
+    updateCaptionEditorFollowControls(-1);
+    return;
+  }
+
+  const activeIndex = getActiveSubtitleCueIndex(Math.max(0, Math.floor((previewVideo.currentTime || 0) * 1000)));
+  updateCaptionEditorFollowControls(activeIndex);
+  captionEditorList.innerHTML = '';
+
+  subtitleCues.forEach((cue, index) => {
+    const row = document.createElement('div');
+    row.className = `caption-row${activeIndex === index ? ' is-active' : ''}`;
+    row.dataset.index = String(index);
+
+    const top = document.createElement('div');
+    top.className = 'caption-row-top';
+
+    const idx = document.createElement('div');
+    idx.className = 'caption-index';
+    idx.textContent = String(index + 1).padStart(2, '0');
+
+    const timeGrid = document.createElement('div');
+    timeGrid.className = 'caption-time-grid';
+
+    const startInput = document.createElement('input');
+    startInput.className = 'caption-time-input';
+    startInput.value = formatCueTimeForEditor(cue.start);
+    startInput.title = 'Start time HH:MM:SS.mmm';
+
+    const endInput = document.createElement('input');
+    endInput.className = 'caption-time-input';
+    endInput.value = formatCueTimeForEditor(cue.end);
+    endInput.title = 'End time HH:MM:SS.mmm';
+
+    const seekButton = document.createElement('button');
+    seekButton.type = 'button';
+    seekButton.className = 'asset-mini-button';
+    seekButton.textContent = 'Go';
+    seekButton.title = 'Jump preview to this caption';
+
+    timeGrid.append(startInput, endInput);
+    top.append(idx, timeGrid, seekButton);
+
+    const textArea = document.createElement('textarea');
+    textArea.className = 'caption-textarea';
+    textArea.value = cue.text || '';
+    textArea.spellcheck = true;
+
+    const rowActions = document.createElement('div');
+    rowActions.className = 'caption-row-actions';
+
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.className = 'asset-mini-button danger';
+    deleteButton.textContent = 'Delete cue';
+    rowActions.append(deleteButton);
+
+    const focusCueInPreview = () => {
+      seekPreviewToCaptionEditorRow(index);
+    };
+
+    startInput.addEventListener('focus', focusCueInPreview);
+    endInput.addEventListener('focus', focusCueInPreview);
+    textArea.addEventListener('focus', focusCueInPreview);
+
+    const updateCueFromInputs = () => {
+      const nextStart = parseEditorCueTimeToMs(startInput.value);
+      const nextEnd = parseEditorCueTimeToMs(endInput.value);
+      subtitleCues[index] = {
+        ...subtitleCues[index],
+        start: nextStart,
+        end: Math.max(nextStart + 1, nextEnd),
+        text: textArea.value,
+        timed_words: String(textArea.value || '') === String(subtitleCues[index]?.text || '')
+          ? (Array.isArray(subtitleCues[index]?.timed_words) ? subtitleCues[index].timed_words : [])
+          : []
+      };
+      subtitleCues = normalizeEditorCues(subtitleCues);
+      markCaptionsDirty();
+    };
+
+    startInput.addEventListener('change', () => {
+      updateCueFromInputs();
+      renderCaptionsEditor();
+      seekPreviewToCaptionEditorRow(Math.min(index, subtitleCues.length - 1), { scroll: true, instant: true });
+    });
+
+    endInput.addEventListener('change', () => {
+      updateCueFromInputs();
+      renderCaptionsEditor();
+      seekPreviewToCaptionEditorRow(Math.min(index, subtitleCues.length - 1), { scroll: true, instant: true });
+    });
+
+    textArea.addEventListener('input', updateCueFromInputs);
+
+    seekButton.addEventListener('click', () => {
+      seekPreviewToCaptionEditorRow(index, { scroll: true });
+    });
+
+    deleteButton.addEventListener('click', () => {
+      subtitleCues.splice(index, 1);
+      subtitleCues = normalizeEditorCues(subtitleCues);
+      markCaptionsDirty();
+      renderCaptionsEditor();
+    });
+
+    row.append(top, textArea, rowActions);
+    captionEditorList.append(row);
+  });
+
+  if (options.followActive) {
+    requestAnimationFrame(() => scrollCaptionRowIntoView(activeIndex, { force: Boolean(options.force), instant: Boolean(options.instant) }));
+  }
+}
+
+function clearCaptionsEditorState() {
+  subtitleCues = [];
+  captionsDirty = false;
+  captionsEditorFilename = 'captions.srt';
+  captionsEditorSourceAssetId = currentProject?.selectedAssetId || null;
+  srtPreviewText = 'Preview caption will appear here';
+  srtInput.value = '';
+  syncNativeCaptionPreview();
+  applyHelperPreview();
+  renderCaptionsEditor();
+}
+
+async function loadCaptionsForSelectedAsset() {
+  const asset = getSelectedProjectAsset();
+  captionsEditorSourceAssetId = asset?.id || null;
+
+  if (!asset?.captions?.text) {
+    clearCaptionsEditorState();
+    return;
+  }
+
+  const filename = asset.captions.filename || 'captions.srt';
+  const text = String(asset.captions.text || '');
+  const subtitleFile = new File([text], filename, {
+    type: /\.vtt$/i.test(filename) ? 'text/vtt' : 'application/x-subrip'
+  });
+
+  setFileInput(srtInput, subtitleFile);
+
+  if (Array.isArray(asset.captions.cues) && asset.captions.cues.length) {
+    subtitleCues = normalizeEditorCues(asset.captions.cues.map(cue => ({
+      start: cue.start,
+      end: cue.end,
+      text: cue.text,
+      timed_words: Array.isArray(cue.timed_words) ? cue.timed_words : []
+    })));
+    srtPreviewText = subtitleCues[0]?.text || 'Preview caption will appear here';
+    syncNativeCaptionPreview();
+    applyHelperPreview();
+  } else {
+    await readSrtPreview(subtitleFile);
+  }
+
+  captionsDirty = false;
+  captionsEditorFilename = filename;
+  captionsEditorSourceAssetId = asset.id;
+  renderCaptionsEditor();
+}
+
+async function saveCurrentCaptionsToSelectedAsset(options = {}) {
+  if (!currentProject?.selectedAssetId) {
+    if (!options.silent) showStatus('err', 'Select a project video before saving captions.');
+    return false;
+  }
+
+  if (!subtitleCues.length) {
+    if (!options.silent) showStatus('err', 'No captions are loaded to save.');
+    return false;
+  }
+
+  const asset = getSelectedProjectAsset();
+  if (!asset) return false;
+
+  const srtText = syncEditedCaptionsToSubtitleInput(captionsEditorFilename || `${asset.name.replace(/\.[^.]+$/, '')}_captions.srt`);
+  asset.captions = {
+    filename: captionsEditorFilename,
+    format: /\.vtt$/i.test(captionsEditorFilename) ? 'vtt' : 'srt',
+    text: srtText,
+    cues: subtitleCues.map(cue => ({
+      start: cue.start,
+      end: cue.end,
+      text: cue.text,
+      timed_words: Array.isArray(cue.timed_words) ? cue.timed_words : []
+    })),
+    cueCount: subtitleCues.length,
+    updatedAt: Date.now(),
+    source: options.source || 'editor'
+  };
+
+  captionsDirty = false;
+  captionsEditorSourceAssetId = asset.id;
+  await saveCurrentProject();
+  renderCaptionsEditor();
+
+  if (!options.silent) {
+    showStatus('ok', `Captions saved to selected video: <strong>${escapeHtml(asset.name)}</strong>`);
+  }
+
+  return true;
+}
+
+function addCaptionCueAtCurrentTime() {
+  if (!currentProject?.selectedAssetId) {
+    showStatus('err', 'Select a project video before adding captions.');
+    return;
+  }
+
+  const start = Math.max(0, Math.floor((previewVideo.currentTime || 0) * 1000));
+  const end = Math.min(
+    Math.max(start + 1500, start + 1),
+    Math.max(start + 1, Math.floor((previewVideo.duration || 0) * 1000) || start + 2500)
+  );
+
+  subtitleCues.push({ start, end, text: 'New caption', timed_words: [] });
+  subtitleCues = normalizeEditorCues(subtitleCues);
+  markCaptionsDirty();
+  renderCaptionsEditor();
+}
+
+async function saveDirtyCaptionsBeforeAssetChange() {
+  if (!captionsDirty || !currentProject?.selectedAssetId || !subtitleCues.length) return;
+  await saveCurrentCaptionsToSelectedAsset({ silent: true, source: 'autosave-before-source-change' });
+}
 
 /* Normalize subtitle text by removing lightweight markup used in VTT and preserving line breaks. */
 function normalizeCueText(text) {
@@ -4915,12 +6771,15 @@ function getCurrentHelperText() {
 
   const timedWords = Array.isArray(activeCue.timed_words) ? activeCue.timed_words : [];
   if (!timedWords.length) {
-    return String(activeCue.text || '').trim().split(/\s+/).filter(Boolean)[0] || activeCue.text || '';
+    const plainWords = getCueDisplayWords(activeCue);
+    const estimatedIndex = getEstimatedCueWordIndex(activeCue, currentMs);
+    return plainWords[estimatedIndex] || activeCue.text || '';
   }
 
   let activeWord = timedWords[0].word;
   for (const item of timedWords) {
-    if (currentMs >= item.start) {
+    const threshold = Number(item.start || 0) - Number(controls.active_word_lead_ms || 0) + Number(controls.reveal_offset_ms || 0);
+    if (currentMs >= threshold) {
       activeWord = item.word;
     } else {
       break;
@@ -4943,9 +6802,136 @@ function parseSubtitleCues(text, filename) {
   return parseSrtCues(text);
 }
 
+/* Find the active subtitle cue index for the current local video playback time. */
+function getActiveSubtitleCueIndex(currentMs) {
+  return subtitleCues.findIndex(cue => currentMs >= cue.start && currentMs < cue.end);
+}
+
 /* Find the active subtitle cue for the current local video playback time. */
 function getActiveSubtitleCue(currentMs) {
-  return subtitleCues.find(cue => currentMs >= cue.start && currentMs < cue.end) || null;
+  const index = getActiveSubtitleCueIndex(currentMs);
+  return index >= 0 ? subtitleCues[index] : null;
+}
+
+/* Return the words shown in a cue. Used as a fallback when captions came from SRT
+   or after editor changes, where per-word timestamps are not available anymore. */
+function getCueDisplayWords(cue) {
+  return String(cue?.text || '')
+    .replace(/\r/g, '')
+    .replace(/\n/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/* Estimate the active word from cue progress when no per-word timestamps exist.
+   This keeps the WYSIWYG word highlight moving instead of staying on word 1. */
+function getEstimatedCueWordIndex(cue, currentMs) {
+  const words = getCueDisplayWords(cue);
+  if (!words.length) return -1;
+
+  const start = Math.max(0, Number(cue?.start || 0));
+  const end = Math.max(start + 1, Number(cue?.end || start + 1));
+  const lead = Math.max(0, Number(controls.active_word_lead_ms || 0));
+  const adjustedMs = Math.max(start, Math.min(end - 1, Number(currentMs || 0) + lead));
+  const progress = (adjustedMs - start) / Math.max(1, end - start);
+
+  return Math.max(0, Math.min(words.length - 1, Math.floor(progress * words.length)));
+}
+
+function isCaptionEditorTextFieldActive() {
+  const active = document.activeElement;
+  return Boolean(active && captionEditorList?.contains(active) && (active.matches('textarea') || active.matches('input')));
+}
+
+function updateCaptionEditorFollowControls(activeIndex = getActiveSubtitleCueIndex(Math.max(0, Math.floor((previewVideo.currentTime || 0) * 1000)))) {
+  if (captionEditorFollowBtn) {
+    captionEditorFollowBtn.classList.toggle('is-on', captionsAutoFollowEnabled);
+    captionEditorFollowBtn.setAttribute('aria-pressed', captionsAutoFollowEnabled ? 'true' : 'false');
+    captionEditorFollowBtn.textContent = captionsAutoFollowEnabled ? 'Follow playhead: on' : 'Follow playhead: off';
+  }
+
+  if (captionEditorActiveMeta) {
+    if (activeIndex >= 0 && subtitleCues[activeIndex]) {
+      const cue = subtitleCues[activeIndex];
+      captionEditorActiveMeta.textContent = `Cue ${activeIndex + 1} · ${formatCueTimeForEditor(cue.start)} → ${formatCueTimeForEditor(cue.end)}`;
+    } else {
+      captionEditorActiveMeta.textContent = 'No active cue';
+    }
+  }
+}
+
+function scrollCaptionRowIntoView(index, options = {}) {
+  if (!captionEditorList || index < 0) return;
+  if (!captionsSidePanel?.classList.contains('active')) return;
+
+  const row = captionEditorList.querySelector(`.caption-row[data-index="${index}"]`);
+  if (!row) return;
+
+  const force = Boolean(options.force);
+  const now = Date.now();
+
+  if (!force && !captionsAutoFollowEnabled) return;
+  if (!force && isCaptionEditorTextFieldActive()) return;
+  if (!force && now < captionsManualScrollPauseUntil) return;
+
+  const containerRect = captionEditorList.getBoundingClientRect();
+  const rowRect = row.getBoundingClientRect();
+  const comfortableTop = containerRect.top + 42;
+  const comfortableBottom = containerRect.bottom - 42;
+  const isComfortablyVisible = rowRect.top >= comfortableTop && rowRect.bottom <= comfortableBottom;
+
+  if (!force && isComfortablyVisible && index === lastActiveCaptionIndex) return;
+
+  lastActiveCaptionIndex = index;
+  const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  row.scrollIntoView({
+    block: 'center',
+    inline: 'nearest',
+    behavior: prefersReducedMotion || options.instant ? 'auto' : 'smooth'
+  });
+}
+
+function updateCaptionRowsActiveState(activeIndex) {
+  if (!captionEditorList) return;
+
+  captionEditorList.querySelectorAll('.caption-row').forEach(row => {
+    const rowIndex = Number(row.dataset.index || -1);
+    row.classList.toggle('is-active', rowIndex === activeIndex);
+  });
+
+  lastActiveCaptionIndex = activeIndex;
+  updateCaptionEditorFollowControls(activeIndex);
+}
+
+function seekPreviewToCaptionEditorRow(index, options = {}) {
+  const cue = subtitleCues[index];
+  if (!cue || !previewVideo) return;
+
+  const targetSeconds = Math.max(0, Number(cue.start || 0) / 1000);
+  captionsEditorFocusSeekUntil = Date.now() + 700;
+  captionsEditorFocusSeekIndex = index;
+
+  try {
+    if (Math.abs(Number(previewVideo.currentTime || 0) - targetSeconds) > 0.015) {
+      previewVideo.currentTime = targetSeconds;
+    }
+  } catch {}
+
+  updateTransportControls();
+  syncNativeCaptionPreview();
+  applyHelperPreview();
+  updateCaptionRowsActiveState(index);
+
+  if (options.scroll) {
+    scrollCaptionRowIntoView(index, { force: true, instant: Boolean(options.instant) });
+  }
+}
+
+function showCurrentCaptionRow(options = {}) {
+  const currentMs = Math.max(0, Math.floor((previewVideo.currentTime || 0) * 1000));
+  const activeIndex = getActiveSubtitleCueIndex(currentMs);
+  updateCaptionEditorFollowControls(activeIndex);
+  scrollCaptionRowIntoView(activeIndex, { force: true, ...options });
 }
 
 /* Escape text for safe helper HTML rendering. */
@@ -4993,13 +6979,14 @@ function getCurrentHelperState() {
 
   const timedWords = Array.isArray(activeCue.timed_words) ? activeCue.timed_words : [];
   if (!timedWords.length) {
-    const plainWords = String(activeCue.text || '').split(/\s+/).filter(Boolean);
+    const plainWords = getCueDisplayWords(activeCue);
+    const estimatedIndex = getEstimatedCueWordIndex(activeCue, currentMs);
 
     return {
       cueStart: activeCue.start || 0,
       text: applyCase(activeCue.text || ''),
-      activeWord: applyCase(plainWords[0] || ''),
-      activeIndex: plainWords.length ? 0 : -1
+      activeWord: applyCase(plainWords[estimatedIndex] || ''),
+      activeIndex: estimatedIndex
     };
   }
 
@@ -5007,6 +6994,7 @@ function getCurrentHelperState() {
 
   for (let i = 0; i < timedWords.length; i += 1) {
     const threshold = timedWords[i].start
+    - Number(controls.active_word_lead_ms || 0)
     + Number(controls.reveal_offset_ms || 0)
     + pickVariantOffset(
       controls.random_timing_jitter,
@@ -5136,6 +7124,11 @@ async function renderVideo(mode) {
 
   const sourceAsset = getSelectedProjectAsset();
   let video = await getActiveSourceVideoFile();
+  if (captionsDirty && subtitleCues.length) {
+    await saveCurrentCaptionsToSelectedAsset({ silent: true, source: 'autosave-before-render' });
+  } else if (subtitleCues.length) {
+    syncEditedCaptionsToSubtitleInput();
+  }
   const srt = srtInput.files[0];
 
   if (!video || !srt) {
@@ -5148,12 +7141,6 @@ async function renderVideo(mode) {
   formData.append('srt', srt, srt.name);
   formData.append('mode', mode);
   collectSettings(formData, { forCaptionRender: true });
-
-  if (controls.aspect_live_preview && !controls.aspect_enabled) {
-    controls.aspect_enabled = true;
-    refreshGui();
-    showStatus('info', 'Aspect canvas is now enabled for caption render so the exported captions match the live preview canvas.');
-  }
 
   previewBtn.disabled = true;
   renderFullBtn.disabled = true;
@@ -5282,10 +7269,48 @@ async function processVideo(processKind, mode) {
 
 
 
+/* Keep caption chunking controls within backend-supported limits and update the GUI readout. */
+function clampCaptionChunkControls() {
+  controls.caption_chunk_max_words = Math.max(1, Math.min(30, Math.round(Number(controls.caption_chunk_max_words || 4))));
+  controls.caption_chunk_min_words = Math.max(1, Math.min(controls.caption_chunk_max_words, Math.round(Number(controls.caption_chunk_min_words || 1))));
+  controls.caption_chunk_max_seconds = Math.max(0.3, Math.min(12, Number(controls.caption_chunk_max_seconds || 2.2)));
+  controls.caption_chunk_min_seconds = Math.max(0, Math.min(controls.caption_chunk_max_seconds, Number(controls.caption_chunk_min_seconds || 0.25)));
+  controls.caption_chunk_max_chars = Math.max(8, Math.min(180, Math.round(Number(controls.caption_chunk_max_chars || 42))));
+  controls.caption_chunk_gap_seconds = Math.max(0.05, Math.min(3, Number(controls.caption_chunk_gap_seconds || 0.55)));
+  controls.caption_chunk_words_per_line = Math.max(0, Math.min(12, Math.round(Number(controls.caption_chunk_words_per_line || 0))));
+  controls.caption_chunk_max_lines = Math.max(1, Math.min(4, Math.round(Number(controls.caption_chunk_max_lines || 2))));
+  controls.caption_chunk_punctuation = String(controls.caption_chunk_punctuation || '.?!…');
+}
+
+function updateCaptionChunkingReadout() {
+  clampCaptionChunkControls();
+  const pieces = [
+    `${controls.caption_chunk_min_words}-${controls.caption_chunk_max_words} words`,
+    `${Number(controls.caption_chunk_min_seconds).toFixed(2)}-${Number(controls.caption_chunk_max_seconds).toFixed(2)}s`,
+    `${controls.caption_chunk_max_chars} chars`
+  ];
+
+  if (controls.caption_chunk_split_at_punctuation) {
+    pieces.push(`punctuation ${controls.caption_chunk_punctuation || '.?!…'}`);
+  }
+
+  if (controls.caption_chunk_split_on_gap) {
+    pieces.push(`gap ≥ ${Number(controls.caption_chunk_gap_seconds).toFixed(2)}s`);
+  }
+
+  if (controls.caption_chunk_words_per_line > 0) {
+    pieces.push(`${controls.caption_chunk_words_per_line} words/line · ${controls.caption_chunk_max_lines} lines`);
+  }
+
+  controls.caption_chunking_readout = pieces.join(' · ');
+  refreshGui();
+}
+
 /* Start one transcription job for the current source video and auto-load the returned VTT. */
 /* Uses the same job polling path as render and post-processing jobs. */
 async function generateCaptions() {
   clearStatus();
+  updateCaptionChunkingReadout();
 
   let video = await getActiveSourceVideoFile();
 
@@ -5427,6 +7452,7 @@ helperCaption.addEventListener('pointerup', event => {
   dragState = null;
   helperCaption.classList.remove('is-dragging');
   helperCaption.releasePointerCapture(event.pointerId);
+  scheduleProjectVisualSettingsSave();
 });
 
 helperCaption.addEventListener('pointercancel', () => {
@@ -5470,6 +7496,7 @@ overlayHelper.addEventListener('pointerup', event => {
   overlayDragState = null;
   overlayHelper.classList.remove('is-dragging');
   overlayHelper.releasePointerCapture(event.pointerId);
+  scheduleProjectVisualSettingsSave();
 });
 
 overlayHelper.addEventListener('pointercancel', () => {
@@ -5490,8 +7517,8 @@ Object.assign(controls, {
   preview_duration: Number.isFinite(Number(controls.preview_duration)) ? Math.max(1, Number(controls.preview_duration)) : 8,
 
   /* Aspect-canvas fallback controls required by the Aspect Canvas lil-gui folder. */
-  aspect_enabled: typeof controls.aspect_enabled === 'boolean' ? controls.aspect_enabled : true,
-  aspect_live_preview: typeof controls.aspect_live_preview === 'boolean' ? controls.aspect_live_preview : true,
+  aspect_enabled: typeof controls.aspect_enabled === 'boolean' ? controls.aspect_enabled : false,
+  aspect_live_preview: typeof controls.aspect_live_preview === 'boolean' ? controls.aspect_live_preview : false,
   aspect_ratio: controls.aspect_ratio || '9:16',
   aspect_border_colour: controls.aspect_border_colour || '#000000',
   aspect_size_mode: ['none', 'width', 'height', 'custom'].includes(controls.aspect_size_mode) ? controls.aspect_size_mode : 'none',
@@ -5505,6 +7532,16 @@ Object.assign(controls, {
 
 /* Build the lil-gui control surface and move legacy action controls into a closed Actions folder. */
 const gui = new GUI({ title: 'Caption Controls' });
+
+/* Catch lil-gui edits that do not repaint the helper immediately, such as timing lead, blur, and margin-only fields. */
+document.addEventListener('input', event => {
+  if (event.target?.closest?.('.lil-gui')) scheduleProjectVisualSettingsSave();
+});
+document.addEventListener('change', event => {
+  if (event.target?.closest?.('.lil-gui')) scheduleProjectVisualSettingsSave();
+});
+window.addEventListener('beforeunload', persistProjectVisualSettingsBeforeUnload);
+setInterval(scheduleProjectVisualSettingsSave, 1000);
 
 
 
@@ -5527,6 +7564,7 @@ projectFolder.add({
 }, 'edit_project').name('Edit metadata');
 projectFolder.add({
   add_video() {
+    pendingVideoImportIntent = 'add';
     videoInput.click();
   }
 }, 'add_video').name('Add video asset');
@@ -5611,6 +7649,7 @@ const actionState = {
   choose_video() {
     /* Vulnerable block: file picker must only open from a direct user interaction. */
     if (videoInput) {
+      pendingVideoImportIntent = 'prompt';
       videoInput.click();
     }
   },
@@ -5866,7 +7905,10 @@ typeFolder.add(controls, 'font_size', 8, 512, 1).onChange(() => {
   applyHelperPreview();
 });
 typeFolder.add(controls, 'helper_font_scale', 0.6, 1.2, 0.01).name('helper font match').onChange(applyHelperPreview);
-typeFolder.add(controls, 'active_word_lead_ms', 0, 200, 1).name('active lead ms');
+typeFolder.add(controls, 'active_word_lead_ms', 0, 200, 1).name('active lead ms').onChange(() => {
+  syncNativeCaptionPreview();
+  applyHelperPreview();
+});
 typeFolder.add(controls, 'reveal_offset_ms', -500, 500, 1).name('reveal offset ms').onChange(() => {
   syncNativeCaptionPreview();
   applyHelperPreview();
@@ -5875,7 +7917,7 @@ typeFolder.addColor(controls, 'outline_colour').name('outline').onChange(applyHe
 typeFolder.addColor(controls, 'shadow_colour').name('shadow color').onChange(applyHelperPreview);
 typeFolder.add(controls, 'outline', 0, 12, 0.5).onChange(applyHelperPreview);
 typeFolder.add(controls, 'shadow', 0, 12, 0.5).onChange(applyHelperPreview);
-typeFolder.add(controls, 'blur', 0, 8, 0.1);
+typeFolder.add(controls, 'blur', 0, 8, 0.1).onChange(scheduleProjectVisualSettingsSave);
 typeFolder.add(controls, 'bold').onChange(() => {
   renderFontGallery();
   applyHelperPreview();
@@ -5893,6 +7935,70 @@ typeFolder.open();
 refreshFontsFromServer().catch(error => {
   showStatus('err', error.message || 'Could not load fonts.');
 });
+
+const globalOverlayFolder = gui.addFolder('Global Colour Overlay');
+const globalOverlayStopActions = {
+  add_stop: addGlobalOverlayStop,
+  reverse_stops: reverseGlobalOverlayStops
+};
+
+globalOverlayFolder.add(controls, 'global_overlay_enabled').name('enabled').onChange(() => {
+  applyGlobalColourOverlayPreview();
+  scheduleProjectVisualSettingsSave();
+});
+globalOverlayFolder.add(controls, 'global_overlay_kind', {
+  'Solid colour': 'solid',
+  'Linear gradient': 'linear',
+  'Radial gradient': 'radial'
+}).name('type').onChange(() => {
+  applyGlobalColourOverlayPreview();
+  renderGlobalOverlayStopsPanel();
+  scheduleProjectVisualSettingsSave();
+});
+globalOverlayFolder.addColor(controls, 'global_overlay_solid_colour').name('solid colour').onChange(() => {
+  applyGlobalColourOverlayPreview();
+  scheduleProjectVisualSettingsSave();
+});
+globalOverlayFolder.add(controls, 'global_overlay_opacity', 0, 1, 0.01).name('opacity').onChange(() => {
+  applyGlobalColourOverlayPreview();
+  scheduleProjectVisualSettingsSave();
+});
+globalOverlayFolder.add(controls, 'global_overlay_blend_mode', {
+  Normal: 'normal',
+  Multiply: 'multiply',
+  Screen: 'screen',
+  Overlay: 'overlay',
+  Darken: 'darken',
+  Lighten: 'lighten',
+  Addition: 'addition',
+  'Soft light': 'softlight',
+  'Hard light': 'hardlight',
+  Difference: 'difference',
+  Exclusion: 'exclusion'
+}).name('blend mode').onChange(() => {
+  applyGlobalColourOverlayPreview();
+  scheduleProjectVisualSettingsSave();
+});
+globalOverlayFolder.add(controls, 'global_overlay_angle', -180, 180, 1).name('linear angle').onChange(() => {
+  applyGlobalColourOverlayPreview();
+  scheduleProjectVisualSettingsSave();
+});
+globalOverlayFolder.add(controls, 'global_overlay_radial_x', 0, 1, 0.001).name('radial x').onChange(() => {
+  applyGlobalColourOverlayPreview();
+  scheduleProjectVisualSettingsSave();
+});
+globalOverlayFolder.add(controls, 'global_overlay_radial_y', 0, 1, 0.001).name('radial y').onChange(() => {
+  applyGlobalColourOverlayPreview();
+  scheduleProjectVisualSettingsSave();
+});
+globalOverlayFolder.add(globalOverlayStopActions, 'add_stop').name('+ add gradient stop');
+globalOverlayFolder.add(globalOverlayStopActions, 'reverse_stops').name('reverse gradient stops');
+globalOverlayFolder.add(controls, 'global_overlay_readout').name('readout').listen();
+globalOverlayStopsFolder = globalOverlayFolder.addFolder('Gradient stops');
+globalOverlayStopsFolder.close();
+globalOverlayFolder.close();
+syncGlobalOverlaySelectedStopFields();
+renderGlobalOverlayStopsPanel();
 
 const overlayFolder = gui.addFolder('Overlay Layer');
 overlayFolder.add(controls, 'overlay_enabled').name('enabled').onChange(applyHelperPreview);
@@ -5949,7 +8055,10 @@ placeFolder.add(controls, 'alignment', {
 }).onChange(applyHelperPreview);
 placeFolder.add(controls, 'anchor_x', 0, 1, 0.001).onChange(applyHelperPreview);
 placeFolder.add(controls, 'anchor_y', 0, 1, 0.001).onChange(applyHelperPreview);
-placeFolder.add(controls, 'margin_v', 0, 240, 1);
+placeFolder.add(controls, 'margin_v', 0, 240, 1).onChange(() => {
+  applyHelperPreview();
+  scheduleProjectVisualSettingsSave();
+});
 placeFolder.add(controls, 'margin_h', 0, 240, 1).onChange(applyHelperPreview);
 placeFolder.add(controls, 'offset_x', -600, 600, 1).onChange(applyHelperPreview);
 placeFolder.add(controls, 'offset_y', -600, 600, 1).onChange(applyHelperPreview);
@@ -6037,18 +8146,11 @@ previewFolder.close();
 /* Convert the source video onto a coloured canvas with a specific aspect ratio. */
 /* Live browser preview uses CSS only; caption exports send the same canvas settings to FFmpeg. */
 const aspectFolder = gui.addFolder('Aspect Canvas');
-aspectFolder.add(controls, 'aspect_enabled').name('caption/export uses this canvas').onChange(value => {
-  if (!value && controls.aspect_live_preview) {
-    showStatus('info', 'Live preview is still showing the aspect canvas. Caption render will automatically re-enable the canvas to avoid position mismatch. Turn off live browser preview to edit captions on the original video.');
-  }
+aspectFolder.add(controls, 'aspect_enabled').name('export aspect canvas').onChange(() => {
   applyHelperPreview();
+  scheduleProjectVisualSettingsSave();
 });
-aspectFolder.add(controls, 'aspect_live_preview').name('live browser preview').onChange(value => {
-  if (value && !controls.aspect_enabled) {
-    controls.aspect_enabled = true;
-    showStatus('info', 'Caption/export canvas was enabled so the live preview and final render stay matched.');
-    refreshGui();
-  }
+aspectFolder.add(controls, 'aspect_live_preview').name('live browser preview only').onChange(() => {
   applyHelperPreview();
 });
 aspectFolder.add(controls, 'aspect_ratio', {
@@ -6280,6 +8382,21 @@ captionsFolder.add(controls, 'caption_language', {
 captionsFolder.add(controls, 'caption_word_timestamps').name('word timestamps');
 captionsFolder.add(controls, 'caption_vad_filter').name('vad filter');
 
+const captionChunkFolder = captionsFolder.addFolder('Chunk tuning');
+captionChunkFolder.add(controls, 'caption_chunk_max_words', 1, 30, 1).name('max words').onChange(updateCaptionChunkingReadout);
+captionChunkFolder.add(controls, 'caption_chunk_min_words', 1, 12, 1).name('min words').onChange(updateCaptionChunkingReadout);
+captionChunkFolder.add(controls, 'caption_chunk_max_seconds', 0.3, 12, 0.05).name('max seconds').onChange(updateCaptionChunkingReadout);
+captionChunkFolder.add(controls, 'caption_chunk_min_seconds', 0, 4, 0.05).name('min seconds').onChange(updateCaptionChunkingReadout);
+captionChunkFolder.add(controls, 'caption_chunk_max_chars', 8, 180, 1).name('max characters').onChange(updateCaptionChunkingReadout);
+captionChunkFolder.add(controls, 'caption_chunk_split_at_punctuation').name('split punctuation').onChange(updateCaptionChunkingReadout);
+captionChunkFolder.add(controls, 'caption_chunk_punctuation').name('punctuation').onChange(updateCaptionChunkingReadout);
+captionChunkFolder.add(controls, 'caption_chunk_split_on_gap').name('split on gap').onChange(updateCaptionChunkingReadout);
+captionChunkFolder.add(controls, 'caption_chunk_gap_seconds', 0.05, 3, 0.05).name('gap seconds').onChange(updateCaptionChunkingReadout);
+captionChunkFolder.add(controls, 'caption_chunk_words_per_line', 0, 12, 1).name('words per line').onChange(updateCaptionChunkingReadout);
+captionChunkFolder.add(controls, 'caption_chunk_max_lines', 1, 4, 1).name('max lines').onChange(updateCaptionChunkingReadout);
+captionChunkFolder.add(controls, 'caption_chunking_readout').name('rule').disable();
+captionChunkFolder.close();
+
 captionsFolder.add({
   get_captions() {
     return generateCaptions();
@@ -6305,6 +8422,7 @@ captionsFolder.add({
 }, 'save_txt').name('Save TXT');
 
 captionsFolder.close();
+updateCaptionChunkingReadout();
 
 
 
@@ -6427,13 +8545,107 @@ if (projectSelect) {
   });
 }
 
+if (configButton) {
+  configButton.addEventListener('click', openConfigOverlay);
+}
+
+if (configCloseBtn) {
+  configCloseBtn.addEventListener('click', closeConfigOverlay);
+}
+
+if (configDoneBtn) {
+  configDoneBtn.addEventListener('click', closeConfigOverlay);
+}
+
+if (configOverlay) {
+  configOverlay.addEventListener('pointerdown', event => {
+    if (event.target === configOverlay) closeConfigOverlay();
+  });
+}
+
+if (configModeSelect) {
+  configModeSelect.addEventListener('change', () => applyAppSettings({ ...readAppSettings(), mode: configModeSelect.value }));
+}
+
+if (configThemeSelect) {
+  configThemeSelect.addEventListener('change', () => applyAppSettings({ ...readAppSettings(), theme: configThemeSelect.value }));
+}
+
+if (easyGetCaptionsBtn) {
+  easyGetCaptionsBtn.addEventListener('click', generateCaptions);
+}
+
+if (easyRenderPreviewBtn) {
+  easyRenderPreviewBtn.addEventListener('click', renderPreview);
+}
+
+if (easyRenderFullBtn) {
+  easyRenderFullBtn.addEventListener('click', () => renderVideo('full'));
+}
+
+if (easyFontGalleryBtn) {
+  easyFontGalleryBtn.addEventListener('click', openFontGallery);
+}
+
+if (easyFontSizeInput) {
+  easyFontSizeInput.addEventListener('input', () => {
+    controls.font_size = Math.max(8, Math.min(512, Math.round(Number(easyFontSizeInput.value || 24))));
+    renderFontGallery();
+    applyHelperPreview();
+    refreshGui();
+  });
+}
+
+if (easyTextColourInput) {
+  easyTextColourInput.addEventListener('input', () => {
+    controls.primary_colour = easyTextColourInput.value;
+    renderFontGallery();
+    applyHelperPreview();
+    refreshGui();
+  });
+}
+
 if (editProjectBtn) {
   editProjectBtn.addEventListener('click', editCurrentProject);
 }
 
 if (addProjectVideoBtn) {
-  addProjectVideoBtn.addEventListener('click', () => videoInput.click());
+  addProjectVideoBtn.addEventListener('click', () => {
+    pendingVideoImportIntent = 'add';
+    videoInput.click();
+  });
 }
+
+videosTabBtn?.addEventListener('click', () => setSidebarTab('videos'));
+captionsTabBtn?.addEventListener('click', () => setSidebarTab('captions'));
+captionEditorLoadBtn?.addEventListener('click', () => srtInput.click());
+captionEditorSaveBtn?.addEventListener('click', () => saveCurrentCaptionsToSelectedAsset());
+captionEditorAddCueBtn?.addEventListener('click', addCaptionCueAtCurrentTime);
+captionEditorDownloadBtn?.addEventListener('click', () => saveCurrentCaptions('srt'));
+captionEditorFollowBtn?.addEventListener('click', () => {
+  captionsAutoFollowEnabled = !captionsAutoFollowEnabled;
+  updateCaptionEditorFollowControls();
+  if (captionsAutoFollowEnabled) {
+    showCurrentCaptionRow({ instant: false });
+  }
+});
+captionEditorCurrentBtn?.addEventListener('click', () => showCurrentCaptionRow({ instant: false }));
+captionEditorList?.addEventListener('focusin', event => {
+  const target = event.target;
+  if (!target?.matches?.('.caption-time-input, .caption-textarea')) return;
+
+  const row = target.closest('.caption-row');
+  const rowIndex = Number(row?.dataset.index ?? -1);
+  if (rowIndex >= 0) {
+    seekPreviewToCaptionEditorRow(rowIndex);
+  }
+});
+captionEditorList?.addEventListener('wheel', () => {
+  captionsManualScrollPauseUntil = Date.now() + 1800;
+}, { passive: true });
+captionEditorList?.addEventListener('touchstart', () => {
+  captionsManualScrollPauseUntil = Date.now() + 1800;
+}, { passive: true });
 
 ['dragenter', 'dragover'].forEach(name => {
   document.body.addEventListener(name, event => {
@@ -6449,7 +8661,7 @@ if (addProjectVideoBtn) {
   });
 });
 
-/* Accept dropped source video and subtitle files, including WebM, then persist the video in browser cache for reuse. */
+/* Accept dropped source video and subtitle files, including WebM, then persist the video in the chosen project. */
 document.body.addEventListener('drop', async event => {
   const files = [...event.dataTransfer.files];
   const videoFile = files.find(file => /\.(mp4|mov|m4v|webm)$/i.test(file.name));
@@ -6457,12 +8669,15 @@ document.body.addEventListener('drop', async event => {
 
   if (videoFile) {
     setFileInput(videoInput, videoFile);
-    await addVideoAssetToProject(videoFile, { role: currentProject?.assets?.length ? 'derived' : 'root', operationType: 'upload' });
+    await importVideoFileToProject(videoFile, { source: 'drop', defaultAutoCaptions: !srtFile });
   }
 
   if (srtFile) {
     setFileInput(srtInput, srtFile);
     await readSrtPreview(srtFile);
+    captionsDirty = true;
+    await saveCurrentCaptionsToSelectedAsset({ silent: true, source: 'dropped' });
+    setSidebarTab('captions');
   }
 
   updateMeta();
@@ -6470,12 +8685,15 @@ document.body.addEventListener('drop', async event => {
 
 
 
+
 /* Load a newly selected source video, update preview, and refresh the cached browser copy. */
 videoInput.addEventListener('change', async () => {
   const file = videoInput.files[0];
+  const importIntent = pendingVideoImportIntent;
+  pendingVideoImportIntent = 'prompt';
 
   if (file) {
-    await addVideoAssetToProject(file, { role: currentProject?.assets?.length ? 'derived' : 'root', operationType: 'upload' });
+    await importVideoFileToProject(file, { source: 'picker', forceAdd: importIntent === 'add' });
   }
 
   updateMeta();
@@ -6486,6 +8704,9 @@ srtInput.addEventListener('change', async () => {
   const file = srtInput.files[0];
   if (file) {
     await readSrtPreview(file);
+    captionsDirty = true;
+    await saveCurrentCaptionsToSelectedAsset({ silent: true, source: 'loaded' });
+    setSidebarTab('captions');
   }
   refreshGui();
 });
@@ -6605,12 +8826,32 @@ previewVideo.addEventListener('loadeddata', () => {
 previewVideo.addEventListener('timeupdate', () => {
   updateTransportControls();
   syncNativeCaptionPreview();
+  if (captionsSidePanel?.classList.contains('active')) {
+    const activeIndex = getActiveSubtitleCueIndex(Math.max(0, Math.floor((previewVideo.currentTime || 0) * 1000)));
+
+    if (isCaptionEditorTextFieldActive() || Date.now() < captionsEditorFocusSeekUntil) {
+      updateCaptionRowsActiveState(activeIndex >= 0 ? activeIndex : captionsEditorFocusSeekIndex);
+      return;
+    }
+
+    window.clearTimeout(captionsRenderQueued);
+    captionsRenderQueued = window.setTimeout(() => renderCaptionsEditor({ followActive: true }), 120);
+  }
 });
 
 /* Recompute visible caption text when playback state changes. */
 previewVideo.addEventListener('seeked', () => {
   updateTransportControls();
   syncNativeCaptionPreview();
+
+  const activeIndex = getActiveSubtitleCueIndex(Math.max(0, Math.floor((previewVideo.currentTime || 0) * 1000)));
+  if (isCaptionEditorTextFieldActive() || Date.now() < captionsEditorFocusSeekUntil) {
+    updateCaptionRowsActiveState(activeIndex >= 0 ? activeIndex : captionsEditorFocusSeekIndex);
+    applyHelperPreview();
+    return;
+  }
+
+  renderCaptionsEditor({ followActive: true, force: true });
 });
 
 /* Refresh native preview when playback is paused at a subtitle boundary. */
@@ -6644,6 +8885,12 @@ window.addEventListener('resize', () => {
 });
 
 document.addEventListener('keydown', event => {
+  if (configOverlay?.classList.contains('open') && event.key === 'Escape') {
+    event.preventDefault();
+    closeConfigOverlay();
+    return;
+  }
+
   if (event.target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)) return;
 
   const key = event.key.toLowerCase();
@@ -6688,6 +8935,7 @@ resetBtn.addEventListener('click', resetUI);
 
 /* Restore cached source-video metadata on startup so the UI shows that a reusable video already exists. */
 cachedVideoMeta = readCachedVideoMetaFromStorage();
+applyAppSettings(readAppSettings());
 await loadPresets();
 await bootProjects();
 updateMeta();

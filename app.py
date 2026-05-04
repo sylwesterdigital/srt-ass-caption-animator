@@ -16,6 +16,7 @@ import urllib.error
 import urllib.request
 import zipfile
 import time
+import hashlib
 
 
 import platform
@@ -23,9 +24,11 @@ import pysubs2
 from fontTools.ttLib import TTFont
 
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
+ASSETS_DIR = os.path.join(APP_ROOT, "assets")
 UPLOAD_DIR = os.path.join(APP_ROOT, "uploads")
 OUTPUT_DIR = os.path.join(APP_ROOT, "outputs")
 REVEAL_DIR = os.path.join(OUTPUT_DIR, "revealed_assets")
+GLOBAL_OVERLAY_CACHE_DIR = os.path.join(OUTPUT_DIR, "global_overlay_cache")
 TOOLS_DIR = os.path.join(APP_ROOT, "tools")
 REALESRGAN_DIR = os.path.join(TOOLS_DIR, "realesrgan")
 REALESRGAN_RELEASE = "v0.2.5.0"
@@ -66,8 +69,10 @@ ALLOWED_FONT_EXTENSIONS = {".ttf", ".otf", ".woff", ".woff2"}
 # Ensure all runtime directories exist, including the custom font store.
 def ensure_dirs():
     os.makedirs(UPLOAD_DIR, exist_ok=True)
+    os.makedirs(os.path.join(ASSETS_DIR, "images", "icons"), exist_ok=True)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(REVEAL_DIR, exist_ok=True)
+    os.makedirs(GLOBAL_OVERLAY_CACHE_DIR, exist_ok=True)
     os.makedirs(FONTS_DIR, exist_ok=True)
     os.makedirs(TOOLS_DIR, exist_ok=True)
     os.makedirs(REALESRGAN_DIR, exist_ok=True)
@@ -243,7 +248,7 @@ def _list_custom_fonts():
 
 
 # Render a preview or full output while exposing uploaded fonts to libass.
-def render_preview(video_path, ass_path, output_path, preview_start=0, preview_seconds=8, aspect_settings=None):
+def render_preview(video_path, ass_path, output_path, preview_start=0, preview_seconds=8, aspect_settings=None, global_overlay_settings=None):
     # Render a preview or full output while exposing uploaded fonts to libass.
     # Force AV1 inputs through an explicit software decoder and render with a clean libass font directory.
     import shutil
@@ -326,19 +331,34 @@ def render_preview(video_path, ass_path, output_path, preview_start=0, preview_s
         )
 
         source_info = get_video_info(video_path)
-        aspect_filter = ""
-        if _aspect_layer_enabled(aspect_settings):
-            aspect_filter = _build_aspect_pad_filter(aspect_settings, source_info) + ","
+        overlay_png_path = None
+        extra_input_args = []
+        use_global_overlay = _global_overlay_layer_enabled(global_overlay_settings)
+        output_video_info = _video_info_after_aspect(source_info, aspect_settings) if _aspect_layer_enabled(aspect_settings) else source_info
 
+        if use_global_overlay:
+            overlay_png_path = os.path.join(OUTPUT_DIR, f"global_overlay_{uuid.uuid4().hex[:12]}.png")
+            _create_global_overlay_png(global_overlay_settings, output_video_info["width"], output_video_info["height"], overlay_png_path)
+            extra_input_args = ["-loop", "1", "-i", overlay_png_path]
+
+        video_filters = []
         if preview_seconds is not None:
-            video_chain = (
-                f"[0:v]trim=start={requested_start:.6f}:end={requested_end:.6f},"
-                f"setpts=PTS-STARTPTS,{aspect_filter}{ass_filter}[v]"
-            )
+            video_filters.append(f"trim=start={requested_start:.6f}:end={requested_end:.6f}")
+            video_filters.append("setpts=PTS-STARTPTS")
         else:
-            video_chain = f"[0:v]setpts=PTS-STARTPTS,{aspect_filter}{ass_filter}[v]"
+            video_filters.append("setpts=PTS-STARTPTS")
 
-        filter_parts = [video_chain]
+        if _aspect_layer_enabled(aspect_settings):
+            video_filters.append(_build_aspect_pad_filter(aspect_settings, source_info))
+
+        filter_parts = [f"[0:v]{','.join(video_filters)}[basev]"]
+        caption_input_label = "basev"
+
+        if use_global_overlay:
+            _append_global_overlay_filter(filter_parts, "basev", "gradedv", "1:v", global_overlay_settings)
+            caption_input_label = "gradedv"
+
+        filter_parts.append(f"[{caption_input_label}]{ass_filter}[v]")
 
         if has_audio:
             if preview_seconds is not None:
@@ -357,6 +377,7 @@ def render_preview(video_path, ass_path, output_path, preview_start=0, preview_s
             "-nostdin",
             *input_decoder_args,
             "-i", video_path,
+            *extra_input_args,
             "-filter_complex", filter_complex,
             "-map", "[v]",
         ]
@@ -387,6 +408,11 @@ def render_preview(video_path, ass_path, output_path, preview_start=0, preview_s
             raise RuntimeError(result.stderr.strip() or "FFmpeg render failed")
 
     finally:
+        try:
+            if 'overlay_png_path' in locals() and overlay_png_path:
+                os.remove(overlay_png_path)
+        except Exception:
+            pass
         try:
             shutil.rmtree(temp_fonts_dir, ignore_errors=True)
         except Exception:
@@ -1149,6 +1175,298 @@ def _build_aspect_settings_from_form(form):
 
 def _aspect_layer_enabled(aspect_settings):
     return bool(aspect_settings and aspect_settings.get("enabled"))
+
+
+_GLOBAL_OVERLAY_BLEND_MODES = {
+    "normal",
+    "multiply",
+    "screen",
+    "overlay",
+    "darken",
+    "lighten",
+    "addition",
+    "softlight",
+    "hardlight",
+    "difference",
+    "exclusion",
+}
+
+
+def _safe_hex_colour(value, default="#000000"):
+    raw_value = str(value or default).strip()
+    if re.fullmatch(r"#[0-9A-Fa-f]{6}", raw_value):
+        return raw_value.upper()
+    if re.fullmatch(r"[0-9A-Fa-f]{6}", raw_value):
+        return f"#{raw_value.upper()}"
+    return default.upper()
+
+
+def _normalise_global_overlay_kind(value):
+    kind = str(value or "solid").strip().lower()
+    return kind if kind in ("solid", "linear", "radial") else "solid"
+
+
+def _normalise_global_overlay_blend(value):
+    mode = str(value or "normal").strip().lower().replace(" ", "")
+    return mode if mode in _GLOBAL_OVERLAY_BLEND_MODES else "normal"
+
+
+def _parse_global_overlay_stops(stops_json, fallback_a="#000000", fallback_b="#FFFFFF"):
+    raw_items = []
+    try:
+        parsed = json.loads(stops_json or "[]")
+        if isinstance(parsed, list):
+            raw_items = parsed
+    except Exception:
+        raw_items = []
+
+    stops = []
+    for item in raw_items[:16]:
+        if not isinstance(item, dict):
+            continue
+        position = max(0.0, min(1.0, _safe_float(item.get("position", 0), 0)))
+        colour = _safe_hex_colour(item.get("colour", item.get("color", fallback_a)), fallback_a)
+        stops.append({"position": position, "colour": colour})
+
+    if not stops:
+        stops = [
+            {"position": 0.0, "colour": _safe_hex_colour(fallback_a, "#000000")},
+            {"position": 1.0, "colour": _safe_hex_colour(fallback_b, "#FFFFFF")},
+        ]
+
+    stops.sort(key=lambda item: item["position"])
+
+    if stops[0]["position"] > 0:
+        stops.insert(0, {"position": 0.0, "colour": stops[0]["colour"]})
+    if stops[-1]["position"] < 1:
+        stops.append({"position": 1.0, "colour": stops[-1]["colour"]})
+
+    return stops
+
+
+def _build_global_overlay_settings_from_form(form):
+    return {
+        "enabled": _safe_bool(form.get("global_overlay_enabled", "0")),
+        "kind": _normalise_global_overlay_kind(form.get("global_overlay_kind", "solid")),
+        "blend_mode": _normalise_global_overlay_blend(form.get("global_overlay_blend_mode", "normal")),
+        "opacity": max(0.0, min(1.0, _safe_float(form.get("global_overlay_opacity", 0.25), 0.25))),
+        "solid_colour": _safe_hex_colour(form.get("global_overlay_solid_colour", "#000000"), "#000000"),
+        "angle": _safe_float(form.get("global_overlay_angle", 0), 0),
+        "radial_x": max(0.0, min(1.0, _safe_float(form.get("global_overlay_radial_x", 0.5), 0.5))),
+        "radial_y": max(0.0, min(1.0, _safe_float(form.get("global_overlay_radial_y", 0.5), 0.5))),
+        "stops": _parse_global_overlay_stops(
+            form.get("global_overlay_stops_json", ""),
+            form.get("global_overlay_solid_colour", "#000000"),
+            form.get("global_overlay_stop_colour", "#FFFFFF"),
+        ),
+    }
+
+
+def _global_overlay_layer_enabled(settings):
+    return bool(settings and settings.get("enabled") and float(settings.get("opacity", 0)) > 0)
+
+
+def _hex_to_rgb_tuple(value):
+    value = _safe_hex_colour(value, "#000000").lstrip("#")
+    return tuple(int(value[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def _interpolate_rgb(a, b, t):
+    t = max(0.0, min(1.0, float(t)))
+    return tuple(int(round(a[i] + (b[i] - a[i]) * t)) for i in range(3))
+
+
+def _colour_for_position(stops, position):
+    position = max(0.0, min(1.0, float(position)))
+    if position <= stops[0]["position"]:
+        return _hex_to_rgb_tuple(stops[0]["colour"])
+    for idx in range(1, len(stops)):
+        left = stops[idx - 1]
+        right = stops[idx]
+        if position <= right["position"]:
+            span = max(0.000001, right["position"] - left["position"])
+            local_t = (position - left["position"]) / span
+            return _interpolate_rgb(_hex_to_rgb_tuple(left["colour"]), _hex_to_rgb_tuple(right["colour"]), local_t)
+    return _hex_to_rgb_tuple(stops[-1]["colour"])
+
+
+def _global_overlay_cache_key(settings, width, height):
+    safe_settings = {
+        "kind": _normalise_global_overlay_kind(settings.get("kind", "solid")),
+        "blend_mode": _normalise_global_overlay_blend(settings.get("blend_mode", "normal")),
+        "opacity": round(max(0.0, min(1.0, float(settings.get("opacity", 0.25)))), 6),
+        "solid_colour": _safe_hex_colour(settings.get("solid_colour", "#000000"), "#000000"),
+        "angle": round(_safe_float(settings.get("angle", 0), 0), 6),
+        "radial_x": round(max(0.0, min(1.0, _safe_float(settings.get("radial_x", 0.5), 0.5))), 6),
+        "radial_y": round(max(0.0, min(1.0, _safe_float(settings.get("radial_y", 0.5), 0.5))), 6),
+        "stops": settings.get("stops") or [],
+        "width": int(width),
+        "height": int(height),
+    }
+    payload = json.dumps(safe_settings, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+
+def _create_global_overlay_png(settings, width, height, output_path):
+    """Create a cached RGBA overlay image for FFmpeg.
+
+    The preview uses CSS gradients and mix-blend-mode. The export path now creates the
+    same kind of RGB/RGBA overlay once, caches it, and blends in FFmpeg in RGBA space.
+    That avoids repeated Python pixel loops and prevents the old YUV blend mismatch.
+    """
+    from PIL import Image
+    import math
+
+    width = _even_size(max(2, min(7680, int(width))))
+    height = _even_size(max(2, min(7680, int(height))))
+    kind = _normalise_global_overlay_kind(settings.get("kind", "solid"))
+    opacity = max(0.0, min(1.0, float(settings.get("opacity", 0.25))))
+    blend_mode = _normalise_global_overlay_blend(settings.get("blend_mode", "normal"))
+    # For non-normal blend modes, opacity belongs to the blend filter, not the bitmap alpha.
+    # For normal mode, alpha belongs to the overlay image so FFmpeg overlay matches CSS opacity.
+    alpha = 255 if blend_mode != "normal" else int(round(opacity * 255))
+
+    ensure_dirs()
+    cache_key = _global_overlay_cache_key(settings, width, height)
+    cache_path = os.path.join(GLOBAL_OVERLAY_CACHE_DIR, f"{cache_key}.png")
+    if os.path.exists(cache_path):
+        shutil.copy2(cache_path, output_path)
+        return output_path
+
+    if kind == "solid":
+        rgb = _hex_to_rgb_tuple(settings.get("solid_colour", "#000000"))
+        image = Image.new("RGBA", (width, height), (*rgb, alpha))
+        image.save(cache_path)
+        shutil.copy2(cache_path, output_path)
+        return output_path
+
+    stops = settings.get("stops") or _parse_global_overlay_stops("", "#000000", "#FFFFFF")
+
+    try:
+        import numpy as np
+
+        positions = np.array([max(0.0, min(1.0, float(stop["position"]))) for stop in stops], dtype=np.float32)
+        colours = np.array([_hex_to_rgb_tuple(stop["colour"]) for stop in stops], dtype=np.float32)
+
+        if kind == "radial":
+            yy, xx = np.ogrid[0:height, 0:width]
+            cx = max(0.0, min(1.0, float(settings.get("radial_x", 0.5)))) * max(1, width - 1)
+            cy = max(0.0, min(1.0, float(settings.get("radial_y", 0.5)))) * max(1, height - 1)
+            corners = [(0, 0), (width - 1, 0), (0, height - 1), (width - 1, height - 1)]
+            max_dist = max(math.hypot(x - cx, y - cy) for x, y in corners) or 1
+            t = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2) / max_dist
+        else:
+            yy, xx = np.mgrid[0:height, 0:width]
+            # Match CSS linear-gradient angle semantics: 0deg points upward, 90deg points right.
+            angle = math.radians(float(settings.get("angle", 0)))
+            dx = math.sin(angle)
+            dy = -math.cos(angle)
+            corners = [(0, 0), (width - 1, 0), (0, height - 1), (width - 1, height - 1)]
+            projections = [x * dx + y * dy for x, y in corners]
+            min_p = min(projections)
+            span = (max(projections) - min_p) or 1
+            t = ((xx * dx + yy * dy) - min_p) / span
+
+        t = np.clip(t, 0.0, 1.0)
+        channels = [np.interp(t, positions, colours[:, channel]) for channel in range(3)]
+        alpha_channel = np.full_like(t, alpha, dtype=np.float32)
+        rgba = np.dstack([*channels, alpha_channel]).clip(0, 255).astype(np.uint8)
+        image = Image.fromarray(rgba, "RGBA")
+        image.save(cache_path)
+        shutil.copy2(cache_path, output_path)
+        return output_path
+
+    except Exception:
+        # Fallback for environments without NumPy. This is slower but keeps the feature working.
+        image = Image.new("RGBA", (width, height))
+        pixels = image.load()
+
+        if kind == "radial":
+            cx = max(0.0, min(1.0, float(settings.get("radial_x", 0.5)))) * max(1, width - 1)
+            cy = max(0.0, min(1.0, float(settings.get("radial_y", 0.5)))) * max(1, height - 1)
+            corners = [(0, 0), (width - 1, 0), (0, height - 1), (width - 1, height - 1)]
+            max_dist = max(math.hypot(x - cx, y - cy) for x, y in corners) or 1
+            for y in range(height):
+                for x in range(width):
+                    t = math.hypot(x - cx, y - cy) / max_dist
+                    pixels[x, y] = (*_colour_for_position(stops, t), alpha)
+        else:
+            # Match CSS linear-gradient angle semantics: 0deg points upward, 90deg points right.
+            angle = math.radians(float(settings.get("angle", 0)))
+            dx = math.sin(angle)
+            dy = -math.cos(angle)
+            corners = [(0, 0), (width - 1, 0), (0, height - 1), (width - 1, height - 1)]
+            projections = [x * dx + y * dy for x, y in corners]
+            min_p = min(projections)
+            span = (max(projections) - min_p) or 1
+            for y in range(height):
+                base = y * dy
+                for x in range(width):
+                    t = ((x * dx + base) - min_p) / span
+                    pixels[x, y] = (*_colour_for_position(stops, t), alpha)
+
+        image.save(cache_path)
+        shutil.copy2(cache_path, output_path)
+        return output_path
+
+def _append_global_overlay_filter(filter_parts, input_label, output_label, image_label, settings):
+    blend_mode = _normalise_global_overlay_blend(settings.get("blend_mode", "normal"))
+    opacity = max(0.0, min(1.0, float(settings.get("opacity", 0.25))))
+
+    base_rgba = f"{output_label}_base_rgba"
+    overlay_rgba = f"{output_label}_overlay_rgba"
+    filter_parts.append(f"[{input_label}]format=rgba[{base_rgba}]")
+    filter_parts.append(f"[{image_label}]format=rgba[{overlay_rgba}]")
+
+    if blend_mode == "normal":
+        # Normal mode uses PNG alpha and FFmpeg overlay, matching CSS opacity on a normal overlay.
+        filter_parts.append(f"[{base_rgba}][{overlay_rgba}]overlay=0:0:shortest=1,format=yuv420p[{output_label}]")
+    else:
+        # Non-normal modes use an opaque overlay image and FFmpeg's blend opacity.
+        # Keeping both inputs in RGBA avoids the old browser-preview-vs-YUV-export mismatch.
+        filter_parts.append(
+            f"[{base_rgba}][{overlay_rgba}]blend=all_mode={blend_mode}:all_opacity={opacity:.6f},format=yuv420p[{output_label}]"
+        )
+
+def apply_global_overlay_to_video(video_path, output_path, global_overlay_settings):
+    if not _global_overlay_layer_enabled(global_overlay_settings):
+        shutil.copy2(video_path, output_path)
+        return
+
+    info = get_video_info(video_path)
+    overlay_png_path = os.path.join(OUTPUT_DIR, f"global_overlay_{uuid.uuid4().hex[:12]}.png")
+    try:
+        _create_global_overlay_png(global_overlay_settings, info["width"], info["height"], overlay_png_path)
+        filter_parts = []
+        _append_global_overlay_filter(filter_parts, "0:v", "v", "1:v", global_overlay_settings)
+        cmd = [
+            FFMPEG_BIN,
+            "-y",
+            "-nostdin",
+            "-hwaccel", "none",
+            "-i", video_path,
+            "-loop", "1",
+            "-i", overlay_png_path,
+            "-filter_complex", ";".join(filter_parts),
+            "-map", "[v]",
+            "-map", "0:a:0?",
+            "-c:v", "libx264",
+            "-crf", "18",
+            "-preset", "medium",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "copy",
+            "-shortest",
+            "-movflags", "+faststart",
+            output_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or "Global colour overlay failed")
+    finally:
+        try:
+            os.remove(overlay_png_path)
+        except Exception:
+            pass
 
 
 def _video_info_after_aspect(source_info, aspect_settings):
@@ -2047,6 +2365,14 @@ def process_video_job(job_id, video_path, output_path, process_kind, settings, p
         else:
             raise RuntimeError("Unsupported processing mode.")
 
+        global_overlay_settings = settings.get("global_overlay")
+        if _global_overlay_layer_enabled(global_overlay_settings):
+            JOBS[job_id]["status"] = "rendering"
+            JOBS[job_id]["message"] = "Applying global colour overlay..."
+            graded_output_path = os.path.join(OUTPUT_DIR, f"{job_id}_{process_kind}_global_overlay.mp4")
+            apply_global_overlay_to_video(output_path, graded_output_path, global_overlay_settings)
+            os.replace(graded_output_path, output_path)
+
         overlay_ass_name = None
         overlay_settings = settings.get("overlay")
 
@@ -2078,7 +2404,24 @@ def process_video_job(job_id, video_path, output_path, process_kind, settings, p
 
 # Transcribe one video file into WEBVTT using faster-whisper.
 # Generates normal segment cues or word-timestamp cues for the existing VTT parser.
-def transcribe_video_to_vtt(video_path, model_name="small", language=None, word_timestamps=True, vad_filter=True):
+def transcribe_video_to_vtt(
+    video_path,
+    model_name="small",
+    language=None,
+    word_timestamps=True,
+    vad_filter=True,
+    chunk_max_words=4,
+    chunk_min_words=1,
+    chunk_max_seconds=2.2,
+    chunk_min_seconds=0.25,
+    chunk_max_chars=42,
+    chunk_split_at_punctuation=True,
+    chunk_punctuation=".?!…",
+    chunk_split_on_gap=True,
+    chunk_gap_seconds=0.55,
+    chunk_words_per_line=0,
+    chunk_max_lines=2,
+):
     # Extract mono WAV audio from the source video and transcribe it into WEBVTT with optional word timestamps.
     try:
         from faster_whisper import WhisperModel
@@ -2095,6 +2438,153 @@ def transcribe_video_to_vtt(video_path, model_name="small", language=None, word_
 
     def _clean_text(value):
         return " ".join(str(value or "").split()).strip()
+
+    def _clamp_int(value, default_value, min_value, max_value):
+        try:
+            parsed = int(float(value))
+        except Exception:
+            parsed = default_value
+        return max(min_value, min(max_value, parsed))
+
+    def _clamp_float(value, default_value, min_value, max_value):
+        try:
+            parsed = float(value)
+        except Exception:
+            parsed = default_value
+        return max(min_value, min(max_value, parsed))
+
+    max_words = _clamp_int(chunk_max_words, 4, 1, 30)
+    min_words = _clamp_int(chunk_min_words, 1, 1, max_words)
+    max_seconds = _clamp_float(chunk_max_seconds, 2.2, 0.3, 12.0)
+    min_seconds = _clamp_float(chunk_min_seconds, 0.25, 0.0, max_seconds)
+    max_chars = _clamp_int(chunk_max_chars, 42, 8, 180)
+    split_punctuation_enabled = bool(chunk_split_at_punctuation)
+    punctuation_chars = str(chunk_punctuation or ".?!…")
+    split_gap_enabled = bool(chunk_split_on_gap)
+    gap_seconds = _clamp_float(chunk_gap_seconds, 0.55, 0.05, 3.0)
+    words_per_line = _clamp_int(chunk_words_per_line, 0, 0, 12)
+    max_lines = _clamp_int(chunk_max_lines, 2, 1, 4)
+
+    def _word_dict(text_value, start_value, end_value):
+        return {
+            "text": _clean_text(text_value),
+            "start": max(0.0, float(start_value or 0.0)),
+            "end": max(float(start_value or 0.0) + 0.01, float(end_value or (float(start_value or 0.0) + 0.01))),
+        }
+
+    def _fallback_words(text_value, start_value, end_value):
+        tokens = [_clean_text(item) for item in re.findall(r"\S+", str(text_value or ""))]
+        tokens = [item for item in tokens if item]
+        if not tokens:
+            return []
+
+        duration = max(0.05, float(end_value or start_value) - float(start_value or 0.0))
+        step = duration / len(tokens)
+        result = []
+        for index, token in enumerate(tokens):
+            word_start = float(start_value or 0.0) + index * step
+            word_end = float(start_value or 0.0) + (index + 1) * step
+            result.append(_word_dict(token, word_start, word_end))
+        return result
+
+    def _words_from_segment(segment, start_value, end_value, text_value):
+        source_words = list(getattr(segment, "words", []) or [])
+        words = []
+
+        for index, word in enumerate(source_words):
+            word_text = _clean_text(getattr(word, "word", ""))
+            if not word_text:
+                continue
+
+            word_start = float(getattr(word, "start", start_value) or start_value)
+            raw_end = getattr(word, "end", None)
+            if raw_end is None and index + 1 < len(source_words):
+                raw_end = getattr(source_words[index + 1], "start", None)
+            word_end = float(raw_end or min(end_value, word_start + 0.25))
+            words.append(_word_dict(word_text, word_start, min(end_value, max(word_start + 0.01, word_end))))
+
+        return words or _fallback_words(text_value, start_value, end_value)
+
+    def _should_end_chunk(chunk_words, next_word=None, force=False):
+        if force:
+            return True
+
+        if not chunk_words:
+            return False
+
+        chunk_text = " ".join(item["text"] for item in chunk_words).strip()
+        chunk_duration = max(0.0, chunk_words[-1]["end"] - chunk_words[0]["start"])
+        has_min_words = len(chunk_words) >= min_words
+        has_min_seconds = chunk_duration >= min_seconds
+
+        hard_limit = (
+            len(chunk_words) >= max_words
+            or len(chunk_text) >= max_chars
+            or chunk_duration >= max_seconds
+        )
+        if hard_limit and has_min_words:
+            return True
+
+        if not (has_min_words and has_min_seconds):
+            return False
+
+        if split_punctuation_enabled and chunk_words[-1]["text"].rstrip().endswith(tuple(punctuation_chars)):
+            return True
+
+        if split_gap_enabled and next_word:
+            gap = max(0.0, float(next_word["start"]) - float(chunk_words[-1]["end"]))
+            if gap >= gap_seconds:
+                return True
+
+        return False
+
+    def _split_into_chunks(words):
+        chunks = []
+        current = []
+
+        for index, word in enumerate(words):
+            current.append(word)
+            next_word = words[index + 1] if index + 1 < len(words) else None
+
+            if _should_end_chunk(current, next_word=next_word, force=next_word is None):
+                chunks.append(current)
+                current = []
+
+        if current:
+            chunks.append(current)
+
+        return chunks
+
+    def _format_cue_text(chunk_words):
+        if not word_timestamps:
+            return _wrap_plain_cue_text(" ".join(item["text"] for item in chunk_words))
+
+        parts = []
+        for index, item in enumerate(chunk_words):
+            if index == 0:
+                prefix = ""
+            elif words_per_line and (index % words_per_line == 0) and ((index // words_per_line) < max_lines):
+                prefix = "\n"
+            else:
+                prefix = " "
+            parts.append(f"<{_vtt_ts(item['start'])}><c>{prefix}{item['text']}</c>")
+        return "".join(parts)
+
+    def _wrap_plain_cue_text(text_value):
+        words = re.findall(r"\S+", str(text_value or ""))
+        if not words_per_line or not words:
+            return " ".join(words)
+
+        lines = []
+        line = []
+        for word in words:
+            line.append(word)
+            if len(line) >= words_per_line and len(lines) < max_lines - 1:
+                lines.append(" ".join(line))
+                line = []
+        if line:
+            lines.append(" ".join(line))
+        return "\n".join(lines)
 
     tmp_wav_path = None
 
@@ -2140,29 +2630,23 @@ def transcribe_video_to_vtt(video_path, model_name="small", language=None, word_
             if not text_value:
                 continue
 
-            cue_text = text_value
-            words = list(getattr(segment, "words", []) or [])
+            segment_words = _words_from_segment(segment, start_value, end_value, text_value)
+            if not segment_words:
+                continue
 
-            if word_timestamps and words:
-                timed_parts = []
+            for chunk_words in _split_into_chunks(segment_words):
+                cue_start = max(start_value, min(item["start"] for item in chunk_words))
+                cue_end = min(end_value, max(item["end"] for item in chunk_words))
+                cue_end = max(cue_start + 0.01, cue_end)
+                cue_text = _format_cue_text(chunk_words)
 
-                for index, word in enumerate(words):
-                    word_text = _clean_text(getattr(word, "word", ""))
-                    word_start = float(getattr(word, "start", start_value) or start_value)
+                if not _clean_text(re.sub(r"<[^>]+>", "", cue_text)):
+                    continue
 
-                    if not word_text:
-                        continue
-
-                    prefix = "" if index == 0 else " "
-                    timed_parts.append(f"<{_vtt_ts(word_start)}><c>{prefix}{word_text}</c>")
-
-                if timed_parts:
-                    cue_text = "".join(timed_parts)
-
-            lines.append(f"{_vtt_ts(start_value)} --> {_vtt_ts(end_value)}")
-            lines.append(cue_text)
-            lines.append("")
-            cue_count += 1
+                lines.append(f"{_vtt_ts(cue_start)} --> {_vtt_ts(cue_end)}")
+                lines.append(cue_text)
+                lines.append("")
+                cue_count += 1
 
         if cue_count == 0:
             raise RuntimeError("No captions were produced from this video.")
@@ -2190,6 +2674,17 @@ def transcribe_captions_job(job_id, video_path, output_path, settings):
             language=settings["caption_language"],
             word_timestamps=settings["caption_word_timestamps"],
             vad_filter=settings["caption_vad_filter"],
+            chunk_max_words=settings["caption_chunk_max_words"],
+            chunk_min_words=settings["caption_chunk_min_words"],
+            chunk_max_seconds=settings["caption_chunk_max_seconds"],
+            chunk_min_seconds=settings["caption_chunk_min_seconds"],
+            chunk_max_chars=settings["caption_chunk_max_chars"],
+            chunk_split_at_punctuation=settings["caption_chunk_split_at_punctuation"],
+            chunk_punctuation=settings["caption_chunk_punctuation"],
+            chunk_split_on_gap=settings["caption_chunk_split_on_gap"],
+            chunk_gap_seconds=settings["caption_chunk_gap_seconds"],
+            chunk_words_per_line=settings["caption_chunk_words_per_line"],
+            chunk_max_lines=settings["caption_chunk_max_lines"],
         )
 
         JOBS[job_id]["status"] = "rendering"
@@ -2749,6 +3244,7 @@ def process_preview(job_id, video_path, srt_path, ass_path, preview_path, settin
             preview_start=preview_start,
             preview_seconds=preview_seconds,
             aspect_settings=aspect_settings,
+            global_overlay_settings=settings.get("global_overlay"),
         )
 
         JOBS[job_id]["status"] = "done"
@@ -2979,6 +3475,7 @@ def api_preview():
             "out_mode": request.form.get("out_mode", "fade"),
             "overlay": _build_overlay_settings_from_form(request.form),
             "aspect": _build_aspect_settings_from_form(request.form),
+            "global_overlay": _build_global_overlay_settings_from_form(request.form),
         }
 
 
@@ -3063,6 +3560,7 @@ def api_process_video():
             "aspect": _build_aspect_settings_from_form(request.form),
             "crop": _build_crop_settings_from_form(request.form),
             "overlay": _build_overlay_settings_from_form(request.form),
+            "global_overlay": _build_global_overlay_settings_from_form(request.form),
         }
 
         if process_kind == "aspect":
@@ -3127,9 +3625,20 @@ def api_get_captions():
 
         settings = {
             "caption_model": request.form.get("caption_model", "small"),
-            "caption_language": (request.form.get("caption_language", "") or "").strip(),
+            "caption_language": (request.form.get("caption_language", "en") or "en").strip(),
             "caption_word_timestamps": _safe_bool(request.form.get("caption_word_timestamps", "1"), True),
             "caption_vad_filter": _safe_bool(request.form.get("caption_vad_filter", "1"), True),
+            "caption_chunk_max_words": _safe_int(request.form.get("caption_chunk_max_words", 4), 4),
+            "caption_chunk_min_words": _safe_int(request.form.get("caption_chunk_min_words", 1), 1),
+            "caption_chunk_max_seconds": _safe_float(request.form.get("caption_chunk_max_seconds", 2.2), 2.2),
+            "caption_chunk_min_seconds": _safe_float(request.form.get("caption_chunk_min_seconds", 0.25), 0.25),
+            "caption_chunk_max_chars": _safe_int(request.form.get("caption_chunk_max_chars", 42), 42),
+            "caption_chunk_split_at_punctuation": _safe_bool(request.form.get("caption_chunk_split_at_punctuation", "1"), True),
+            "caption_chunk_punctuation": (request.form.get("caption_chunk_punctuation", ".?!…") or ".?!…").strip(),
+            "caption_chunk_split_on_gap": _safe_bool(request.form.get("caption_chunk_split_on_gap", "1"), True),
+            "caption_chunk_gap_seconds": _safe_float(request.form.get("caption_chunk_gap_seconds", 0.55), 0.55),
+            "caption_chunk_words_per_line": _safe_int(request.form.get("caption_chunk_words_per_line", 0), 0),
+            "caption_chunk_max_lines": _safe_int(request.form.get("caption_chunk_max_lines", 2), 2),
         }
 
         JOBS[job_id] = {
@@ -3349,6 +3858,16 @@ def api_delete_server_asset_file():
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.route("/assets/<path:filename>")
+def assets(filename):
+    return send_from_directory(ASSETS_DIR, filename)
+
+
+@app.route("/favicon.svg")
+def favicon():
+    return send_from_directory(os.path.join(ASSETS_DIR, "images", "icons"), "favicon.svg")
 
 
 @app.route("/outputs/<path:filename>")
