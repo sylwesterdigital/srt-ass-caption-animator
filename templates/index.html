@@ -45,22 +45,26 @@
       position: relative;
       width: min(92vw, 1600px);
       height: min(88vh, 960px);
-      display: grid;
-      place-items: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
       border-radius: 18px;
-      border: 1px solid var(--line);
-      background: #000;
-      overflow: hidden;
-      box-shadow: 0 30px 80px rgba(0,0,0,0.4);
+      border: 0;
+      background: transparent;
+      overflow: visible;
+      box-shadow: none;
     }
 
     .media-stage {
       position: relative;
+      flex: 1 1 auto;
+      min-height: 0;
       width: 100%;
-      height: 100%;
       display: grid;
       place-items: center;
-      overflow: hidden;
+      overflow: visible;
     }
 
     .media-frame {
@@ -71,6 +75,13 @@
       height: fit-content;
       max-width: 100%;
       max-height: 100%;
+      border-radius: 12px;
+    }
+
+    .media-frame:not(.aspect-preview-active) {
+      background: transparent;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.08);
+      overflow: hidden;
     }
 
     .media-frame video {
@@ -78,9 +89,113 @@
       width: auto;
       height: auto;
       max-width: min(92vw, 1600px);
-      max-height: min(88vh, 960px);
+      max-height: min(calc(88vh - 58px), 902px);
       object-fit: contain;
+      background: transparent;
+    }
+
+    .media-frame video::-webkit-media-controls,
+    .media-frame video::-webkit-media-controls-enclosure {
+      display: none !important;
+    }
+
+    .media-frame.aspect-preview-active {
+      overflow: hidden;
       background: #000;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+    }
+
+    .media-frame.aspect-preview-active video {
+      max-width: none;
+      max-height: none;
+      background: transparent;
+    }
+
+
+    .custom-video-controls {
+      width: min(760px, 100%);
+      min-height: 46px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(18, 22, 30, 0.88);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 18px 50px rgba(0,0,0,0.28);
+      z-index: 25;
+    }
+
+    .custom-video-controls.show {
+      display: flex;
+    }
+
+    .transport-button {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      min-width: 42px;
+      min-height: 32px;
+      padding: 0 10px;
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .transport-button.primary {
+      background: #ffffff;
+      color: #000000;
+      border-color: #ffffff;
+    }
+
+    .transport-time {
+      min-width: 44px;
+      color: var(--muted);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+    }
+
+    .transport-seek,
+    .transport-volume {
+      appearance: none;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.18);
+      cursor: pointer;
+    }
+
+    .transport-seek {
+      flex: 1 1 auto;
+      min-width: 120px;
+    }
+
+    .transport-volume {
+      width: 88px;
+    }
+
+    .transport-seek::-webkit-slider-thumb,
+    .transport-volume::-webkit-slider-thumb {
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 0;
+    }
+
+    @media (max-width: 760px) {
+      .custom-video-controls {
+        width: 100%;
+        flex-wrap: wrap;
+      }
+
+      .transport-volume {
+        width: 64px;
+      }
     }
 
     .placeholder {
@@ -473,11 +588,465 @@
 
 
 
+    /* Project workspace: left-side source selector and persistent IndexedDB project list. */
+    .app {
+      grid-template-columns: 286px minmax(0, 1fr);
+    }
+
+    .project-sidebar {
+      height: 100vh;
+      min-height: 0;
+      border-right: 1px solid var(--line);
+      background: rgba(10, 13, 19, 0.96);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow: hidden;
+      z-index: 50;
+    }
+
+    .project-sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .project-sidebar-title {
+      font-size: 13px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .project-button,
+    .project-select,
+    .project-input-action {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.07);
+      color: var(--text);
+      min-height: 36px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .project-button.primary {
+      background: #ffffff;
+      color: #000000;
+      border-color: #ffffff;
+    }
+
+    .project-button.ghost {
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .project-select {
+      width: 100%;
+      font-weight: normal;
+      cursor: pointer;
+    }
+
+    .project-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,0.045);
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .project-name {
+      font-weight: bold;
+      font-size: 15px;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .project-description {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      max-height: 48px;
+      overflow: hidden;
+    }
+
+    .project-meta {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .project-actions-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .project-assets-title {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-top: 4px;
+    }
+
+    .project-assets {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      display: grid;
+      gap: 10px;
+      padding-right: 2px;
+    }
+
+    .project-empty {
+      border: 1px dashed var(--line);
+      border-radius: 16px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      padding: 14px;
+    }
+
+    .asset-card {
+      appearance: none;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      padding: 8px;
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr);
+      gap: 10px;
+      text-align: left;
+    }
+
+    .asset-card:hover {
+      background: rgba(255,255,255,0.075);
+    }
+
+    .asset-card.selected {
+      border-color: rgba(125, 211, 252, 0.82);
+      box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.45) inset;
+    }
+
+    .asset-thumb {
+      width: 72px;
+      height: 50px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.08);
+      object-fit: cover;
+      display: block;
+    }
+
+    .asset-title {
+      font-size: 12px;
+      line-height: 1.25;
+      font-weight: bold;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+
+    .asset-details {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .asset-lineage {
+      color: #9fd3ff;
+      font-size: 10px;
+      line-height: 1.3;
+      margin-top: 4px;
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .project-sidebar {
+        position: fixed;
+        left: 8px;
+        top: 8px;
+        bottom: 8px;
+        width: min(286px, calc(100vw - 16px));
+        max-height: calc(100vh - 16px);
+        transform: translateX(calc(-100% - 12px));
+        transition: transform 0.2s ease;
+        box-shadow: 0 30px 80px rgba(0,0,0,0.45);
+      }
+
+      .project-sidebar.open {
+        transform: translateX(0);
+      }
+    }
+
+    /* App modal system: accessible overlays for forms, confirmations, and guarded actions. */
+    .app-modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 120;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at top left, rgba(125, 211, 252, 0.16), transparent 34%),
+        radial-gradient(circle at bottom right, rgba(168, 85, 247, 0.12), transparent 32%),
+        rgba(2, 6, 12, 0.68);
+      backdrop-filter: blur(18px) saturate(140%);
+      opacity: 0;
+      transition: opacity 0.16s ease;
+    }
+
+    .app-modal-overlay.open {
+      display: flex;
+      opacity: 1;
+    }
+
+    .app-modal-dialog {
+      width: min(540px, calc(100vw - 28px));
+      max-height: min(760px, calc(100vh - 28px));
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 24px;
+      background: linear-gradient(180deg, rgba(24, 29, 40, 0.98), rgba(12, 16, 24, 0.98));
+      box-shadow: 0 40px 110px rgba(0,0,0,0.58), inset 0 1px 0 rgba(255,255,255,0.06);
+      transform: translateY(14px) scale(0.985);
+      transition: transform 0.16s ease;
+    }
+
+    .app-modal-overlay.open .app-modal-dialog {
+      transform: translateY(0) scale(1);
+    }
+
+    .app-modal-header {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: start;
+      padding: 22px 22px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .app-modal-icon {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      background: rgba(125, 211, 252, 0.14);
+      color: #9fd3ff;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .app-modal-dialog.danger .app-modal-icon {
+      background: rgba(248, 113, 113, 0.14);
+      color: #fca5a5;
+    }
+
+    .app-modal-title {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.18;
+      letter-spacing: -0.01em;
+    }
+
+    .app-modal-description {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .app-modal-close {
+      appearance: none;
+      width: 34px;
+      height: 34px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .app-modal-close:hover {
+      background: rgba(255,255,255,0.1);
+    }
+
+    .app-modal-body {
+      padding: 18px 22px 8px;
+      overflow: auto;
+    }
+
+    .app-modal-field {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .app-modal-label {
+      color: #d9e2ef;
+      font-size: 12px;
+      font-weight: bold;
+      letter-spacing: 0.02em;
+    }
+
+    .app-modal-input,
+    .app-modal-textarea {
+      width: 100%;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      outline: none;
+      padding: 12px 13px;
+      font: inherit;
+      font-size: 14px;
+      transition: border-color 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+    }
+
+    .app-modal-textarea {
+      min-height: 104px;
+      resize: vertical;
+      line-height: 1.4;
+    }
+
+    .app-modal-input:focus,
+    .app-modal-textarea:focus {
+      border-color: rgba(125, 211, 252, 0.8);
+      background: rgba(255,255,255,0.08);
+      box-shadow: 0 0 0 4px rgba(125, 211, 252, 0.12);
+    }
+
+    .app-modal-hint {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .app-modal-error {
+      min-height: 18px;
+      color: #fca5a5;
+      font-size: 12px;
+      line-height: 1.35;
+      padding: 0 22px 4px;
+    }
+
+    .app-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 16px 22px 22px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      background: rgba(0,0,0,0.12);
+    }
+
+    .app-modal-action {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px;
+      min-height: 42px;
+      padding: 0 16px;
+      background: rgba(255,255,255,0.07);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    .app-modal-action:hover {
+      background: rgba(255,255,255,0.12);
+    }
+
+    .app-modal-action.primary {
+      background: #ffffff;
+      color: #000000;
+      border-color: #ffffff;
+    }
+
+    .app-modal-action.danger {
+      background: #f87171;
+      color: #190b0b;
+      border-color: #f87171;
+    }
+
+    .app-modal-action:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    @media (max-width: 560px) {
+      .app-modal-overlay {
+        padding: 12px;
+      }
+
+      .app-modal-header {
+        grid-template-columns: minmax(0, 1fr) auto;
+      }
+
+      .app-modal-icon {
+        display: none;
+      }
+
+      .app-modal-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+    }
+
+
+
 
   </style>
 </head>
 <body>
   <div class="app">
+
+
+    <aside class="project-sidebar" id="projectSidebar">
+      <div class="project-sidebar-header">
+        <div class="project-sidebar-title">Projects</div>
+        <button id="newProjectBtn" type="button" class="project-button primary">New</button>
+      </div>
+
+      <select id="projectSelect" class="project-select" title="Continue project">
+        <option value="">Continue project…</option>
+      </select>
+
+      <div class="project-card">
+        <div id="projectName" class="project-name">No project open</div>
+        <div id="projectDescription" class="project-description">Create a project first. Videos and rendered results will be kept in browser IndexedDB.</div>
+        <div id="projectMeta" class="project-meta">No selected source asset.</div>
+        <div class="project-actions-row">
+          <button id="editProjectBtn" type="button" class="project-button ghost">Edit</button>
+          <button id="addProjectVideoBtn" type="button" class="project-button">Add video</button>
+        </div>
+      </div>
+
+      <div class="project-assets-title">Project videos</div>
+      <div id="projectAssetList" class="project-assets">
+        <div class="project-empty">No videos yet. Add a root video to start the project.</div>
+      </div>
+    </aside>
 
     <div id="fontGalleryOverlay" class="font-gallery-overlay" aria-hidden="true">
       <div class="font-gallery-backdrop"></div>
@@ -542,7 +1111,7 @@
               Choose a video and SRT, drag the helper text on the real video area, then render the preview.
             </div>
 
-            <video id="previewVideo" controls playsinline></video>
+            <video id="previewVideo" playsinline preload="metadata"></video>
 
             <div class="helper-layer" id="helperLayer" style="display:none;">
               <div class="helper-safe-area"></div>
@@ -560,16 +1129,48 @@
             </div>
           </div>
         </div>
+
+        <div id="customVideoControls" class="custom-video-controls" aria-label="Video playback controls">
+          <button id="playPauseBtn" type="button" class="transport-button primary" aria-label="Play video">Play</button>
+          <span id="transportCurrent" class="transport-time">0:00</span>
+          <input id="transportSeek" class="transport-seek" type="range" min="0" max="1000" step="1" value="0" aria-label="Seek video">
+          <span id="transportDuration" class="transport-time">0:00</span>
+          <button id="muteBtn" type="button" class="transport-button" aria-label="Mute video">Mute</button>
+          <input id="volumeRange" class="transport-volume" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volume">
+          <button id="fullscreenBtn" type="button" class="transport-button" aria-label="Fullscreen preview">Full</button>
+        </div>
       </div>
 
       <div id="status" class="status"></div>
 
       <div class="hint">
         H = toggle helpers.<br>
-        Helper font is scaled to the displayed video size so it matches the rendered preview more closely.
+        Controls sit outside the video so caption placement is not blocked by native browser controls.
       </div>
     </div>
   </div>
+
+
+    <div id="appModalOverlay" class="app-modal-overlay" aria-hidden="true">
+      <section id="appModalDialog" class="app-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="appModalTitle" aria-describedby="appModalDescription" tabindex="-1">
+        <header class="app-modal-header">
+          <div id="appModalIcon" class="app-modal-icon" aria-hidden="true">✦</div>
+          <div>
+            <h2 id="appModalTitle" class="app-modal-title"></h2>
+            <p id="appModalDescription" class="app-modal-description"></p>
+          </div>
+          <button id="appModalClose" type="button" class="app-modal-close" aria-label="Close dialog">×</button>
+        </header>
+        <form id="appModalForm" novalidate>
+          <div id="appModalBody" class="app-modal-body"></div>
+          <div id="appModalError" class="app-modal-error" role="alert"></div>
+          <div class="app-modal-actions">
+            <button id="appModalCancel" type="button" class="app-modal-action">Cancel</button>
+            <button id="appModalConfirm" type="submit" class="app-modal-action primary">Continue</button>
+          </div>
+        </form>
+      </section>
+    </div>
 
 
   <script type="module">
@@ -581,6 +1182,14 @@
     const renderFullBtn = document.getElementById('renderFullBtn');
     const resetBtn = document.getElementById('resetBtn');
     const previewVideo = document.getElementById('previewVideo');
+    const customVideoControls = document.getElementById('customVideoControls');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const transportCurrent = document.getElementById('transportCurrent');
+    const transportSeek = document.getElementById('transportSeek');
+    const transportDuration = document.getElementById('transportDuration');
+    const muteBtn = document.getElementById('muteBtn');
+    const volumeRange = document.getElementById('volumeRange');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
     const placeholder = document.getElementById('placeholder');
     const selectionMeta = document.getElementById('selectionMeta');
     const statusEl = document.getElementById('status');
@@ -607,6 +1216,28 @@
     const fontGalleryList = document.getElementById('fontGalleryList');
     const fontGalleryClose = document.getElementById('fontGalleryClose');
 
+    const projectSidebar = document.getElementById('projectSidebar');
+    const newProjectBtn = document.getElementById('newProjectBtn');
+    const projectSelect = document.getElementById('projectSelect');
+    const editProjectBtn = document.getElementById('editProjectBtn');
+    const addProjectVideoBtn = document.getElementById('addProjectVideoBtn');
+    const projectNameEl = document.getElementById('projectName');
+    const projectDescriptionEl = document.getElementById('projectDescription');
+    const projectMetaEl = document.getElementById('projectMeta');
+    const projectAssetList = document.getElementById('projectAssetList');
+
+    const appModalOverlay = document.getElementById('appModalOverlay');
+    const appModalDialog = document.getElementById('appModalDialog');
+    const appModalIcon = document.getElementById('appModalIcon');
+    const appModalTitle = document.getElementById('appModalTitle');
+    const appModalDescription = document.getElementById('appModalDescription');
+    const appModalClose = document.getElementById('appModalClose');
+    const appModalForm = document.getElementById('appModalForm');
+    const appModalBody = document.getElementById('appModalBody');
+    const appModalError = document.getElementById('appModalError');
+    const appModalCancel = document.getElementById('appModalCancel');
+    const appModalConfirm = document.getElementById('appModalConfirm');
+
     const fontUploadInput = document.createElement('input');
     fontUploadInput.type = 'file';
     fontUploadInput.accept = '.ttf,.otf,.woff,.woff2';
@@ -625,6 +1256,16 @@
     const VIDEO_CACHE_STORE_NAME = 'videos';
     const VIDEO_CACHE_KEY = 'lastVideo';
     const VIDEO_CACHE_META_KEY = 'captionAnimatorLastVideoMeta';
+
+    const PROJECT_DB_NAME = 'captionAnimatorProjectsDB';
+    const PROJECT_STORE_NAME = 'projects';
+    const PROJECT_BLOB_STORE_NAME = 'blobs';
+    const PROJECT_LAST_KEY = 'captionAnimatorLastProjectId';
+
+    let projectDb = null;
+    let currentProject = null;
+    let projectListCache = [];
+    let pendingOutputContext = null;
 
     let pollTimer = null;
     let sourceObjectUrl = null;
@@ -650,6 +1291,7 @@
     let availableFonts = [];    
 /* Keep metadata for the last cached source video available across reloads. */
     let cachedVideoMeta = readCachedVideoMetaFromStorage();
+    let showingRenderedOutput = false;
 
 
 
@@ -734,6 +1376,17 @@
       upscale_factor: 2,
       upscale_mode: 'traditional',
 
+      aspect_enabled: true,
+      aspect_live_preview: true,
+      aspect_ratio: '9:16',
+      aspect_border_colour: '#000000',
+      aspect_size_mode: 'none',
+      aspect_target_width: 1080,
+      aspect_target_height: 1920,
+      aspect_width_nudge: 0,
+      aspect_height_nudge: 0,
+      aspect_readout: 'Load a video to calculate the caption/export canvas.',
+
       overlay_enabled: false,
       overlay_text: '',
       overlay_font_name: 'Arial',
@@ -784,11 +1437,881 @@
       statusEl.innerHTML = '';
     }
 
+    let activeAppModal = null;
+
+    function setAppModalError(message) {
+      if (appModalError) {
+        appModalError.textContent = message || '';
+      }
+    }
+
+    function getModalFocusableElements() {
+      if (!appModalDialog) return [];
+      return Array.from(appModalDialog.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )).filter(element => {
+        const style = window.getComputedStyle(element);
+        return style.display !== 'none' && style.visibility !== 'hidden';
+      });
+    }
+
+    function closeAppModal(result) {
+      if (!activeAppModal || !appModalOverlay) return;
+
+      const state = activeAppModal;
+      activeAppModal = null;
+      appModalOverlay.classList.remove('open');
+      appModalOverlay.setAttribute('aria-hidden', 'true');
+      document.removeEventListener('keydown', handleAppModalKeydown, true);
+      document.body.style.overflow = state.previousBodyOverflow || '';
+
+      window.setTimeout(() => {
+        if (!appModalOverlay.classList.contains('open')) {
+          appModalBody.innerHTML = '';
+          setAppModalError('');
+        }
+      }, 180);
+
+      if (state.previousFocus && typeof state.previousFocus.focus === 'function') {
+        try { state.previousFocus.focus({ preventScroll: true }); } catch {}
+      }
+
+      state.resolve(result);
+    }
+
+    function handleAppModalKeydown(event) {
+      if (!activeAppModal) return;
+
+      if (event.key === 'Escape' && activeAppModal.closeOnEscape !== false) {
+        event.preventDefault();
+        closeAppModal(null);
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+
+      const focusable = getModalFocusableElements();
+      if (!focusable.length) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    function buildModalField(field) {
+      const wrapper = document.createElement('label');
+      wrapper.className = 'app-modal-field';
+
+      const label = document.createElement('span');
+      label.className = 'app-modal-label';
+      label.textContent = field.label || field.name || 'Value';
+      wrapper.appendChild(label);
+
+      const control = field.type === 'textarea'
+        ? document.createElement('textarea')
+        : document.createElement('input');
+
+      control.className = field.type === 'textarea' ? 'app-modal-textarea' : 'app-modal-input';
+      control.dataset.modalField = field.name;
+      control.name = field.name;
+      control.value = field.value ?? '';
+      control.placeholder = field.placeholder || '';
+      control.required = Boolean(field.required);
+
+      if (field.type !== 'textarea') {
+        control.type = field.inputType || 'text';
+      } else if (field.rows) {
+        control.rows = field.rows;
+      }
+
+      if (field.maxLength) {
+        control.maxLength = field.maxLength;
+      }
+
+      wrapper.appendChild(control);
+
+      if (field.hint) {
+        const hint = document.createElement('span');
+        hint.className = 'app-modal-hint';
+        hint.textContent = field.hint;
+        wrapper.appendChild(hint);
+      }
+
+      return wrapper;
+    }
+
+    function openAppModal({
+      title,
+      description = '',
+      icon = '✦',
+      fields = [],
+      confirmText = 'Continue',
+      cancelText = 'Cancel',
+      danger = false,
+      closeOnBackdrop = true,
+      closeOnEscape = true,
+      validator = null
+    } = {}) {
+      if (!appModalOverlay || !appModalDialog || !appModalForm) {
+        return Promise.resolve(null);
+      }
+
+      if (activeAppModal) {
+        closeAppModal(null);
+      }
+
+      appModalTitle.textContent = title || 'Confirm action';
+      appModalDescription.textContent = description || '';
+      appModalDescription.style.display = description ? '' : 'none';
+      appModalIcon.textContent = icon || '✦';
+      appModalDialog.classList.toggle('danger', Boolean(danger));
+      appModalConfirm.textContent = confirmText || 'Continue';
+      appModalCancel.textContent = cancelText || 'Cancel';
+      appModalConfirm.className = `app-modal-action ${danger ? 'danger' : 'primary'}`;
+      setAppModalError('');
+      appModalBody.innerHTML = '';
+
+      if (fields.length) {
+        fields.forEach(field => appModalBody.appendChild(buildModalField(field)));
+      } else {
+        const empty = document.createElement('div');
+        empty.className = 'app-modal-hint';
+        empty.textContent = 'This action will be applied immediately after confirmation.';
+        appModalBody.appendChild(empty);
+      }
+
+      return new Promise(resolve => {
+        const previousFocus = document.activeElement;
+        activeAppModal = {
+          resolve,
+          previousFocus,
+          closeOnBackdrop,
+          closeOnEscape,
+          previousBodyOverflow: document.body.style.overflow
+        };
+
+        document.body.style.overflow = 'hidden';
+        appModalOverlay.setAttribute('aria-hidden', 'false');
+        appModalOverlay.classList.add('open');
+        document.addEventListener('keydown', handleAppModalKeydown, true);
+
+        requestAnimationFrame(() => {
+          const firstInput = appModalDialog.querySelector('[data-modal-field]');
+          const target = firstInput || appModalConfirm || appModalDialog;
+          if (target && typeof target.focus === 'function') {
+            target.focus({ preventScroll: true });
+            if (target.select) target.select();
+          }
+        });
+
+        appModalForm.onsubmit = event => {
+          event.preventDefault();
+          if (!activeAppModal) return;
+
+          const values = {};
+          for (const field of fields) {
+            const input = appModalDialog.querySelector(`[data-modal-field="${field.name}"]`);
+            const value = String(input?.value ?? '');
+            const trimmed = value.trim();
+
+            if (field.required && !trimmed) {
+              setAppModalError(`${field.label || field.name} is required.`);
+              if (input) input.focus();
+              return;
+            }
+
+            values[field.name] = field.trim === false ? value : trimmed;
+          }
+
+          if (typeof validator === 'function') {
+            const validationMessage = validator(values);
+            if (validationMessage) {
+              setAppModalError(validationMessage);
+              return;
+            }
+          }
+
+          closeAppModal(values);
+        };
+      });
+    }
+
+    if (appModalClose) {
+      appModalClose.addEventListener('click', () => closeAppModal(null));
+    }
+
+    if (appModalCancel) {
+      appModalCancel.addEventListener('click', () => closeAppModal(null));
+    }
+
+    if (appModalOverlay) {
+      appModalOverlay.addEventListener('pointerdown', event => {
+        if (!activeAppModal || activeAppModal.closeOnBackdrop === false) return;
+        if (event.target === appModalOverlay) {
+          closeAppModal(null);
+        }
+      });
+    }
+
+    function openProjectDetailsModal(initial = {}) {
+      return openAppModal({
+        title: initial.edit ? 'Edit project' : 'Create project',
+        description: initial.edit
+          ? 'Update the project metadata stored with this workspace.'
+          : 'Create a workspace for source videos, rendered versions, thumbnails, and operation history.',
+        icon: initial.edit ? '✎' : '+',
+        confirmText: initial.edit ? 'Save project' : 'Create project',
+        fields: [
+          {
+            name: 'name',
+            label: 'Project name',
+            value: initial.name || '',
+            placeholder: 'TikTok captions test',
+            required: true,
+            maxLength: 96
+          },
+          {
+            name: 'description',
+            label: 'Description',
+            type: 'textarea',
+            value: initial.description || '',
+            placeholder: 'What this project is for, notes, client, format, etc.',
+            rows: 5,
+            maxLength: 600,
+            trim: true
+          }
+        ]
+      });
+    }
+
+    function openPresetNameModal({ title, description, value = '', confirmText = 'Save preset' } = {}) {
+      return openAppModal({
+        title,
+        description,
+        icon: '◆',
+        confirmText,
+        fields: [
+          {
+            name: 'name',
+            label: 'Preset name',
+            value,
+            placeholder: 'Caption style preset',
+            required: true,
+            maxLength: 96
+          }
+        ]
+      });
+    }
+
+    function openConfirmModal({ title, description, confirmText = 'Confirm', danger = false } = {}) {
+      return openAppModal({
+        title,
+        description,
+        icon: danger ? '!' : '✓',
+        fields: [],
+        confirmText,
+        danger
+      }).then(result => Boolean(result));
+    }
+
+
+    function formatTransportTime(value) {
+      const total = Math.max(0, Number.isFinite(Number(value)) ? Number(value) : 0);
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const seconds = Math.floor(total % 60).toString().padStart(2, '0');
+      if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds}`;
+      }
+      return `${minutes}:${seconds}`;
+    }
+
+    function setCustomControlsVisible(visible) {
+      if (!customVideoControls) return;
+      customVideoControls.classList.toggle('show', Boolean(visible));
+    }
+
+    function updateTransportControls() {
+      const hasVideo = previewVideo.style.display !== 'none' && Boolean(previewVideo.currentSrc || previewVideo.src);
+      setCustomControlsVisible(hasVideo);
+
+      if (!hasVideo) {
+        return;
+      }
+
+      const duration = Number(previewVideo.duration || 0);
+      const current = Number(previewVideo.currentTime || 0);
+      const hasDuration = Number.isFinite(duration) && duration > 0;
+
+      playPauseBtn.textContent = previewVideo.paused ? 'Play' : 'Pause';
+      playPauseBtn.setAttribute('aria-label', previewVideo.paused ? 'Play video' : 'Pause video');
+      transportCurrent.textContent = formatTransportTime(current);
+      transportDuration.textContent = hasDuration ? formatTransportTime(duration) : '0:00';
+      transportSeek.disabled = !hasDuration;
+
+      if (hasDuration && document.activeElement !== transportSeek) {
+        transportSeek.value = String(Math.max(0, Math.min(1000, Math.round((current / duration) * 1000))));
+      }
+
+      muteBtn.textContent = previewVideo.muted || Number(previewVideo.volume || 0) === 0 ? 'Unmute' : 'Mute';
+      muteBtn.setAttribute('aria-label', previewVideo.muted ? 'Unmute video' : 'Mute video');
+
+      if (document.activeElement !== volumeRange) {
+        volumeRange.value = String(previewVideo.muted ? 0 : Number(previewVideo.volume || 0));
+      }
+    }
+
+    function resetPreviewFrameToRealVideo() {
+      mediaFrame.classList.remove('aspect-preview-active');
+      mediaFrame.style.backgroundColor = '';
+      mediaFrame.style.width = '';
+      mediaFrame.style.height = '';
+      previewVideo.style.width = 'auto';
+      previewVideo.style.height = 'auto';
+      previewVideo.style.maxWidth = 'min(92vw, 1600px)';
+      previewVideo.style.maxHeight = 'min(calc(88vh - 58px), 902px)';
+      previewVideo.controls = false;
+    }
+
     /* Put dropped file into a hidden file input. */
     function setFileInput(input, file) {
       const dt = new DataTransfer();
       dt.items.add(file);
       input.files = dt.files;
+    }
+
+
+    function makeProjectId(prefix = 'id') {
+      if (window.crypto?.randomUUID) {
+        return `${prefix}_${crypto.randomUUID()}`;
+      }
+      return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    }
+
+    function formatBytes(value) {
+      const size = Number(value || 0);
+      if (size >= 1024 * 1024 * 1024) return `${(size / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+      if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+      if (size >= 1024) return `${(size / 1024).toFixed(1)} KB`;
+      return `${Math.round(size)} B`;
+    }
+
+    function formatDuration(value) {
+      const total = Math.max(0, Number(value || 0));
+      const minutes = Math.floor(total / 60);
+      const seconds = Math.round(total % 60).toString().padStart(2, '0');
+      return `${minutes}:${seconds}`;
+    }
+
+    function getProjectAsset(assetId) {
+      if (!currentProject || !Array.isArray(currentProject.assets)) return null;
+      return currentProject.assets.find(item => item.id === assetId) || null;
+    }
+
+    function getSelectedProjectAsset() {
+      return getProjectAsset(currentProject?.selectedAssetId);
+    }
+
+    function openProjectDb() {
+      if (projectDb) return Promise.resolve(projectDb);
+
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(PROJECT_DB_NAME, 1);
+
+        request.onupgradeneeded = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains(PROJECT_STORE_NAME)) {
+            db.createObjectStore(PROJECT_STORE_NAME, { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains(PROJECT_BLOB_STORE_NAME)) {
+            db.createObjectStore(PROJECT_BLOB_STORE_NAME, { keyPath: 'id' });
+          }
+        };
+
+        request.onsuccess = () => {
+          projectDb = request.result;
+          resolve(projectDb);
+        };
+        request.onerror = () => reject(request.error || new Error('Could not open projects database.'));
+      });
+    }
+
+    async function dbGet(storeName, key) {
+      const db = await openProjectDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readonly');
+        const request = tx.objectStore(storeName).get(key);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error || new Error(`Could not read ${storeName}.`));
+      });
+    }
+
+    async function dbGetAll(storeName) {
+      const db = await openProjectDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readonly');
+        const request = tx.objectStore(storeName).getAll();
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error || new Error(`Could not read ${storeName}.`));
+      });
+    }
+
+    async function dbPut(storeName, value) {
+      const db = await openProjectDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).put(value);
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error || new Error(`Could not save ${storeName}.`));
+        tx.onabort = () => reject(tx.error || new Error(`Could not save ${storeName}.`));
+      });
+    }
+
+    async function saveCurrentProject() {
+      if (!currentProject) return;
+      currentProject.updatedAt = Date.now();
+      await dbPut(PROJECT_STORE_NAME, currentProject);
+      localStorage.setItem(PROJECT_LAST_KEY, currentProject.id);
+      await refreshProjectList(currentProject.id);
+      renderProjectPanel();
+    }
+
+    async function refreshProjectList(selectedId = currentProject?.id || '') {
+      projectListCache = await dbGetAll(PROJECT_STORE_NAME);
+      projectListCache.sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+
+      if (!projectSelect) return;
+      const current = selectedId || projectSelect.value || '';
+      projectSelect.innerHTML = '<option value="">Continue project…</option>';
+
+      for (const project of projectListCache) {
+        const option = document.createElement('option');
+        option.value = project.id;
+        option.textContent = project.name || 'Untitled project';
+        projectSelect.appendChild(option);
+      }
+
+      if (current && projectListCache.some(project => project.id === current)) {
+        projectSelect.value = current;
+      }
+    }
+
+    async function loadProject(projectId, options = {}) {
+      const project = await dbGet(PROJECT_STORE_NAME, projectId);
+      if (!project) throw new Error('Project could not be found in IndexedDB.');
+
+      currentProject = {
+        ...project,
+        assets: Array.isArray(project.assets) ? project.assets : [],
+        operations: Array.isArray(project.operations) ? project.operations : []
+      };
+
+      if (!currentProject.selectedAssetId && currentProject.assets.length) {
+        currentProject.selectedAssetId = currentProject.assets[0].id;
+      }
+
+      localStorage.setItem(PROJECT_LAST_KEY, currentProject.id);
+      await refreshProjectList(currentProject.id);
+      renderProjectPanel();
+
+      if (options.loadSelected !== false && currentProject.selectedAssetId) {
+        await selectProjectAsset(currentProject.selectedAssetId, { silent: true });
+      }
+
+      updateMeta();
+      refreshGui();
+    }
+
+    async function createProject({ name, description } = {}) {
+      let projectName = String(name || '').trim();
+      let projectDescription = String(description || '').trim();
+
+      if (!projectName) {
+        const values = await openProjectDetailsModal();
+        if (!values) return null;
+        projectName = String(values.name || '').trim();
+        projectDescription = String(values.description || '').trim();
+      }
+
+      if (!projectName) return null;
+      const now = Date.now();
+
+      currentProject = {
+        id: makeProjectId('project'),
+        name: projectName,
+        description: projectDescription,
+        thumbnailBlobId: null,
+        selectedAssetId: null,
+        createdAt: now,
+        updatedAt: now,
+        assets: [],
+        operations: []
+      };
+
+      await saveCurrentProject();
+      showStatus('ok', `Project created: <strong>${escapeHtml(projectName)}</strong>`);
+      return currentProject;
+    }
+
+    async function editCurrentProject() {
+      if (!currentProject) {
+        await createProject();
+        return;
+      }
+
+      const values = await openProjectDetailsModal({
+        edit: true,
+        name: currentProject.name || 'Untitled project',
+        description: currentProject.description || ''
+      });
+
+      if (!values) return;
+
+      currentProject.name = String(values.name || 'Untitled project').trim() || 'Untitled project';
+      currentProject.description = String(values.description || '').trim();
+      await saveCurrentProject();
+      updateMeta();
+      showStatus('ok', 'Project updated.');
+    }
+
+    async function getVideoMetadataFromFile(file) {
+      return new Promise(resolve => {
+        const url = URL.createObjectURL(file);
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.muted = true;
+        video.playsInline = true;
+
+        const cleanup = () => URL.revokeObjectURL(url);
+        video.onloadedmetadata = () => {
+          const result = {
+            width: Number(video.videoWidth || 0),
+            height: Number(video.videoHeight || 0),
+            duration: Number(video.duration || 0)
+          };
+          cleanup();
+          resolve(result);
+        };
+        video.onerror = () => {
+          cleanup();
+          resolve({ width: 0, height: 0, duration: 0 });
+        };
+        video.src = url;
+      });
+    }
+
+    async function extractVideoThumbnailBlob(file, seekFraction = 0.02) {
+      return new Promise(resolve => {
+        const url = URL.createObjectURL(file);
+        const video = document.createElement('video');
+        video.preload = 'auto';
+        video.muted = true;
+        video.playsInline = true;
+        video.crossOrigin = 'anonymous';
+
+        const cleanup = () => URL.revokeObjectURL(url);
+        const finishEmpty = () => {
+          cleanup();
+          resolve(null);
+        };
+
+        video.onloadedmetadata = () => {
+          const targetTime = Math.min(Math.max(0.05, Number(video.duration || 0) * seekFraction), Math.max(0.05, Number(video.duration || 0) - 0.05));
+          try {
+            video.currentTime = Number.isFinite(targetTime) ? targetTime : 0.05;
+          } catch {
+            finishEmpty();
+          }
+        };
+
+        video.onseeked = () => {
+          try {
+            const maxW = 360;
+            const maxH = 240;
+            const sourceW = Number(video.videoWidth || 16);
+            const sourceH = Number(video.videoHeight || 9);
+            const scale = Math.min(maxW / sourceW, maxH / sourceH, 1);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(2, Math.round(sourceW * scale));
+            canvas.height = Math.max(2, Math.round(sourceH * scale));
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(blob => {
+              cleanup();
+              resolve(blob || null);
+            }, 'image/jpeg', 0.82);
+          } catch {
+            finishEmpty();
+          }
+        };
+
+        video.onerror = finishEmpty;
+        video.src = url;
+      });
+    }
+
+    async function storeProjectBlob(blob, prefix = 'blob') {
+      const id = makeProjectId(prefix);
+      await dbPut(PROJECT_BLOB_STORE_NAME, { id, blob, createdAt: Date.now() });
+      return id;
+    }
+
+    async function getProjectBlob(blobId) {
+      if (!blobId) return null;
+      const record = await dbGet(PROJECT_BLOB_STORE_NAME, blobId);
+      return record?.blob instanceof Blob ? record.blob : null;
+    }
+
+    async function ensureProjectForFile(file) {
+      if (currentProject) return currentProject;
+      const base = String(file?.name || 'New project').replace(/\.[^.]+$/, '').trim() || 'New project';
+      return createProject({ name: base, description: 'Created from the first imported video.' });
+    }
+
+    function createOperationLabel(type, settings = {}) {
+      if (type === 'aspect') return `Aspect ${settings.aspect_ratio || settings.ratio || controls.aspect_ratio || ''}`.trim();
+      if (type === 'caption_render') return 'Caption render';
+      if (type === 'silence') return 'Silence chop';
+      if (type === 'speed') return `Speed ${settings.speed_factor || controls.speed_factor || ''}x`.trim();
+      if (type === 'upscale') return `Upscale ${settings.upscale_factor || controls.upscale_factor || ''}x`.trim();
+      if (type === 'upload') return 'Original upload';
+      return String(type || 'Video output');
+    }
+
+    async function addVideoAssetToProject(file, options = {}) {
+      await ensureProjectForFile(file);
+      if (!currentProject) return null;
+
+      const now = Date.now();
+      const metadata = await getVideoMetadataFromFile(file);
+      const videoBlobId = await storeProjectBlob(file, 'video');
+      const thumbBlob = await extractVideoThumbnailBlob(file);
+      const thumbnailBlobId = thumbBlob ? await storeProjectBlob(thumbBlob, 'thumb') : null;
+      const sourceName = String(file.name || 'video.mp4');
+      const role = options.role || (currentProject.assets.length ? 'derived' : 'root');
+      const operationType = options.operationType || (role === 'root' ? 'upload' : 'derived');
+
+      const asset = {
+        id: makeProjectId('asset'),
+        type: 'video',
+        name: options.name || sourceName,
+        role,
+        blobId: videoBlobId,
+        thumbnailBlobId,
+        width: metadata.width,
+        height: metadata.height,
+        duration: metadata.duration,
+        size: Number(file.size || 0),
+        mimeType: file.type || 'video/mp4',
+        createdAt: now,
+        parentAssetId: options.parentAssetId || null,
+        operationId: options.operationId || null,
+        operationType
+      };
+
+      currentProject.assets.push(asset);
+      currentProject.selectedAssetId = asset.id;
+      if (!currentProject.thumbnailBlobId && thumbnailBlobId) {
+        currentProject.thumbnailBlobId = thumbnailBlobId;
+      }
+
+      if (options.operation) {
+        currentProject.operations.push(options.operation);
+      }
+
+      await saveCurrentProject();
+      await selectProjectAsset(asset.id, { silent: true });
+      return asset;
+    }
+
+    async function getProjectAssetFile(asset) {
+      if (!asset) return null;
+      const blob = await getProjectBlob(asset.blobId);
+      if (!blob) return null;
+      return new File([blob], asset.name || 'project-video.mp4', {
+        type: asset.mimeType || blob.type || 'video/mp4',
+        lastModified: Number(asset.createdAt || Date.now())
+      });
+    }
+
+    async function selectProjectAsset(assetId, options = {}) {
+      if (!currentProject) return;
+      const asset = getProjectAsset(assetId);
+      if (!asset) return;
+
+      currentProject.selectedAssetId = asset.id;
+      await dbPut(PROJECT_STORE_NAME, { ...currentProject, updatedAt: Date.now() });
+      localStorage.setItem(PROJECT_LAST_KEY, currentProject.id);
+      renderProjectPanel();
+
+      const file = await getProjectAssetFile(asset);
+      if (!file) {
+        showStatus('err', 'Could not load this project video from IndexedDB.');
+        return;
+      }
+
+      setFileInput(videoInput, file);
+      await loadSourceVideoPreview(file);
+      updateMeta();
+      refreshGui();
+
+      if (!options.silent) {
+        showStatus('ok', `Source selected: <strong>${asset.name}</strong>`);
+      }
+    }
+
+    async function addRenderedOutputToProject(outputUrl, context = {}) {
+      if (!currentProject || !context.sourceAssetId || !outputUrl) return null;
+
+      const response = await fetch(outputUrl, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Rendered output was ready, but could not be copied into the project.');
+      const blob = await response.blob();
+      const sourceAsset = getProjectAsset(context.sourceAssetId);
+      const opId = makeProjectId('op');
+      const operationType = context.operationType || 'render';
+      const label = createOperationLabel(operationType, context.settings || {});
+      const baseName = (sourceAsset?.name || 'video').replace(/\.[^.]+$/, '');
+      const outputName = `${baseName}_${label.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').toLowerCase()}_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.mp4`;
+      const file = new File([blob], outputName, { type: blob.type || 'video/mp4', lastModified: Date.now() });
+
+      const operation = {
+        id: opId,
+        type: operationType,
+        label,
+        sourceAssetId: context.sourceAssetId,
+        outputAssetId: null,
+        settings: context.settings || {},
+        createdAt: Date.now()
+      };
+
+      const asset = await addVideoAssetToProject(file, {
+        role: 'derived',
+        name: outputName,
+        parentAssetId: context.sourceAssetId,
+        operationId: opId,
+        operationType,
+        operation
+      });
+
+      if (asset) {
+        operation.outputAssetId = asset.id;
+        const saved = currentProject.operations.find(item => item.id === opId);
+        if (saved) saved.outputAssetId = asset.id;
+        await saveCurrentProject();
+      }
+
+      return asset;
+    }
+
+    async function getActiveSourceVideoFile() {
+      const selectedAsset = getSelectedProjectAsset();
+      if (selectedAsset) {
+        const file = await getProjectAssetFile(selectedAsset);
+        if (file) {
+          setFileInput(videoInput, file);
+          return file;
+        }
+      }
+
+      let video = videoInput.files[0];
+      if (!video) {
+        try {
+          video = await getCachedSourceVideoFile();
+        } catch {
+          video = null;
+        }
+      }
+      return video || null;
+    }
+
+    function snapshotOperationSettings() {
+      return JSON.parse(JSON.stringify({ ...controls }));
+    }
+
+    function renderProjectPanel() {
+      if (!projectNameEl || !projectAssetList) return;
+
+      if (!currentProject) {
+        projectNameEl.textContent = 'No project open';
+        projectDescriptionEl.textContent = 'Create a project first. Videos and rendered results will be kept in browser IndexedDB.';
+        projectMetaEl.textContent = 'No selected source asset.';
+        projectAssetList.innerHTML = '<div class="project-empty">No videos yet. Add a root video to start the project.</div>';
+        return;
+      }
+
+      projectNameEl.textContent = currentProject.name || 'Untitled project';
+      projectDescriptionEl.textContent = currentProject.description || 'No description.';
+      const selectedAsset = getSelectedProjectAsset();
+      const count = currentProject.assets.length;
+      projectMetaEl.textContent = selectedAsset
+        ? `Selected source: ${selectedAsset.width || '?'}×${selectedAsset.height || '?'} · ${formatDuration(selectedAsset.duration)} · ${count} video${count === 1 ? '' : 's'}`
+        : `${count} video${count === 1 ? '' : 's'} · no selected source`;
+
+      if (!currentProject.assets.length) {
+        projectAssetList.innerHTML = '<div class="project-empty">No videos yet. Add a root video to start the project.</div>';
+        return;
+      }
+
+      projectAssetList.innerHTML = '';
+      for (const asset of currentProject.assets.slice().sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0))) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `asset-card${asset.id === currentProject.selectedAssetId ? ' selected' : ''}`;
+        button.dataset.assetId = asset.id;
+
+        const img = document.createElement('img');
+        img.className = 'asset-thumb';
+        img.alt = '';
+        img.loading = 'lazy';
+        img.dataset.thumbBlobId = asset.thumbnailBlobId || '';
+
+        const body = document.createElement('div');
+        const title = document.createElement('div');
+        title.className = 'asset-title';
+        title.textContent = asset.role === 'root' ? `Root · ${asset.name}` : asset.name;
+        const details = document.createElement('div');
+        details.className = 'asset-details';
+        details.textContent = `${asset.width || '?'}×${asset.height || '?'} · ${formatDuration(asset.duration)} · ${formatBytes(asset.size)}`;
+        const lineage = document.createElement('div');
+        lineage.className = 'asset-lineage';
+        const parent = asset.parentAssetId ? getProjectAsset(asset.parentAssetId) : null;
+        lineage.textContent = parent ? `from ${parent.name} · ${createOperationLabel(asset.operationType)}` : 'original uploaded source';
+        body.append(title, details, lineage);
+        button.append(img, body);
+        button.addEventListener('click', () => selectProjectAsset(asset.id));
+        projectAssetList.appendChild(button);
+
+        if (asset.thumbnailBlobId) {
+          getProjectBlob(asset.thumbnailBlobId).then(blob => {
+            if (!blob) return;
+            const url = URL.createObjectURL(blob);
+            img.src = url;
+            img.onload = () => URL.revokeObjectURL(url);
+          }).catch(() => {});
+        }
+      }
+    }
+
+    async function bootProjects() {
+      try {
+        await openProjectDb();
+        await refreshProjectList(localStorage.getItem(PROJECT_LAST_KEY) || '');
+        const lastProjectId = localStorage.getItem(PROJECT_LAST_KEY);
+        if (lastProjectId && projectListCache.some(project => project.id === lastProjectId)) {
+          await loadProject(lastProjectId, { loadSelected: true });
+        } else {
+          renderProjectPanel();
+        }
+      } catch (error) {
+        showStatus('err', error.message || 'Could not open projects database.');
+      }
     }
 
     async function loadCustomFontsIntoBrowser() {
@@ -1176,25 +2699,237 @@
 
 
 
-    /* Refresh top metadata with selected file names. */
-/* Refresh top metadata with selected file names or the last cached source video. */
+    /* Refresh top metadata with selected project asset, selected file names, or cached fallback. */
     function updateMeta() {
+      const selectedAsset = getSelectedProjectAsset();
       const v = videoInput.files[0];
       const s = srtInput.files[0];
       const cachedLabel = !v && cachedVideoMeta?.name ? `${cachedVideoMeta.name} (cached)` : null;
 
+      if (selectedAsset) {
+        const projectLabel = currentProject?.name || 'Project';
+        selectionMeta.innerHTML =
+          `<strong>Project:</strong> ${escapeHtml(projectLabel)} &nbsp; · &nbsp; <strong>Source:</strong> ${escapeHtml(selectedAsset.name)} &nbsp; · &nbsp; <strong>SRT:</strong> ${s ? escapeHtml(s.name) : '—'}`;
+        renderProjectPanel();
+        return;
+      }
+
       if (!v && !s && !cachedLabel) {
         selectionMeta.textContent = 'No files selected.';
+        renderProjectPanel();
         return;
       }
 
       selectionMeta.innerHTML =
-    `<strong>Video:</strong> ${v ? v.name : (cachedLabel || '—')} &nbsp; · &nbsp; <strong>SRT:</strong> ${s ? s.name : '—'}`;
+        `<strong>Video:</strong> ${v ? escapeHtml(v.name) : (cachedLabel ? escapeHtml(cachedLabel) : '—')} &nbsp; · &nbsp; <strong>SRT:</strong> ${s ? escapeHtml(s.name) : '—'}`;
+      renderProjectPanel();
+    }
+
+  function evenPixel(value) {
+    const rounded = Math.max(2, Math.round(Number(value) || 2));
+    return rounded % 2 ? rounded + 1 : rounded;
+  }
+
+  function parseAspectRatioParts(value) {
+    const match = String(value || '9:16').trim().match(/^(\d{1,4})\s*:\s*(\d{1,4})$/);
+    if (!match) return { w: 9, h: 16, label: '9:16' };
+
+    const w = Math.max(1, Number(match[1]) || 9);
+    const h = Math.max(1, Number(match[2]) || 16);
+    return { w, h, label: `${w}:${h}` };
+  }
+
+  function getAspectCanvasLayout() {
+    const sourceWidth = Number(previewVideo.videoWidth || 0);
+    const sourceHeight = Number(previewVideo.videoHeight || 0);
+
+    if (!sourceWidth || !sourceHeight) {
+      return null;
+    }
+
+    const ratio = parseAspectRatioParts(controls.aspect_ratio);
+    const sourceRatio = sourceWidth / sourceHeight;
+    const targetRatio = ratio.w / ratio.h;
+    const mode = ['none', 'width', 'height', 'custom'].includes(controls.aspect_size_mode)
+      ? controls.aspect_size_mode
+      : 'none';
+
+    let baseCanvasWidth;
+    let baseCanvasHeight;
+    let isRescaled = false;
+
+    if (mode === 'width') {
+      baseCanvasWidth = evenPixel(controls.aspect_target_width);
+      baseCanvasHeight = evenPixel(baseCanvasWidth * ratio.h / ratio.w);
+      isRescaled = true;
+    } else if (mode === 'height') {
+      baseCanvasHeight = evenPixel(controls.aspect_target_height);
+      baseCanvasWidth = evenPixel(baseCanvasHeight * ratio.w / ratio.h);
+      isRescaled = true;
+    } else if (mode === 'custom') {
+      baseCanvasWidth = evenPixel(controls.aspect_target_width);
+      baseCanvasHeight = evenPixel(controls.aspect_target_height);
+      isRescaled = true;
+    } else if (sourceRatio > targetRatio) {
+      baseCanvasWidth = evenPixel(sourceWidth);
+      baseCanvasHeight = evenPixel(sourceWidth * ratio.h / ratio.w);
+    } else {
+      baseCanvasWidth = evenPixel(sourceHeight * ratio.w / ratio.h);
+      baseCanvasHeight = evenPixel(sourceHeight);
+    }
+
+    const nudgeWidth = evenPixel(baseCanvasWidth + Number(controls.aspect_width_nudge || 0)) - baseCanvasWidth;
+    const nudgeHeight = evenPixel(baseCanvasHeight + Number(controls.aspect_height_nudge || 0)) - baseCanvasHeight;
+
+    let canvasWidth = evenPixel(baseCanvasWidth + nudgeWidth);
+    let canvasHeight = evenPixel(baseCanvasHeight + nudgeHeight);
+
+    /* In pad-only mode, never let nudges make the canvas smaller than the unscaled source video. */
+    if (mode === 'none') {
+      canvasWidth = Math.max(canvasWidth, evenPixel(sourceWidth));
+      canvasHeight = Math.max(canvasHeight, evenPixel(sourceHeight));
+    }
+
+    const scaleToCanvas = mode === 'none'
+      ? 1
+      : Math.min(canvasWidth / sourceWidth, canvasHeight / sourceHeight);
+
+    const innerWidth = sourceWidth * scaleToCanvas;
+    const innerHeight = sourceHeight * scaleToCanvas;
+    const padX = Math.max(0, (canvasWidth - innerWidth) / 2);
+    const padY = Math.max(0, (canvasHeight - innerHeight) / 2);
+    const actualRatio = canvasWidth / canvasHeight;
+    const ratioDeltaPercent = ((actualRatio / targetRatio) - 1) * 100;
+
+    return {
+      sourceWidth,
+      sourceHeight,
+      baseCanvasWidth,
+      baseCanvasHeight,
+      canvasWidth,
+      canvasHeight,
+      innerWidth,
+      innerHeight,
+      padX,
+      padY,
+      mode,
+      ratioLabel: ratio.label,
+      actualRatio,
+      ratioDeltaPercent,
+      widthNudge: canvasWidth - baseCanvasWidth,
+      heightNudge: canvasHeight - baseCanvasHeight,
+      isRescaled
+    };
+  }
+
+  function updateAspectReadout(layout = getAspectCanvasLayout()) {
+    if (!layout) {
+      controls.aspect_readout = 'Load a video to calculate the caption/export canvas.';
+      return;
+    }
+
+    const scaleText = layout.isRescaled ? ` · video scaled to ${Math.round(layout.innerWidth)}×${Math.round(layout.innerHeight)}` : ' · source not rescaled';
+    const padText = ` · pad ${Math.round(layout.padX)}px H / ${Math.round(layout.padY)}px V`;
+    const baseText = `base ${layout.ratioLabel} ${layout.baseCanvasWidth}×${layout.baseCanvasHeight}`;
+    const nudgeText = (layout.widthNudge || layout.heightNudge)
+      ? ` · nudge ${layout.widthNudge >= 0 ? '+' : ''}${layout.widthNudge}w ${layout.heightNudge >= 0 ? '+' : ''}${layout.heightNudge}h · ratio drift ${layout.ratioDeltaPercent.toFixed(2)}%`
+      : '';
+
+    controls.aspect_readout = `${baseText} → canvas ${layout.canvasWidth}×${layout.canvasHeight}${nudgeText}${scaleText}${padText}`;
+  }
+
+  function syncAspectDimensionsFromRatio() {
+    const layout = getAspectCanvasLayout();
+    if (!layout) {
+      updateAspectReadout(null);
+      refreshGui();
+      return;
+    }
+
+    controls.aspect_target_width = layout.baseCanvasWidth;
+    controls.aspect_target_height = layout.baseCanvasHeight;
+    updateAspectReadout(layout);
+    refreshGui();
+    applyHelperPreview();
+  }
+
+  function updateLinkedAspectDimension(changedDimension) {
+    const ratio = parseAspectRatioParts(controls.aspect_ratio);
+    const mode = controls.aspect_size_mode;
+
+    controls.aspect_target_width = evenPixel(controls.aspect_target_width);
+    controls.aspect_target_height = evenPixel(controls.aspect_target_height);
+
+    if (mode === 'width' || (mode !== 'custom' && changedDimension === 'width')) {
+      controls.aspect_target_height = evenPixel(controls.aspect_target_width * ratio.h / ratio.w);
+    } else if (mode === 'height' || (mode !== 'custom' && changedDimension === 'height')) {
+      controls.aspect_target_width = evenPixel(controls.aspect_target_height * ratio.w / ratio.h);
+    }
+
+    updateAspectReadout();
+    refreshGui();
+    applyHelperPreview();
+  }
+
+  function updateAspectNudge() {
+    controls.aspect_width_nudge = Math.round(Number(controls.aspect_width_nudge || 0));
+    controls.aspect_height_nudge = Math.round(Number(controls.aspect_height_nudge || 0));
+    updateAspectReadout();
+    refreshGui();
+    applyHelperPreview();
+  }
+
+  function resetAspectNudge() {
+    controls.aspect_width_nudge = 0;
+    controls.aspect_height_nudge = 0;
+    updateAspectReadout();
+    refreshGui();
+    applyHelperPreview();
+  }
+
+  function applyAspectCanvasPreview() {
+    if (!controls.aspect_live_preview || showingRenderedOutput) {
+      updateAspectReadout();
+      return false;
+    }
+
+    const layout = getAspectCanvasLayout();
+    if (!layout) {
+      updateAspectReadout(null);
+      return false;
+    }
+
+    const shellRect = videoShell.getBoundingClientRect();
+    const maxWidth = Math.max(1, shellRect.width - 24);
+    const maxHeight = Math.max(1, shellRect.height - 24);
+    const displayScale = Math.min(maxWidth / layout.canvasWidth, maxHeight / layout.canvasHeight);
+
+    mediaFrame.classList.add('aspect-preview-active');
+    mediaFrame.style.width = `${layout.canvasWidth * displayScale}px`;
+    mediaFrame.style.height = `${layout.canvasHeight * displayScale}px`;
+    mediaFrame.style.backgroundColor = controls.aspect_border_colour || '#000000';
+
+    previewVideo.style.width = `${layout.innerWidth * displayScale}px`;
+    previewVideo.style.height = `${layout.innerHeight * displayScale}px`;
+    previewVideo.style.maxWidth = 'none';
+    previewVideo.style.maxHeight = 'none';
+
+    updateAspectReadout(layout);
+    return true;
   }
 
     /* Convert ASS-size font into displayed-video CSS size. */
   function getPreviewScaleFactor() {
     if (!previewVideo.videoWidth || !previewVideo.videoHeight) return 1;
+
+    if (controls.aspect_live_preview && !showingRenderedOutput) {
+      const layout = getAspectCanvasLayout();
+      const rect = mediaFrame.getBoundingClientRect();
+
+      if (layout && rect.width && layout.canvasWidth) {
+        return rect.width / layout.canvasWidth;
+      }
+    }
 
     const rect = previewVideo.getBoundingClientRect();
     if (!rect.width || !rect.height) return 1;
@@ -1204,15 +2939,30 @@
     return Math.min(scaleX, scaleY);
   }
 
-    /* Force helper overlay to exactly match the displayed video rectangle. */
+    /* Force helper overlay to exactly match either the live aspect canvas or the displayed video rectangle. */
   function syncOverlayToVideo() {
     if (previewVideo.style.display === 'none') return;
+
+    if (applyAspectCanvasPreview()) {
+      helperLayer.style.left = '0px';
+      helperLayer.style.top = '0px';
+      helperLayer.style.width = '100%';
+      helperLayer.style.height = '100%';
+      return;
+    }
 
     const videoRect = previewVideo.getBoundingClientRect();
     if (!videoRect.width || !videoRect.height) return;
 
+    mediaFrame.classList.remove('aspect-preview-active');
+    mediaFrame.style.backgroundColor = '';
     mediaFrame.style.width = `${videoRect.width}px`;
     mediaFrame.style.height = `${videoRect.height}px`;
+
+    previewVideo.style.width = 'auto';
+    previewVideo.style.height = 'auto';
+    previewVideo.style.maxWidth = 'min(92vw, 1600px)';
+    previewVideo.style.maxHeight = 'min(calc(88vh - 58px), 902px)';
 
     helperLayer.style.left = '0px';
     helperLayer.style.top = '0px';
@@ -1306,6 +3056,7 @@
 
 
   function applyHelperPreview() {
+    syncOverlayToVideo();
     const scale = getPreviewScaleFactor();
     const rect = helperLayer.getBoundingClientRect();
     const displayedWidth = rect.width || 0;
@@ -1380,7 +3131,6 @@
     helperCaption.style.transform =
   `translate(${helperTranslate}) translate(${(controls.offset_x + jitterX) * scale}px, ${(controls.offset_y + jitterY) * scale}px) rotate(${-controls.rotation_z}deg) scale(${controls.end_scale / 100})`;
 
-  syncOverlayToVideo();
   applyHelpersVisibility();
   applyOverlayHelperPreview();
 }
@@ -1530,8 +3280,20 @@ document.addEventListener('pointercancel', () => {
 });
 
     /* Append current control values to render request. */
-function collectSettings(formData) {
-  Object.entries(controls).forEach(([key, value]) => {
+function shouldExportAspectCanvasWithCaptions() {
+  return Boolean(controls.aspect_enabled || controls.aspect_live_preview);
+}
+
+function collectSettings(formData, options = {}) {
+  const values = { ...controls };
+
+  /* Keep the caption render aligned with the canvas the user is editing on.
+     If the live aspect preview is visible, captions should render on that same canvas. */
+  if (options.forCaptionRender && controls.aspect_live_preview) {
+    values.aspect_enabled = true;
+  }
+
+  Object.entries(values).forEach(([key, value]) => {
     formData.append(key, String(value));
   });
 }
@@ -1682,9 +3444,56 @@ async function savePreset() {
   let name = presetSelect.value;
 
   if (!name) {
-    name = prompt('Preset name');
-    if (!name) return;
-    name = name.trim();
+    const values = await openPresetNameModal({
+      title: 'Save preset',
+      description: 'Name this caption/style preset so it can be reused later.',
+      confirmText: 'Save preset'
+    });
+
+    if (!values) return;
+    name = String(values.name || '').trim();
+  }
+
+  if (!name) return;
+
+  const presetObject = exportCurrentPresetObject(name);
+  presetsCache[presetObject.name] = presetObject;
+
+  try {
+    if (presetDb) {
+      await putPresetToDb(presetObject);
+    }
+  } catch {}
+
+  syncLocalStorageMirror();
+  renderPresetSelect();
+  presetSelect.value = presetObject.name;
+  showStatus('ok', `Preset saved: <strong>${escapeHtml(presetObject.name)}</strong>`);
+}
+
+
+/* Save current controls as a new preset name. */
+async function savePresetAs() {
+  const values = await openPresetNameModal({
+    title: 'Save preset as',
+    description: 'Create a new named copy of the current GUI settings.',
+    confirmText: 'Save as new preset'
+  });
+
+  if (!values) return;
+
+  const name = String(values.name || '').trim();
+  if (!name) return;
+
+  if (presetsCache[name]) {
+    const overwrite = await openConfirmModal({
+      title: 'Overwrite existing preset?',
+      description: `A preset named “${name}” already exists. Replace it with the current settings?`,
+      confirmText: 'Overwrite preset',
+      danger: true
+    });
+
+    if (!overwrite) return;
   }
 
   const presetObject = exportCurrentPresetObject(name);
@@ -1699,31 +3508,7 @@ async function savePreset() {
   syncLocalStorageMirror();
   renderPresetSelect();
   presetSelect.value = presetObject.name;
-  showStatus('ok', `Preset saved: <strong>${presetObject.name}</strong>`);
-}
-
-
-/* Save current controls as a new preset name. */
-async function savePresetAs() {
-  let name = prompt('New preset name');
-  if (!name) return;
-
-  name = name.trim();
-  if (!name) return;
-
-  const presetObject = exportCurrentPresetObject(name);
-  presetsCache[presetObject.name] = presetObject;
-
-  try {
-    if (presetDb) {
-      await putPresetToDb(presetObject);
-    }
-  } catch {}
-
-  syncLocalStorageMirror();
-  renderPresetSelect();
-  presetSelect.value = presetObject.name;
-  showStatus('ok', `Preset saved as: <strong>${presetObject.name}</strong>`);
+  showStatus('ok', `Preset saved as: <strong>${escapeHtml(presetObject.name)}</strong>`);
 }
 
 
@@ -1737,6 +3522,15 @@ async function deletePreset() {
     return;
   }
 
+  const confirmed = await openConfirmModal({
+    title: 'Delete preset?',
+    description: `“${name}” will be removed from IndexedDB and the local preset mirror. This does not affect existing projects.`,
+    confirmText: 'Delete preset',
+    danger: true
+  });
+
+  if (!confirmed) return;
+
   delete presetsCache[name];
 
   try {
@@ -1747,7 +3541,7 @@ async function deletePreset() {
 
   syncLocalStorageMirror();
   renderPresetSelect();
-  showStatus('ok', `Preset deleted: <strong>${name}</strong>`);
+  showStatus('ok', `Preset deleted: <strong>${escapeHtml(name)}</strong>`);
 }
 
     /* Export selected or current preset as JSON file. */
@@ -1828,8 +3622,10 @@ function resetUI() {
   previewVideo.removeAttribute('src');
   previewVideo.load();
   previewVideo.style.display = 'none';
+  setCustomControlsVisible(false);
   placeholder.style.display = 'block';
   helperLayer.style.display = 'none';
+  resetPreviewFrameToRealVideo();
 
   openPreview.style.display = 'none';
   openAss.style.display = 'none';
@@ -1922,10 +3718,15 @@ async function startPolling(jobId) {
           return;
         }
 
+        showingRenderedOutput = true;
+        controls.aspect_live_preview = false;
         previewVideo.src = `${data.preview_url}?t=${Date.now()}`;
         previewVideo.style.display = 'block';
+        setCustomControlsVisible(true);
         placeholder.style.display = 'none';
         helperLayer.style.display = 'block';
+        resetPreviewFrameToRealVideo();
+        updateTransportControls();
 
         openPreview.href = data.preview_url;
         openAss.href = data.ass_url || '#';
@@ -1937,7 +3738,25 @@ async function startPolling(jobId) {
         previewBtn.textContent = 'Render preview';
         renderFullBtn.textContent = 'Render full';
 
-        showStatus('ok', 'Render ready.');
+        if (pendingOutputContext?.jobId === jobId && pendingOutputContext.mode === 'full' && data.preview_url) {
+          try {
+            const asset = await addRenderedOutputToProject(data.preview_url, pendingOutputContext);
+            if (asset) {
+              showStatus('ok', `Full render saved as project video: <strong>${asset.name}</strong>`);
+            } else {
+              showStatus('ok', 'Render ready.');
+            }
+          } catch (projectError) {
+            showStatus('err', projectError.message || 'Render ready, but could not save output into the project.');
+          } finally {
+            pendingOutputContext = null;
+          }
+        } else {
+          showStatus('ok', pendingOutputContext?.mode === 'preview' ? 'Preview render ready. It was not added to the project.' : 'Render ready.');
+          if (pendingOutputContext?.jobId === jobId) {
+            pendingOutputContext = null;
+          }
+        }
 
         requestAnimationFrame(() => {
           syncOverlayToVideo();
@@ -2399,16 +4218,19 @@ async function loadSourceVideoPreview(file) {
 
   await saveCachedSourceVideo(file);
 
+  showingRenderedOutput = false;
+  controls.aspect_live_preview = false;
   sourceObjectUrl = URL.createObjectURL(file);
   previewVideo.src = sourceObjectUrl;
   previewVideo.style.display = 'block';
+  setCustomControlsVisible(true);
   placeholder.style.display = 'none';
   helperLayer.style.display = 'block';
-  mediaFrame.style.width = '';
-  mediaFrame.style.height = '';
+  resetPreviewFrameToRealVideo();
   previewVideo.load();
 
   updateMeta();
+  updateTransportControls();
 }
 
 
@@ -2421,16 +4243,9 @@ async function loadSourceVideoPreview(file) {
 async function renderVideo(mode) {
   clearStatus();
 
-  let video = videoInput.files[0];
+  const sourceAsset = getSelectedProjectAsset();
+  let video = await getActiveSourceVideoFile();
   const srt = srtInput.files[0];
-
-  if (!video) {
-    try {
-      video = await getCachedSourceVideoFile();
-    } catch {
-      video = null;
-    }
-  }
 
   if (!video || !srt) {
     showStatus('err', 'Choose subtitle and either load a new video or reuse the cached one.');
@@ -2441,7 +4256,13 @@ async function renderVideo(mode) {
   formData.append('video', video, video.name);
   formData.append('srt', srt, srt.name);
   formData.append('mode', mode);
-  collectSettings(formData);
+  collectSettings(formData, { forCaptionRender: true });
+
+  if (controls.aspect_live_preview && !controls.aspect_enabled) {
+    controls.aspect_enabled = true;
+    refreshGui();
+    showStatus('info', 'Aspect canvas is now enabled for caption render so the exported captions match the live preview canvas.');
+  }
 
   previewBtn.disabled = true;
   renderFullBtn.disabled = true;
@@ -2463,6 +4284,14 @@ async function renderVideo(mode) {
       throw new Error(data.error || `Could not start ${mode} render.`);
     }
 
+    pendingOutputContext = {
+      jobId: data.job_id,
+      mode,
+      operationType: 'caption_render',
+      sourceAssetId: sourceAsset?.id || currentProject?.selectedAssetId || null,
+      settings: snapshotOperationSettings()
+    };
+
     startPolling(data.job_id);
   } catch (err) {
     previewBtn.disabled = false;
@@ -2480,15 +4309,8 @@ async function renderVideo(mode) {
 async function processVideo(processKind, mode) {
   clearStatus();
 
-  let video = videoInput.files[0];
-
-  if (!video) {
-    try {
-      video = await getCachedSourceVideoFile();
-    } catch {
-      video = null;
-    }
-  }
+  const sourceAsset = getSelectedProjectAsset();
+  let video = await getActiveSourceVideoFile();
 
   if (!video) {
     showStatus('err', 'Choose a video first or reuse the cached one.');
@@ -2520,6 +4342,10 @@ async function processVideo(processKind, mode) {
       full: controls.upscale_mode === 'ai'
         ? 'Starting Real-ESRGAN full upscale...'
         : 'Starting traditional full upscale...'
+    },
+    aspect: {
+      preview: 'Starting aspect-ratio preview...',
+      full: 'Starting aspect-ratio conversion...'
     }
   };
 
@@ -2537,6 +4363,14 @@ async function processVideo(processKind, mode) {
       throw new Error(data.error || 'Could not start processing.');
     }
 
+    pendingOutputContext = {
+      jobId: data.job_id,
+      mode,
+      operationType: processKind,
+      sourceAssetId: sourceAsset?.id || currentProject?.selectedAssetId || null,
+      settings: snapshotOperationSettings()
+    };
+
     startPolling(data.job_id);
   } catch (err) {
     showStatus('err', err.message || 'Processing request failed.');
@@ -2550,15 +4384,7 @@ async function processVideo(processKind, mode) {
 async function generateCaptions() {
   clearStatus();
 
-  let video = videoInput.files[0];
-
-  if (!video) {
-    try {
-      video = await getCachedSourceVideoFile();
-    } catch {
-      video = null;
-    }
-  }
+  let video = await getActiveSourceVideoFile();
 
   if (!video) {
     showStatus('err', 'Choose a video first or reuse the cached one.');
@@ -2758,7 +4584,19 @@ Object.assign(controls, {
 
   /* Preview fallback controls required by the Preview lil-gui folder. */
   preview_start: Number.isFinite(Number(controls.preview_start)) ? Math.max(0, Number(controls.preview_start)) : 0,
-  preview_duration: Number.isFinite(Number(controls.preview_duration)) ? Math.max(1, Number(controls.preview_duration)) : 8
+  preview_duration: Number.isFinite(Number(controls.preview_duration)) ? Math.max(1, Number(controls.preview_duration)) : 8,
+
+  /* Aspect-canvas fallback controls required by the Aspect Canvas lil-gui folder. */
+  aspect_enabled: typeof controls.aspect_enabled === 'boolean' ? controls.aspect_enabled : true,
+  aspect_live_preview: typeof controls.aspect_live_preview === 'boolean' ? controls.aspect_live_preview : true,
+  aspect_ratio: controls.aspect_ratio || '9:16',
+  aspect_border_colour: controls.aspect_border_colour || '#000000',
+  aspect_size_mode: ['none', 'width', 'height', 'custom'].includes(controls.aspect_size_mode) ? controls.aspect_size_mode : 'none',
+  aspect_target_width: Number.isFinite(Number(controls.aspect_target_width)) ? Math.max(2, Number(controls.aspect_target_width)) : 1080,
+  aspect_target_height: Number.isFinite(Number(controls.aspect_target_height)) ? Math.max(2, Number(controls.aspect_target_height)) : 1920,
+  aspect_width_nudge: Number.isFinite(Number(controls.aspect_width_nudge)) ? Number(controls.aspect_width_nudge) : 0,
+  aspect_height_nudge: Number.isFinite(Number(controls.aspect_height_nudge)) ? Number(controls.aspect_height_nudge) : 0,
+  aspect_readout: controls.aspect_readout || 'Load a video to calculate the caption/export canvas.'
 });
 
 
@@ -2767,6 +4605,35 @@ const gui = new GUI({ title: 'Caption Controls' });
 
 
 
+
+
+
+/* Add project controls before source-video actions so source selection is explicit. */
+const projectFolder = gui.addFolder('Project');
+projectFolder.add({
+  async new_project() {
+    await createProject();
+    refreshGui();
+  }
+}, 'new_project').name('New project');
+projectFolder.add({
+  async edit_project() {
+    await editCurrentProject();
+    refreshGui();
+  }
+}, 'edit_project').name('Edit metadata');
+projectFolder.add({
+  add_video() {
+    videoInput.click();
+  }
+}, 'add_video').name('Add video asset');
+projectFolder.add({
+  get selected_source() {
+    const asset = getSelectedProjectAsset();
+    return asset ? asset.name : 'No project source selected';
+  }
+}, 'selected_source').name('Source').listen();
+projectFolder.close();
 
 /* Add source-video actions to lil-gui, including reuse of the last cached video from IndexedDB. */
 const sourceVideoFolder = gui.addFolder('Source Video');
@@ -2796,7 +4663,8 @@ let presetController = null;
 const actionState = {
   /* Return the selected video filename for lil-gui display. */
   get video_file() {
-    return videoInput?.files?.[0]?.name || 'No video selected';
+    const asset = getSelectedProjectAsset();
+    return asset ? asset.name : (videoInput?.files?.[0]?.name || 'No video selected');
   },
 
   /* Return the selected subtitle filename for lil-gui display. */
@@ -2867,7 +4735,7 @@ const actionState = {
     refreshGui();
   },
 
-  /* Save current controls into the selected preset or prompt for a new name. */
+  /* Save current controls into the selected preset, or open the preset-name dialog when needed. */
   async save_preset() {
     await savePreset();
     refreshGui();
@@ -3263,6 +5131,78 @@ previewFolder.close();
 
 
 
+/* Convert the source video onto a coloured canvas with a specific aspect ratio. */
+/* Live browser preview uses CSS only; caption exports send the same canvas settings to FFmpeg. */
+const aspectFolder = gui.addFolder('Aspect Canvas');
+aspectFolder.add(controls, 'aspect_enabled').name('caption/export uses this canvas').onChange(value => {
+  if (!value && controls.aspect_live_preview) {
+    showStatus('info', 'Live preview is still showing the aspect canvas. Caption render will automatically re-enable the canvas to avoid position mismatch. Turn off live browser preview to edit captions on the original video.');
+  }
+  applyHelperPreview();
+});
+aspectFolder.add(controls, 'aspect_live_preview').name('live browser preview').onChange(value => {
+  if (value && !controls.aspect_enabled) {
+    controls.aspect_enabled = true;
+    showStatus('info', 'Caption/export canvas was enabled so the live preview and final render stay matched.');
+    refreshGui();
+  }
+  applyHelperPreview();
+});
+aspectFolder.add(controls, 'aspect_ratio', {
+  'Square 1:1': '1:1',
+  'Portrait 9:16': '9:16',
+  'Portrait 4:5': '4:5',
+  'Landscape 16:9': '16:9'
+}).name('ratio').onChange(syncAspectDimensionsFromRatio);
+aspectFolder.addColor(controls, 'aspect_border_colour').name('border colour').onChange(applyHelperPreview);
+aspectFolder.add(controls, 'aspect_size_mode', {
+  'Keep source size — pad only': 'none',
+  'Resize by canvas width': 'width',
+  'Resize by canvas height': 'height',
+  'Custom exact canvas': 'custom'
+}).name('sizing mode').onChange(value => {
+  if (value === 'none') {
+    showStatus('info', 'Live preview is CSS only. Export keeps source pixels unchanged and only adds coloured padding. Use the deviation sliders to add/remove pixels after the ratio baseline is calculated.');
+  } else if (value === 'custom') {
+    showStatus('info', 'Live preview uses the baseline width/height plus any deviation pixels. Export scales the source to fit that final canvas.');
+  } else {
+    showStatus('info', 'Live preview updates instantly. Export scales the source to fit the ratio baseline plus any width/height deviation.');
+  }
+  syncAspectDimensionsFromRatio();
+});
+aspectFolder.add(controls, 'aspect_target_width', 2, 7680, 2).name('ratio baseline width px').onChange(() => updateLinkedAspectDimension('width'));
+aspectFolder.add(controls, 'aspect_target_height', 2, 7680, 2).name('ratio baseline height px').onChange(() => updateLinkedAspectDimension('height'));
+aspectFolder.add(controls, 'aspect_width_nudge', -1000, 1000, 2).name('deviate width ±px').onChange(updateAspectNudge);
+aspectFolder.add(controls, 'aspect_height_nudge', -1000, 1000, 2).name('deviate height ±px').onChange(updateAspectNudge);
+const aspectReadoutController = aspectFolder.add(controls, 'aspect_readout').name('live size').listen();
+if (aspectReadoutController.disable) {
+  aspectReadoutController.disable();
+}
+aspectFolder.add({
+  set_from_ratio() {
+    syncAspectDimensionsFromRatio();
+  }
+}, 'set_from_ratio').name('Set baseline from ratio/source');
+aspectFolder.add({
+  reset_deviation() {
+    resetAspectNudge();
+  }
+}, 'reset_deviation').name('Reset deviation to ratio');
+aspectFolder.add({
+  export_preview_clip() {
+    return processVideo('aspect', 'preview');
+  }
+}, 'export_preview_clip').name('Export preview clip');
+aspectFolder.add({
+  export_full_video() {
+    return processVideo('aspect', 'full');
+  }
+}, 'export_full_video').name('Export full video');
+aspectFolder.close();
+
+
+
+
 /* Group silence-based post-processing controls and reuse the global preview window for partial processing. */
 const silenceFolder = gui.addFolder('Silence Chop');
 silenceFolder.add(controls, 'silence_threshold', -80, -5, 0.5).name('threshold dB');
@@ -3460,6 +5400,34 @@ presetImportInput.addEventListener('change', async () => {
 
 bindActionGuiObservers();
 
+if (newProjectBtn) {
+  newProjectBtn.addEventListener('click', async () => {
+    await createProject();
+    refreshGui();
+  });
+}
+
+if (projectSelect) {
+  projectSelect.addEventListener('change', async () => {
+    const value = projectSelect.value;
+    if (!value) return;
+    try {
+      await loadProject(value, { loadSelected: true });
+      showStatus('ok', `Project opened: <strong>${escapeHtml(currentProject?.name || 'Untitled project')}</strong>`);
+    } catch (error) {
+      showStatus('err', error.message || 'Could not open project.');
+    }
+  });
+}
+
+if (editProjectBtn) {
+  editProjectBtn.addEventListener('click', editCurrentProject);
+}
+
+if (addProjectVideoBtn) {
+  addProjectVideoBtn.addEventListener('click', () => videoInput.click());
+}
+
 ['dragenter', 'dragover'].forEach(name => {
   document.body.addEventListener(name, event => {
     event.preventDefault();
@@ -3482,7 +5450,7 @@ document.body.addEventListener('drop', async event => {
 
   if (videoFile) {
     setFileInput(videoInput, videoFile);
-    await loadSourceVideoPreview(videoFile);
+    await addVideoAssetToProject(videoFile, { role: currentProject?.assets?.length ? 'derived' : 'root', operationType: 'upload' });
   }
 
   if (srtFile) {
@@ -3500,7 +5468,7 @@ videoInput.addEventListener('change', async () => {
   const file = videoInput.files[0];
 
   if (file) {
-    await loadSourceVideoPreview(file);
+    await addVideoAssetToProject(file, { role: currentProject?.assets?.length ? 'derived' : 'root', operationType: 'upload' });
   }
 
   updateMeta();
@@ -3515,8 +5483,57 @@ srtInput.addEventListener('change', async () => {
   refreshGui();
 });
 
+playPauseBtn.addEventListener('click', async () => {
+  try {
+    if (previewVideo.paused) {
+      await previewVideo.play();
+    } else {
+      previewVideo.pause();
+    }
+  } catch (error) {
+    showStatus('err', error.message || 'Playback could not start.');
+  }
+  updateTransportControls();
+});
+
+transportSeek.addEventListener('input', () => {
+  const duration = Number(previewVideo.duration || 0);
+  if (!Number.isFinite(duration) || duration <= 0) return;
+  previewVideo.currentTime = (Number(transportSeek.value || 0) / 1000) * duration;
+  updateTransportControls();
+});
+
+muteBtn.addEventListener('click', () => {
+  previewVideo.muted = !previewVideo.muted;
+  updateTransportControls();
+});
+
+volumeRange.addEventListener('input', () => {
+  const value = Math.max(0, Math.min(1, Number(volumeRange.value || 0)));
+  previewVideo.volume = value;
+  previewVideo.muted = value === 0;
+  updateTransportControls();
+});
+
+fullscreenBtn.addEventListener('click', async () => {
+  const target = videoShell || mediaFrame || previewVideo;
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else if (target?.requestFullscreen) {
+      await target.requestFullscreen();
+    }
+  } catch (error) {
+    showStatus('err', error.message || 'Fullscreen is not available.');
+  }
+});
+
 previewVideo.addEventListener('loadedmetadata', () => {
+  updateTransportControls();
   requestAnimationFrame(() => {
+    if (!showingRenderedOutput) {
+      syncAspectDimensionsFromRatio();
+    }
     syncOverlayToVideo();
     helperLayer.style.display = 'block';
     applyHelperPreview();
@@ -3524,6 +5541,7 @@ previewVideo.addEventListener('loadedmetadata', () => {
 });
 
 previewVideo.addEventListener('loadeddata', () => {
+  updateTransportControls();
   requestAnimationFrame(() => {
     syncOverlayToVideo();
     applyHelperPreview();
@@ -3532,23 +5550,31 @@ previewVideo.addEventListener('loadeddata', () => {
 
 /* Keep native subtitle preview synchronized with local video playback. */
 previewVideo.addEventListener('timeupdate', () => {
+  updateTransportControls();
   syncNativeCaptionPreview();
 });
 
 /* Recompute visible caption text when playback state changes. */
 previewVideo.addEventListener('seeked', () => {
+  updateTransportControls();
   syncNativeCaptionPreview();
 });
 
 /* Refresh native preview when playback is paused at a subtitle boundary. */
 previewVideo.addEventListener('pause', () => {
+  updateTransportControls();
   syncNativeCaptionPreview();
 });
 
 /* Refresh native preview when playback resumes. */
 previewVideo.addEventListener('play', () => {
+  updateTransportControls();
   syncNativeCaptionPreview();
 });
+
+
+previewVideo.addEventListener('durationchange', updateTransportControls);
+previewVideo.addEventListener('volumechange', updateTransportControls);
 
 
 
@@ -3558,6 +5584,10 @@ window.addEventListener('resize', () => {
     syncOverlayToVideo();
     applyHelperPreview();
   });
+});
+
+window.addEventListener('resize', () => {
+  requestAnimationFrame(applyHelperPreview);
 });
 
 document.addEventListener('keydown', event => {
@@ -3576,6 +5606,7 @@ resetBtn.addEventListener('click', resetUI);
 /* Restore cached source-video metadata on startup so the UI shows that a reusable video already exists. */
 cachedVideoMeta = readCachedVideoMetaFromStorage();
 await loadPresets();
+await bootProjects();
 updateMeta();
 applyHelperPreview();
 </script>

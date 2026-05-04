@@ -241,7 +241,7 @@ def _list_custom_fonts():
 
 
 # Render a preview or full output while exposing uploaded fonts to libass.
-def render_preview(video_path, ass_path, output_path, preview_start=0, preview_seconds=8):
+def render_preview(video_path, ass_path, output_path, preview_start=0, preview_seconds=8, aspect_settings=None):
     # Render a preview or full output while exposing uploaded fonts to libass.
     # Force AV1 inputs through an explicit software decoder and render with a clean libass font directory.
     import shutil
@@ -323,13 +323,18 @@ def render_preview(video_path, ass_path, output_path, preview_start=0, preview_s
             f":fontsdir='{_escape_ffmpeg_filter_path(temp_fonts_dir)}'"
         )
 
+        source_info = get_video_info(video_path)
+        aspect_filter = ""
+        if _aspect_layer_enabled(aspect_settings):
+            aspect_filter = _build_aspect_pad_filter(aspect_settings, source_info) + ","
+
         if preview_seconds is not None:
             video_chain = (
                 f"[0:v]trim=start={requested_start:.6f}:end={requested_end:.6f},"
-                f"setpts=PTS-STARTPTS,{ass_filter}[v]"
+                f"setpts=PTS-STARTPTS,{aspect_filter}{ass_filter}[v]"
             )
         else:
-            video_chain = f"[0:v]setpts=PTS-STARTPTS,{ass_filter}[v]"
+            video_chain = f"[0:v]setpts=PTS-STARTPTS,{aspect_filter}{ass_filter}[v]"
 
         filter_parts = [video_chain]
 
@@ -1059,6 +1064,165 @@ def _even_size(value):
     return value
 
 
+def _parse_aspect_ratio(value, default="9:16"):
+    raw_value = str(value or default).strip()
+    if raw_value.lower() in ("original", "source", "none"):
+        raw_value = default
+
+    match = re.fullmatch(r"(\d{1,4})\s*:\s*(\d{1,4})", raw_value)
+    if not match:
+        raise RuntimeError("Aspect ratio must be like 1:1, 9:16, 4:5, or 16:9.")
+
+    ratio_w = int(match.group(1))
+    ratio_h = int(match.group(2))
+    if ratio_w <= 0 or ratio_h <= 0:
+        raise RuntimeError("Aspect ratio numbers must be greater than zero.")
+
+    return ratio_w, ratio_h, f"{ratio_w}:{ratio_h}"
+
+
+def _normalise_ffmpeg_colour(value, default="black"):
+    raw_value = str(value or default).strip()
+    if not raw_value:
+        raw_value = default
+
+    if re.fullmatch(r"#[0-9A-Fa-f]{6}", raw_value):
+        return f"0x{raw_value[1:]}"
+
+    if re.fullmatch(r"0x[0-9A-Fa-f]{6}", raw_value):
+        return raw_value
+
+    if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", raw_value):
+        return raw_value.lower()
+
+    raise RuntimeError("Border colour must be a hex colour like #ff0000 or an FFmpeg colour name like black or white.")
+
+
+def _normalise_aspect_size_mode(value):
+    mode = str(value or "none").strip().lower()
+    if mode in ("width", "height", "custom", "none"):
+        return mode
+    return "none"
+
+
+def _safe_aspect_dimension(value, default_value):
+    size = _safe_int(value, default_value)
+    size = max(2, min(7680, size))
+    return _even_size(size)
+
+
+def _safe_aspect_nudge(value):
+    nudge = _safe_int(value, 0)
+    return max(-1000, min(1000, nudge))
+
+
+def _check_aspect_canvas_limits(width, height):
+    width = _even_size(width)
+    height = _even_size(height)
+    if width > 7680 or height > 7680:
+        raise RuntimeError("Computed aspect canvas is larger than 7680px on one side. Use a smaller output width/height or a less extreme ratio.")
+    return width, height
+
+
+def _aspect_canvas_dimensions(source_info, aspect_settings):
+    ratio_w, ratio_h, _ = _parse_aspect_ratio(aspect_settings.get("ratio", "9:16"))
+    mode = _normalise_aspect_size_mode(aspect_settings.get("size_mode", "none"))
+
+    if mode == "width":
+        base_w = _safe_aspect_dimension(aspect_settings.get("target_width", 1080), 1080)
+        base_h = _even_size(base_w * ratio_h / ratio_w)
+        allow_scale = True
+    elif mode == "height":
+        base_h = _safe_aspect_dimension(aspect_settings.get("target_height", 1920), 1920)
+        base_w = _even_size(base_h * ratio_w / ratio_h)
+        allow_scale = True
+    elif mode == "custom":
+        base_w = _safe_aspect_dimension(aspect_settings.get("target_width", 1080), 1080)
+        base_h = _safe_aspect_dimension(aspect_settings.get("target_height", 1920), 1920)
+        allow_scale = True
+    else:
+        source_w = _even_size(source_info.get("width", 2))
+        source_h = _even_size(source_info.get("height", 2))
+
+        if source_w / source_h > ratio_w / ratio_h:
+            base_w = source_w
+            base_h = _even_size(source_w * ratio_h / ratio_w)
+        else:
+            base_w = _even_size(source_h * ratio_w / ratio_h)
+            base_h = source_h
+        allow_scale = False
+
+    width_nudge = _safe_aspect_nudge(aspect_settings.get("width_nudge", 0))
+    height_nudge = _safe_aspect_nudge(aspect_settings.get("height_nudge", 0))
+
+    canvas_w = _even_size(base_w + width_nudge)
+    canvas_h = _even_size(base_h + height_nudge)
+
+    if not allow_scale:
+        canvas_w = max(canvas_w, _even_size(source_info.get("width", 2)))
+        canvas_h = max(canvas_h, _even_size(source_info.get("height", 2)))
+
+    return _check_aspect_canvas_limits(canvas_w, canvas_h)
+
+
+def _build_aspect_pad_filter(aspect_settings, source_info=None):
+    ratio_w, ratio_h, _ = _parse_aspect_ratio(aspect_settings.get("ratio", "9:16"))
+    pad_colour = _normalise_ffmpeg_colour(aspect_settings.get("border_colour", "black"), "black")
+    mode = _normalise_aspect_size_mode(aspect_settings.get("size_mode", "none"))
+    width_nudge = _safe_aspect_nudge(aspect_settings.get("width_nudge", 0))
+    height_nudge = _safe_aspect_nudge(aspect_settings.get("height_nudge", 0))
+
+    if mode in ("width", "height", "custom"):
+        canvas_w, canvas_h = _aspect_canvas_dimensions(source_info or {"width": 2, "height": 2}, aspect_settings)
+        return (
+            f"scale={canvas_w}:{canvas_h}:force_original_aspect_ratio=decrease:"
+            f"force_divisible_by=2:flags=lanczos,"
+            f"pad={canvas_w}:{canvas_h}:(ow-iw)/2:(oh-ih)/2:{pad_colour},setsar=1"
+        )
+
+    if source_info and (width_nudge or height_nudge):
+        canvas_w, canvas_h = _aspect_canvas_dimensions(source_info, aspect_settings)
+        return f"pad={canvas_w}:{canvas_h}:(ow-iw)/2:(oh-ih)/2:{pad_colour},setsar=1"
+
+    return (
+        f"pad='if(gt(iw/ih,{ratio_w}/{ratio_h}),iw,ceil(ih*{ratio_w}/{ratio_h}/2)*2)':"
+        f"'if(gt(iw/ih,{ratio_w}/{ratio_h}),ceil(iw*{ratio_h}/{ratio_w}/2)*2,ih)':"
+        f"(ow-iw)/2:(oh-ih)/2:{pad_colour},setsar=1"
+    )
+
+
+def _build_aspect_settings_from_form(form):
+    # The browser UI keeps these as live canvas sliders. Older templates may still send aspect_target_* only.
+    target_width = form.get("aspect_canvas_width", form.get("aspect_target_width", 1080))
+    target_height = form.get("aspect_canvas_height", form.get("aspect_target_height", 1920))
+
+    return {
+        "enabled": _safe_bool(form.get("aspect_enabled", "0")),
+        "ratio": form.get("aspect_ratio", "9:16"),
+        "border_colour": form.get("aspect_border_colour", "#000000"),
+        "size_mode": _normalise_aspect_size_mode(form.get("aspect_size_mode", "none")),
+        "target_width": _safe_aspect_dimension(target_width, 1080),
+        "target_height": _safe_aspect_dimension(target_height, 1920),
+        "width_nudge": _safe_aspect_nudge(form.get("aspect_width_nudge", 0)),
+        "height_nudge": _safe_aspect_nudge(form.get("aspect_height_nudge", 0)),
+    }
+
+
+def _aspect_layer_enabled(aspect_settings):
+    return bool(aspect_settings and aspect_settings.get("enabled"))
+
+
+def _video_info_after_aspect(source_info, aspect_settings):
+    if not _aspect_layer_enabled(aspect_settings):
+        return dict(source_info)
+
+    width, height = _aspect_canvas_dimensions(source_info, aspect_settings)
+    return {
+        "width": int(width),
+        "height": int(height),
+    }
+
+
 _JOB_PROGRESS_UNSET = object()
 
 
@@ -1732,6 +1896,46 @@ def process_speed_video(video_path, output_path, speed_factor=1.25, preview_star
         raise RuntimeError(result.stderr.strip() or "Speed processing failed")
 
 
+# Render a padded canvas around the source video to fit a selected aspect ratio.
+# This is the Flask equivalent of the standalone vid2.sh padding workflow, with safer server-side validation.
+def process_aspect_ratio_video(video_path, output_path, aspect_settings, preview_start=0, preview_seconds=None):
+    source_info = get_video_info(video_path)
+    vf_expr = _build_aspect_pad_filter(aspect_settings, source_info)
+
+    cmd = [
+        FFMPEG_BIN,
+        "-y",
+        "-nostdin",
+        "-hwaccel", "none",
+    ]
+
+    if preview_start is not None and float(preview_start) > 0:
+        cmd += ["-ss", f"{float(preview_start):.6f}"]
+
+    cmd += ["-i", video_path]
+
+    if preview_seconds is not None:
+        cmd += ["-t", f"{max(0.1, float(preview_seconds)):.6f}"]
+
+    cmd += [
+        "-vf", vf_expr,
+        "-map", "0:v:0",
+        "-map", "0:a:0?",
+        "-c:v", "libx264",
+        "-crf", "18",
+        "-preset", "medium",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-movflags", "+faststart",
+        output_path,
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or "Aspect-ratio conversion failed")
+
+
 # Run one post-processing job and publish the resulting video through the existing job polling flow.
 # Reuses the app’s preview_url player loading instead of inventing a second status system.
 def process_video_job(job_id, video_path, output_path, process_kind, settings, preview_start=0, preview_seconds=None):
@@ -1755,6 +1959,16 @@ def process_video_job(job_id, video_path, output_path, process_kind, settings, p
                 video_path,
                 output_path,
                 speed_factor=settings["speed_factor"],
+                preview_start=preview_start,
+                preview_seconds=preview_seconds,
+            )
+        elif process_kind == "aspect":
+            JOBS[job_id]["status"] = "rendering"
+            JOBS[job_id]["message"] = "Converting aspect ratio..."
+            process_aspect_ratio_video(
+                video_path,
+                output_path,
+                aspect_settings=settings["aspect"],
                 preview_start=preview_start,
                 preview_seconds=preview_seconds,
             )
@@ -2335,8 +2549,10 @@ def process_preview(job_id, video_path, srt_path, ass_path, preview_path, settin
     try:
         JOBS[job_id]["status"] = "preparing"
         JOBS[job_id]["message"] = "Reading video resolution..."
-        video_info = get_video_info(video_path)
+        source_video_info = get_video_info(video_path)
         source_duration = get_video_duration(video_path)
+        aspect_settings = settings.get("aspect")
+        video_info = _video_info_after_aspect(source_video_info, aspect_settings)
 
         JOBS[job_id]["status"] = "preparing"
         JOBS[job_id]["message"] = "Generating animated ASS..."
@@ -2356,6 +2572,7 @@ def process_preview(job_id, video_path, srt_path, ass_path, preview_path, settin
             preview_path,
             preview_start=preview_start,
             preview_seconds=preview_seconds,
+            aspect_settings=aspect_settings,
         )
 
         JOBS[job_id]["status"] = "done"
@@ -2585,6 +2802,7 @@ def api_preview():
             "reveal_offset_ms": _safe_int(request.form.get("reveal_offset_ms", 0), 0),
             "out_mode": request.form.get("out_mode", "fade"),
             "overlay": _build_overlay_settings_from_form(request.form),
+            "aspect": _build_aspect_settings_from_form(request.form),
         }
 
 
@@ -2633,7 +2851,7 @@ def api_process_video():
             return jsonify({"ok": False, "error": "Video must be mp4, mov, m4v, or webm."}), 400
 
         process_kind = request.form.get("process_kind", "silence")
-        if process_kind not in ("silence", "speed", "upscale"):
+        if process_kind not in ("silence", "speed", "upscale", "aspect"):
             return jsonify({"ok": False, "error": "Invalid processing mode."}), 400
 
         mode = request.form.get("mode", "preview")
@@ -2666,8 +2884,12 @@ def api_process_video():
             "speed_factor": _safe_float(request.form.get("speed_factor", 1.25), 1.25),
             "upscale_factor": 4 if int(_safe_float(request.form.get("upscale_factor", 2), 2)) >= 4 else 2,
             "upscale_mode": "ai" if request.form.get("upscale_mode", "traditional") == "ai" else "traditional",
+            "aspect": _build_aspect_settings_from_form(request.form),
             "overlay": _build_overlay_settings_from_form(request.form),
         }
+
+        if process_kind == "aspect":
+            settings["aspect"]["enabled"] = True
 
         JOBS[job_id] = {
             "status": "queued",
