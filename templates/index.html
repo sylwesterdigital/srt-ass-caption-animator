@@ -6,6 +6,96 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
+    @font-face {
+      font-family: "InterVariable";
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+      src: url("/assets/fonts/InterVariable.woff2") format("woff2");
+    }
+
+    @font-face {
+      font-family: "InterVariable";
+      font-style: italic;
+      font-weight: 100 900;
+      font-display: swap;
+      src: url("/assets/fonts/InterVariable-Italic.woff2") format("woff2");
+    }
+
+    @font-face { font-family: "Inter"; font-style: normal; font-weight: 100; font-display: swap; src: url("/assets/fonts/Inter-Thin.woff2") format("woff2"); }
+    @font-face { font-family: "Inter"; font-style: italic; font-weight: 100; font-display: swap; src: url("/assets/fonts/Inter-ThinItalic.woff2") format("woff2"); }
+    @font-face { font-family: "Inter"; font-style: normal; font-weight: 200; font-display: swap; src: url("/assets/fonts/Inter-ExtraLight.woff2") format("woff2"); }
+    @font-face { font-family: "Inter"; font-style: italic; font-weight: 200; font-display: swap; src: url("/assets/fonts/Inter-ExtraLightItalic.woff2") format("woff2"); }
+    @font-face { font-family: "Inter"; font-style: normal; font-weight: 300; font-display: swap; src: url("/assets/fonts/Inter-Light.woff2") format("woff2"); }
+    @font-face { font-family: "Inter"; font-style: italic; font-weight: 300; font-display: swap; src: url("/assets/fonts/Inter-LightItalic.woff2") format("woff2"); }
+    @font-face { font-family: "Inter"; font-style: normal; font-weight: 400; font-display: swap; src: url("/assets/fonts/Inter-Regular.woff2") format("woff2"); }
+    @font-face { font-family: "Inter"; font-style: italic; font-weight: 400; font-display: swap; src: url("/assets/fonts/Inter-Italic.woff2") format("woff2"); }
+    @font-face { font-family: "Inter"; font-style: normal; font-weight: 500; font-display: swap; src: url("/assets/fonts/Inter-Medium.woff2") format("woff2"); }
+    @font-face { font-family: "Inter"; font-style: italic; font-weight: 500; font-display: swap; src: url("/assets/fonts/Inter-MediumItalic.woff2") format("woff2"); }
+    @font-face { font-family: "Inter"; font-style: normal; font-weight: 600; font-display: swap; src: url("/assets/fonts/Inter-SemiBold.woff2") format("woff2"); }
+    @font-face { font-family: "Inter"; font-style: italic; font-weight: 600; font-display: swap; src: url("/assets/fonts/Inter-SemiBoldItalic.woff2") format("woff2"); }
+    @font-face { font-family: "Inter"; font-style: normal; font-weight: 700; font-display: swap; src: url("/assets/fonts/Inter-Bold.woff2") format("woff2"); }
+    @font-face { font-family: "Inter"; font-style: italic; font-weight: 700; font-display: swap; src: url("/assets/fonts/Inter-BoldItalic.woff2") format("woff2"); }
+    @font-face { font-family: "Inter"; font-style: normal; font-weight: 800; font-display: swap; src: url("/assets/fonts/Inter-ExtraBold.woff2") format("woff2"); }
+    @font-face { font-family: "Inter"; font-style: italic; font-weight: 800; font-display: swap; src: url("/assets/fonts/Inter-ExtraBoldItalic.woff2") format("woff2"); }
+    @font-face { font-family: "Inter"; font-style: normal; font-weight: 900; font-display: swap; src: url("/assets/fonts/Inter-Black.woff2") format("woff2"); }
+    @font-face { font-family: "Inter"; font-style: italic; font-weight: 900; font-display: swap; src: url("/assets/fonts/Inter-BlackItalic.woff2") format("woff2"); }
+
+    @font-face { font-family: "InterDisplay"; font-style: normal; font-weight: 100; font-display: swap; src: url("/assets/fonts/InterDisplay-Thin.woff2") format("woff2"); }
+    @font-face { font-family: "InterDisplay"; font-style: italic; font-weight: 100; font-display: swap; src: url("/assets/fonts/InterDisplay-ThinItalic.woff2") format("woff2"); }
+    @font-face { font-family: "InterDisplay"; font-style: normal; font-weight: 200; font-display: swap; src: url("/assets/fonts/InterDisplay-ExtraLight.woff2") format("woff2"); }
+    @font-face { font-family: "InterDisplay"; font-style: italic; font-weight: 200; font-display: swap; src: url("/assets/fonts/InterDisplay-ExtraLightItalic.woff2") format("woff2"); }
+    @font-face { font-family: "InterDisplay"; font-style: normal; font-weight: 300; font-display: swap; src: url("/assets/fonts/InterDisplay-Light.woff2") format("woff2"); }
+    @font-face { font-family: "InterDisplay"; font-style: italic; font-weight: 300; font-display: swap; src: url("/assets/fonts/InterDisplay-LightItalic.woff2") format("woff2"); }
+    @font-face { font-family: "InterDisplay"; font-style: normal; font-weight: 400; font-display: swap; src: url("/assets/fonts/InterDisplay-Regular.woff2") format("woff2"); }
+    @font-face { font-family: "InterDisplay"; font-style: italic; font-weight: 400; font-display: swap; src: url("/assets/fonts/InterDisplay-Italic.woff2") format("woff2"); }
+    @font-face { font-family: "InterDisplay"; font-style: normal; font-weight: 500; font-display: swap; src: url("/assets/fonts/InterDisplay-Medium.woff2") format("woff2"); }
+    @font-face { font-family: "InterDisplay"; font-style: italic; font-weight: 500; font-display: swap; src: url("/assets/fonts/InterDisplay-MediumItalic.woff2") format("woff2"); }
+    @font-face { font-family: "InterDisplay"; font-style: normal; font-weight: 600; font-display: swap; src: url("/assets/fonts/InterDisplay-SemiBold.woff2") format("woff2"); }
+    @font-face { font-family: "InterDisplay"; font-style: italic; font-weight: 600; font-display: swap; src: url("/assets/fonts/InterDisplay-SemiBoldItalic.woff2") format("woff2"); }
+    @font-face { font-family: "InterDisplay"; font-style: normal; font-weight: 700; font-display: swap; src: url("/assets/fonts/InterDisplay-Bold.woff2") format("woff2"); }
+    @font-face { font-family: "InterDisplay"; font-style: italic; font-weight: 700; font-display: swap; src: url("/assets/fonts/InterDisplay-BoldItalic.woff2") format("woff2"); }
+    @font-face { font-family: "InterDisplay"; font-style: normal; font-weight: 800; font-display: swap; src: url("/assets/fonts/InterDisplay-ExtraBold.woff2") format("woff2"); }
+    @font-face { font-family: "InterDisplay"; font-style: italic; font-weight: 800; font-display: swap; src: url("/assets/fonts/InterDisplay-ExtraBoldItalic.woff2") format("woff2"); }
+    @font-face { font-family: "InterDisplay"; font-style: normal; font-weight: 900; font-display: swap; src: url("/assets/fonts/InterDisplay-Black.woff2") format("woff2"); }
+    @font-face { font-family: "InterDisplay"; font-style: italic; font-weight: 900; font-display: swap; src: url("/assets/fonts/InterDisplay-BlackItalic.woff2") format("woff2"); }
+
+    @font-feature-values InterVariable {
+      @character-variant {
+        cv01: 1; cv02: 2; cv03: 3; cv04: 4; cv05: 5; cv06: 6; cv07: 7; cv08: 8;
+        cv09: 9; cv10: 10; cv11: 11; cv12: 12; cv13: 13;
+        alt-1: 1; alt-3: 9; open-4: 2; open-6: 3; open-9: 4; lc-l-with-tail: 5; simplified-u: 6; alt-double-s: 7; uc-i-with-serif: 8; uc-g-with-spur: 10; single-story-a: 11; compact-lc-f: 12; compact-lc-t: 13;
+      }
+      @styleset {
+        ss01: 1; ss02: 2; ss03: 3; ss04: 4; ss05: 5; ss06: 6; ss07: 7; ss08: 8;
+        open-digits: 1; disambiguation: 2; disambiguation-except-zero: 4; round-quotes-and-commas: 3; square-punctuation: 7; square-quotes: 8; circled-characters: 5; squared-characters: 6;
+      }
+    }
+
+    @font-feature-values Inter {
+      @character-variant {
+        cv01: 1; cv02: 2; cv03: 3; cv04: 4; cv05: 5; cv06: 6; cv07: 7; cv08: 8;
+        cv09: 9; cv10: 10; cv11: 11; cv12: 12; cv13: 13;
+        alt-1: 1; alt-3: 9; open-4: 2; open-6: 3; open-9: 4; lc-l-with-tail: 5; simplified-u: 6; alt-double-s: 7; uc-i-with-serif: 8; uc-g-with-spur: 10; single-story-a: 11; compact-lc-f: 12; compact-lc-t: 13;
+      }
+      @styleset {
+        ss01: 1; ss02: 2; ss03: 3; ss04: 4; ss05: 5; ss06: 6; ss07: 7; ss08: 8;
+        open-digits: 1; disambiguation: 2; disambiguation-except-zero: 4; round-quotes-and-commas: 3; square-punctuation: 7; square-quotes: 8; circled-characters: 5; squared-characters: 6;
+      }
+    }
+
+    @font-feature-values InterDisplay {
+      @character-variant {
+        cv01: 1; cv02: 2; cv03: 3; cv04: 4; cv05: 5; cv06: 6; cv07: 7; cv08: 8;
+        cv09: 9; cv10: 10; cv11: 11; cv12: 12; cv13: 13;
+        alt-1: 1; alt-3: 9; open-4: 2; open-6: 3; open-9: 4; lc-l-with-tail: 5; simplified-u: 6; alt-double-s: 7; uc-i-with-serif: 8; uc-g-with-spur: 10; single-story-a: 11; compact-lc-f: 12; compact-lc-t: 13;
+      }
+      @styleset {
+        ss01: 1; ss02: 2; ss03: 3; ss04: 4; ss05: 5; ss06: 6; ss07: 7; ss08: 8;
+        open-digits: 1; disambiguation: 2; disambiguation-except-zero: 4; round-quotes-and-commas: 3; square-punctuation: 7; square-quotes: 8; circled-characters: 5; squared-characters: 6;
+      }
+    }
+
     :root {
       --bg: #0c0f14;
       --panel: rgba(18, 22, 30, 0.82);
@@ -22,6 +112,18 @@
       --button-primary-bg: #ffffff;
       --button-primary-text: #000000;
       --accent: #7dd3fc;
+      --app-font-family: "Inter", sans-serif;
+      --app-display-font-family: "InterDisplay", "Inter", sans-serif;
+      font-family: var(--app-font-family);
+    }
+
+    @supports (font-variation-settings: normal) {
+      :root {
+        --app-font-family: "InterVariable", "Inter", sans-serif;
+        --app-display-font-family: "InterVariable", "InterDisplay", "Inter", sans-serif;
+        font-family: var(--app-font-family);
+        font-optical-sizing: auto;
+      }
     }
 
     body[data-theme="light"] {
@@ -49,7 +151,7 @@
       height: 100%;
       background: var(--bg);
       color: var(--text);
-      font-family: Arial, sans-serif;
+      font-family: var(--app-font-family);
       overflow: hidden;
     }
 
@@ -91,6 +193,106 @@
       display: grid;
       place-items: center;
       overflow: visible;
+    }
+
+    .media-frame-shell {
+      position: relative;
+      display: inline-grid;
+      place-items: center;
+      width: fit-content;
+      height: fit-content;
+      max-width: 100%;
+      max-height: 100%;
+      isolation: isolate;
+    }
+
+    .processing-ring {
+      position: absolute;
+      inset: -10px;
+      border-radius: 20px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 180ms ease;
+      z-index: 1;
+    }
+
+    .processing-ring::before,
+    .processing-ring::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+    }
+
+    .processing-ring::before {
+      padding: 3px;
+      background:
+        linear-gradient(120deg,
+          #ff4d6d 0%,
+          #ff9f1c 14%,
+          #ffe66d 28%,
+          #4dff88 42%,
+          #3dd6ff 57%,
+          #6c63ff 72%,
+          #c774ff 86%,
+          #ff4d6d 100%);
+      background-size: 260% 260%;
+      background-position: 0% 50%;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.12);
+      animation: processing-ring-gradient 2.8s ease-in-out infinite alternate;
+    }
+
+    .processing-ring::after {
+      inset: -6px;
+      padding: 4px;
+      background:
+        linear-gradient(115deg,
+          rgba(255,255,255,0.00) 0%,
+          rgba(255,255,255,0.00) 32%,
+          rgba(255,255,255,0.42) 50%,
+          rgba(255,255,255,0.00) 68%,
+          rgba(255,255,255,0.00) 100%),
+        linear-gradient(120deg,
+          rgba(255,77,109,0.20) 0%,
+          rgba(255,159,28,0.20) 14%,
+          rgba(255,230,109,0.20) 28%,
+          rgba(77,255,136,0.20) 42%,
+          rgba(61,214,255,0.20) 57%,
+          rgba(108,99,255,0.20) 72%,
+          rgba(199,116,255,0.20) 86%,
+          rgba(255,77,109,0.20) 100%);
+      background-size: 220% 220%, 260% 260%;
+      background-position: 0% 50%, 0% 50%;
+      filter: blur(12px);
+      opacity: 0.9;
+      z-index: -1;
+      animation: processing-ring-reflection 3.4s ease-in-out infinite alternate;
+    }
+
+    .media-frame-shell.is-processing .processing-ring {
+      opacity: 1;
+    }
+
+    @keyframes processing-ring-gradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    @keyframes processing-ring-reflection {
+      0% { background-position: 0% 50%, 0% 50%; opacity: 0.72; }
+      50% { background-position: 100% 50%, 100% 50%; opacity: 1; }
+      100% { background-position: 0% 50%, 0% 50%; opacity: 0.72; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .processing-ring::before,
+      .processing-ring::after {
+        animation-duration: 8s;
+      }
     }
 
     .media-frame {
@@ -177,6 +379,21 @@
       border-color: var(--button-primary-bg);
     }
 
+    .transport-button.icon-only,
+    .project-button.icon,
+    .status-toggle-button,
+    .sidebar-dock-toggle,
+    .sidebar-dock-show-toggle {
+      width: 38px;
+      min-width: 38px;
+      height: 38px;
+      min-height: 38px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     .transport-time {
       min-width: 44px;
       color: var(--muted);
@@ -255,7 +472,7 @@
       border: 1px solid rgba(255,255,255,0.1);
       border-radius: 12px;
       background: var(--card-bg);
-      font-family: Arial, sans-serif;
+      font-family: var(--app-font-family);
     }
 
     .gradient-stops-editor[hidden] {
@@ -631,9 +848,9 @@
 
     .status {
       position: absolute;
-      left: 16px;
-      bottom: 16px;
-      max-width: min(520px, calc(100vw - 32px));
+      left: 58px;
+      top: 16px;
+      max-width: min(560px, calc(100vw - 96px));
       display: none;
       padding: 12px 14px;
       border-radius: 14px;
@@ -642,7 +859,7 @@
       font-size: 14px;
       line-height: 1.4;
       background: var(--panel);
-      z-index: 30;
+      z-index: 96;
     }
 
     .status.show { display: block; }
@@ -802,7 +1019,7 @@
       display: block;
       margin-top: 8px;
       color: var(--muted);
-      font-family: Arial, sans-serif;
+      font-family: var(--app-font-family);
       font-size: 12px;
     }
 
@@ -1028,6 +1245,10 @@
       font-weight: bold;
       line-height: 1;
       padding: 5px 7px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
     }
 
     .asset-mini-button:hover {
@@ -1040,8 +1261,589 @@
       background: rgba(127, 29, 29, 0.24);
     }
 
-    .asset-mini-button.danger:hover {
+    .asset-thumb {
+      width: 56px;
+      height: 56px;
+      object-fit: contain;
+      background: rgba(0,0,0,0.32);
+    }
+
+    .trim-panel {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: auto;
+      max-width: none;
+      display: none;
+      gap: 4px;
+      padding: 0 18px 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      z-index: 92;
+      pointer-events: none;
+    }
+
+    .trim-panel.show {
+      display: grid;
+    }
+
+    .trim-panel.show .trim-timeline,
+    .trim-panel.show .trim-scrub-timeline {
+      pointer-events: auto;
+    }
+
+    .trim-panel-row,
+    .trim-segment-list {
+      display: none;
+    }
+
+    .trim-timeline {
+      position: relative;
+      height: 54px;
+      overflow: visible;
+      cursor: crosshair;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .trim-timeline:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 4px;
+      border-radius: 10px;
+    }
+
+    .trim-timeline-track {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      top: 24px;
+      height: 3px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.28);
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18);
+    }
+
+    .trim-timeline-ticks {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      top: 40px;
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 9px;
+      pointer-events: none;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .trim-scrub-timeline {
+      position: relative;
+      height: 20px;
+      cursor: pointer;
+      user-select: none;
+      touch-action: none;
+      opacity: 0.92;
+    }
+
+    .trim-scrub-track {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      top: 9px;
+      height: 2px;
+      border-radius: 999px;
+      background: rgba(125, 211, 252, 0.38);
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.16);
+    }
+
+    .trim-scrub-playhead {
+      position: absolute;
+      top: -5px;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--accent);
+      border: 2px solid rgba(255,255,255,0.9);
+      transform: translateX(-50%);
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.38), 0 7px 16px rgba(0,0,0,0.28);
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    .trim-waveform-strip,
+    .trim-audio-mix-strip,
+    .trim-filmstrip-strip {
+      position: relative;
+      display: none;
+      height: 34px;
+      margin-left: 18px;
+      margin-right: 18px;
+      overflow: hidden;
+      border-radius: 8px;
+      background: rgba(0,0,0,0.22);
+      border: 1px solid rgba(255,255,255,0.08);
+      pointer-events: none;
+    }
+
+    .trim-waveform-strip.show,
+    .trim-audio-mix-strip.show,
+    .trim-filmstrip-strip.show {
+      display: block;
+    }
+
+    .trim-audio-mix-strip {
+      height: 30px;
+      border-color: rgba(168, 85, 247, 0.26);
+      background: rgba(88, 28, 135, 0.18);
+    }
+
+    .trim-filmstrip-strip {
+      height: 42px;
+    }
+
+    .trim-waveform-strip canvas,
+    .trim-audio-mix-strip canvas,
+    .trim-filmstrip-strip canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .trim-panel.show .trim-waveform-strip.show,
+    .trim-panel.show .trim-audio-mix-strip.show,
+    .trim-panel.show .trim-filmstrip-strip.show {
+      pointer-events: auto;
+      cursor: pointer;
+    }
+
+    .audio-mix-row {
+      display: none;
+      grid-template-columns: auto auto minmax(120px, 220px) auto auto minmax(0, 1fr);
+      align-items: center;
+      gap: 8px;
+      margin: 0 18px 2px;
+      pointer-events: auto;
+    }
+
+    .trim-panel.show .audio-mix-row {
+      display: grid;
+    }
+
+    .audio-mix-button,
+    .audio-mix-icon-button {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      min-height: 28px;
+      background: var(--button-bg);
+      color: var(--button-text);
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .audio-mix-button {
+      padding: 0 10px;
+    }
+
+    .audio-mix-button:disabled {
+      opacity: 0.42;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .audio-mix-icon-button {
+      width: 30px;
+      min-width: 30px;
+      padding: 0;
+    }
+
+    .audio-mix-icon-button.is-open,
+    .audio-mix-icon-button.is-active {
+      border-color: rgba(168, 85, 247, 0.58);
+      background: rgba(168, 85, 247, 0.18);
+    }
+
+    .audio-mix-select {
+      min-width: 0;
+      width: 100%;
+      height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--button-bg);
+      color: var(--button-text);
+      font: inherit;
+      font-size: 11px;
+      padding: 0 8px;
+    }
+
+    .audio-mix-popover-wrap {
+      position: relative;
+      display: inline-flex;
+    }
+
+    .audio-mix-popover {
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 8px);
+      transform: translateX(-50%);
+      display: none;
+      min-width: 172px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.34);
+      backdrop-filter: blur(12px);
+      z-index: 98;
+    }
+
+    .audio-mix-popover.show {
+      display: grid;
+      gap: 7px;
+    }
+
+    .audio-mix-popover label {
+      display: grid;
+      grid-template-columns: 46px 1fr;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .audio-mix-popover input[type="range"] {
+      width: 100%;
+      accent-color: #a855f7;
+    }
+
+    .audio-mix-readout {
+      min-width: 0;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .trim-strip-playhead {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #22c55e;
+      transform: translateX(-50%);
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.32), 0 0 10px rgba(34,197,94,0.56);
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    .trim-segment-visual,
+    .trim-draft-range {
+      position: absolute;
+      top: -3px;
+      height: 9px;
+      border-radius: 999px;
+    }
+
+    .trim-segment-visual {
+      background: rgba(34, 197, 94, 0.44);
+      border: 1px solid rgba(34, 197, 94, 0.82);
+      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.10);
+    }
+
+    .trim-draft-range {
+      background: rgba(250, 204, 21, 0.30);
+      border: 1px dashed rgba(250, 204, 21, 0.90);
+      display: none;
+    }
+
+    .trim-draft-range.show {
+      display: block;
+    }
+
+    .trim-handle {
+      position: absolute;
+      top: 50%;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(0,0,0,0.72);
+      border-radius: 4px;
+      background: #22c55e;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.24), 0 6px 16px rgba(0,0,0,0.30);
+      cursor: ew-resize;
+      transform: translate(-50%, -50%) rotate(45deg);
+      z-index: 5;
+      touch-action: none;
+    }
+
+    .trim-handle::after {
+      display: none;
+    }
+
+    .trim-handle.trim-handle-end {
+      background: #f59e0b;
+    }
+
+    .trim-handle.trim-draft-handle {
+      background: #22c55e;
+      border-color: rgba(255,255,255,0.92);
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.22), 0 8px 18px rgba(0,0,0,0.32);
+    }
+
+    .trim-handle.is-active {
+      border-color: #ffffff;
+      box-shadow: 0 0 0 4px rgba(125, 211, 252, 0.22), 0 10px 24px rgba(0,0,0,0.34);
+    }
+
+    .trim-handle.is-last-nudged {
+      border-color: #ef4444;
+      box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.28), 0 10px 24px rgba(0,0,0,0.34);
+    }
+
+    .trim-point-label {
+      position: absolute;
+      top: 14px;
+      min-width: 14px;
+      height: 14px;
+      display: grid;
+      place-items: center;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: rgba(2, 6, 12, 0.78);
+      border: 1px solid rgba(255,255,255,0.18);
+      color: #ffffff;
+      font-size: 9px;
+      line-height: 1;
+      font-weight: 800;
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    body[data-theme="light"] .trim-point-label {
+      background: rgba(255,255,255,0.9);
+      color: #111827;
+      border-color: rgba(15,23,42,0.16);
+    }
+
+    .trim-point-time-editor {
+      position: absolute;
+      top: -72px;
+      transform: translateX(-50%);
+      display: grid;
+      gap: 4px;
+      min-width: 116px;
+      padding: 6px;
+      border: 1px solid rgba(125, 211, 252, 0.52);
+      border-radius: 10px;
+      background: rgba(2, 6, 12, 0.86);
+      box-shadow: 0 16px 34px rgba(0,0,0,0.36);
+      z-index: 9;
+    }
+
+    body[data-theme="light"] .trim-point-time-editor {
+      background: rgba(255,255,255,0.96);
+      box-shadow: 0 16px 34px rgba(15,23,42,0.16);
+    }
+
+    .trim-point-time-editor-start {
+      left: 0;
+    }
+
+    .trim-point-time-editor-end {
+      left: 100%;
+    }
+
+    .trim-point-time-editor span {
+      color: var(--muted);
+      font-size: 9px;
+      line-height: 1;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      pointer-events: none;
+    }
+
+    .trim-point-time-editor input {
+      width: 100%;
+      height: 24px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--button-bg);
+      color: var(--button-text);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      padding: 0 7px;
+      outline: none;
+    }
+
+    .trim-point-time-editor input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.18);
+    }
+
+    .trim-playhead {
+      position: absolute;
+      top: -9px;
+      width: 2px;
+      height: 21px;
+      background: #ffffff;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.42), 0 0 12px rgba(255,255,255,0.52);
+      transform: translateX(-50%);
+      pointer-events: none;
+      z-index: 6;
+    }
+
+    .trim-help-row {
+      display: none;
+    }
+
+    .trim-action-button {
+      display: none;
+    }
+
+    .custom-video-controls.trim-mode-active .trim-action-button {
+      display: inline-flex;
+    }
+
+    .transport-button.is-active {
+      border-color: rgba(34, 197, 94, 0.68);
+      background: rgba(34, 197, 94, 0.18);
+      color: #dcfce7;
+    }
+
+    .icon-mask {
+      width: 18px;
+      height: 18px;
+      display: inline-block;
+      flex: 0 0 auto;
+      background: currentColor;
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+      -webkit-mask-position: center;
+      mask-position: center;
+      -webkit-mask-size: contain;
+      mask-size: contain;
+    }
+
+    .icon-loop { -webkit-mask-image: url('/assets/images/icons/loop.svg'); mask-image: url('/assets/images/icons/loop.svg'); }
+    .icon-volume { -webkit-mask-image: url('/assets/images/icons/volume.svg'); mask-image: url('/assets/images/icons/volume.svg'); }
+    .icon-headphone { -webkit-mask-image: url('/assets/images/icons/headphone.svg'); mask-image: url('/assets/images/icons/headphone.svg'); }
+    .icon-config { -webkit-mask-image: url('/assets/images/icons/config.svg'); mask-image: url('/assets/images/icons/config.svg'); }
+    .icon-delete { -webkit-mask-image: url('/assets/images/icons/delete.svg'); mask-image: url('/assets/images/icons/delete.svg'); }
+    .icon-show { -webkit-mask-image: url('/assets/images/icons/show.svg'); mask-image: url('/assets/images/icons/show.svg'); }
+    .icon-hide { -webkit-mask-image: url('/assets/images/icons/hide.svg'); mask-image: url('/assets/images/icons/hide.svg'); }
+
+    .sidebar-dock-toggle,
+    .sidebar-dock-show-toggle,
+    .status-toggle-button {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      width: 34px;
+      height: 34px;
+      display: inline-grid;
+      place-items: center;
+      background: var(--panel);
+      color: var(--text);
+      backdrop-filter: blur(12px);
+      cursor: pointer;
+      z-index: 95;
+    }
+
+    .sidebar-dock-toggle {
+      flex: 0 0 auto;
+    }
+
+    .sidebar-dock-show-toggle,
+    .status-toggle-button {
+      position: fixed;
+    }
+
+    .sidebar-dock-show-toggle {
+      display: none;
+      left: 16px;
+      top: 64px;
+    }
+
+    .status-toggle-button {
+      left: 16px;
+      top: 16px;
+    }
+
+    .app.sidebar-collapsed {
+      grid-template-columns: 0 minmax(0, 1fr);
+    }
+
+    .app.sidebar-collapsed .project-sidebar {
+      width: 0;
+      min-width: 0;
+      padding: 0;
+      border-right: 0;
+      overflow: hidden;
+    }
+
+    .app.sidebar-collapsed .sidebar-dock-show-toggle {
+      display: inline-grid;
+    }
+
+    .status.is-user-hidden {
+      display: none !important;
+    }
+
+    .stage .status-toggle-button {
+      position: absolute;
+      left: 16px;
+      top: 16px;
+    }
+
+    .stage .status {
+      left: 58px;
+      top: 16px;
+    }
+
+    .job-log {
+      margin-top: 8px;
+      max-height: 150px;
+      overflow: auto;
+      display: grid;
+      gap: 4px;
+      border-top: 1px solid rgba(255,255,255,0.12);
+      padding-top: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      line-height: 1.35;
+      color: rgba(243,244,246,0.82);
+    }
+
+    .job-log-row {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .job-cancel-button {
+      appearance: none;
+      border: 1px solid rgba(248, 113, 113, 0.38);
+      border-radius: 10px;
       background: rgba(127, 29, 29, 0.38);
+      color: #fecaca;
+      min-height: 30px;
+      padding: 0 10px;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 8px;
     }
 
 
@@ -1227,7 +2029,7 @@
       border-radius: 9px;
       background: rgba(0,0,0,0.22);
       color: var(--text);
-      font-family: Arial, sans-serif;
+      font-family: var(--app-font-family);
       font-size: 10px;
       outline: none;
     }
@@ -1249,6 +2051,10 @@
       display: flex;
       justify-content: flex-end;
       gap: 5px;
+    }
+
+    .caption-row:not(.is-active) .caption-trim-point-button {
+      display: none;
     }
 
     .caption-editor-dirty {
@@ -1591,7 +2397,8 @@
 
     .easy-toolbar-button,
     .easy-toolbar-input,
-    .easy-toolbar-color {
+    .easy-toolbar-color,
+    .easy-toolbar-toggle {
       appearance: none;
       border: 1px solid var(--line);
       border-radius: 11px;
@@ -1623,6 +2430,36 @@
       width: 40px;
       padding: 2px;
       cursor: pointer;
+    }
+
+    .easy-toolbar-toggle,
+    .transport-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 10px;
+      cursor: pointer;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .easy-toolbar-toggle input,
+    .transport-toggle input {
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      accent-color: var(--accent);
+    }
+
+    .transport-toggle {
+      min-height: 32px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
     }
 
     .config-overlay {
@@ -1704,8 +2541,10 @@
   </style>
 </head>
 <body data-theme="dark" data-ui-mode="pro">
-  <div class="app">
-
+  <div class="app" id="appRoot">
+    <button id="sidebarDockShowToggle" type="button" class="sidebar-dock-show-toggle" aria-label="Show project dock" aria-pressed="true">
+      <span class="icon-mask icon-show" aria-hidden="true"></span>
+    </button>
 
     <aside class="project-sidebar" id="projectSidebar">
       <div class="project-sidebar-header">
@@ -1713,8 +2552,11 @@
           <img class="brand-logo" src="/assets/images/icons/logo.svg" alt="Caption Animator">
           <div class="project-sidebar-title">Projects</div>
         </div>
+        <button id="sidebarDockToggle" type="button" class="sidebar-dock-toggle" aria-label="Hide project dock" aria-pressed="false">
+          <span class="icon-mask icon-hide" aria-hidden="true"></span>
+        </button>
         <div class="project-header-actions">
-          <button id="configButton" type="button" class="project-button icon" aria-label="Open app settings">⚙</button>
+          <button id="configButton" type="button" class="project-button icon" aria-label="Open app settings"><span class="icon-mask icon-config" aria-hidden="true"></span></button>
           <button id="newProjectBtn" type="button" class="project-button primary">New</button>
         </div>
       </div>
@@ -1792,6 +2634,10 @@
         <div id="easyToolbar" class="easy-toolbar" aria-label="Easy mode controls">
           <button id="easyGetCaptionsBtn" type="button" class="easy-toolbar-button primary">Get captions</button>
           <button id="easyRenderPreviewBtn" type="button" class="easy-toolbar-button">Preview</button>
+          <label class="easy-toolbar-toggle" title="Burn captions into Render full output">
+            <input id="easyBurnCaptionsToggle" type="checkbox" checked aria-label="Burn captions on Render full">
+            <span>Captions</span>
+          </label>
           <button id="easyRenderFullBtn" type="button" class="easy-toolbar-button">Render full</button>
           <button id="easyFontGalleryBtn" type="button" class="easy-toolbar-button">Fonts</button>
           <input id="easyFontSizeInput" class="easy-toolbar-input" type="number" min="8" max="512" step="1" value="24" aria-label="Caption font size">
@@ -1806,6 +2652,7 @@
 
           <!-- Backend file input used by lil-gui subtitle actions and drag/drop import. -->
           <input type="file" id="srt" accept=".srt,.vtt">
+          <input type="file" id="audioMixInput" accept=".mp3,.wav,.m4a,.aac,.flac,.ogg,.opus,audio/*" multiple>
 
           <!-- Backend preset selector used by preset storage and lil-gui preset sync. -->
           <select id="presetSelect" title="Choose preset">
@@ -1837,7 +2684,9 @@
 
       <div class="video-shell" id="videoShell">
         <div class="media-stage">
-          <div class="media-frame" id="mediaFrame">
+          <div class="media-frame-shell" id="mediaFrameShell">
+            <div id="processingRing" class="processing-ring" aria-hidden="true"></div>
+            <div class="media-frame" id="mediaFrame">
             <div id="placeholder" class="placeholder">
               Choose a video and SRT, drag the helper text on the real video area, then render the preview.
             </div>
@@ -1862,8 +2711,63 @@
 
             <div id="cropOverlay" class="crop-overlay" aria-hidden="true">
               <div id="cropRect" class="crop-rect"></div>
-              <div id="cropHelp" class="crop-help">Draw a rectangle, then press Enter to confirm. Esc clears draft. Cmd/Ctrl+Z undo, Cmd/Ctrl+Shift+Z or Ctrl+Y redo.</div>
+              <div id="cropHelp" class="crop-help">Draw a rectangle, then press Enter to confirm. Esc clears draft. Cmd/Ctrl+Z undo, Cmd/Ctrl+Shift+Z or Ctrl+Y redo across editor changes.</div>
             </div>
+          </div>
+        </div>
+        </div>
+
+        <div id="trimPanel" class="trim-panel" aria-label="Trim ranges">
+          <div class="trim-help-row">
+            <span>Click the line to drop start/end diamonds. Drag diamonds to nudge. Delete removes selected range. Esc clears draft.</span>
+            <span id="trimDraftLabel">—</span>
+          </div>
+          <div class="audio-mix-row" id="audioMixRow" aria-label="Additional audio mixer">
+            <button id="addAudioMixBtn" type="button" class="audio-mix-button">+ audio</button>
+            <button id="removeAudioMixBtn" type="button" class="audio-mix-button" disabled>- audio</button>
+            <select id="activeAudioTrackSelect" class="audio-mix-select" aria-label="Additional audio track"></select>
+            <span class="audio-mix-popover-wrap">
+              <button id="audioVolumeToggleBtn" type="button" class="audio-mix-icon-button" aria-label="Audio volume controls" aria-pressed="false"><span class="icon-mask icon-volume" aria-hidden="true"></span></button>
+              <span id="audioVolumePopover" class="audio-mix-popover">
+                <label>source <input id="audioSourceVolumeRange" type="range" min="0" max="3" step="0.01" value="1"></label>
+                <label>track <input id="audioTrackVolumeRange" type="range" min="0" max="3" step="0.01" value="1"></label>
+              </span>
+            </span>
+            <span class="audio-mix-popover-wrap">
+              <button id="audioPanToggleBtn" type="button" class="audio-mix-icon-button" aria-label="Additional audio pan controls" aria-pressed="false"><span class="icon-mask icon-headphone" aria-hidden="true"></span></button>
+              <span id="audioPanPopover" class="audio-mix-popover">
+                <label>L / R <input id="audioTrackPanRange" type="range" min="-1" max="1" step="0.01" value="0"></label>
+              </span>
+            </span>
+            <span id="audioMixReadout" class="audio-mix-readout">No additional audio</span>
+          </div>
+          <div id="trimTimeline" class="trim-timeline" tabindex="0" aria-label="Trim timeline">
+            <div class="trim-timeline-ticks">
+              <span id="trimTimelineStartLabel">0:00</span>
+              <span id="trimTimelineEndLabel">0:00</span>
+            </div>
+            <div class="trim-timeline-track" id="trimTimelineTrack">
+              <div id="trimSegmentsLayer"></div>
+              <div id="trimDraftRange" class="trim-draft-range"></div>
+              <div id="trimPlayhead" class="trim-playhead"></div>
+            </div>
+          </div>
+          <div id="trimScrubTimeline" class="trim-scrub-timeline" tabindex="0" aria-label="Trim playhead timeline">
+            <div id="trimScrubTrack" class="trim-scrub-track">
+              <div id="trimScrubPlayhead" class="trim-scrub-playhead"></div>
+            </div>
+          </div>
+          <div id="trimWaveformStrip" class="trim-waveform-strip" aria-hidden="true">
+            <canvas id="trimWaveformCanvas"></canvas>
+            <div id="trimWaveformPlayhead" class="trim-strip-playhead"></div>
+          </div>
+          <div id="trimAudioMixStrip" class="trim-audio-mix-strip" aria-hidden="true">
+            <canvas id="trimAudioMixCanvas"></canvas>
+            <div id="trimAudioMixPlayhead" class="trim-strip-playhead"></div>
+          </div>
+          <div id="trimFilmstripStrip" class="trim-filmstrip-strip" aria-hidden="true">
+            <canvas id="trimFilmstripCanvas"></canvas>
+            <div id="trimFilmstripPlayhead" class="trim-strip-playhead"></div>
           </div>
         </div>
 
@@ -1875,9 +2779,21 @@
           <button id="muteBtn" type="button" class="transport-button" aria-label="Mute video">Mute</button>
           <input id="volumeRange" class="transport-volume" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volume">
           <button id="fullscreenBtn" type="button" class="transport-button" aria-label="Fullscreen preview">Full</button>
+          <label class="transport-toggle" title="Burn captions into Render full output">
+            <input id="burnCaptionsToggle" type="checkbox" checked aria-label="Burn captions on Render full">
+            <span>Captions</span>
+          </label>
+          <button id="trimToggleBtn" type="button" class="transport-button" aria-label="Show trim timeline" aria-pressed="false">Trim</button>
+          <button id="trimLoopBtn" type="button" class="transport-button trim-action-button icon-only" aria-label="Loop kept trim ranges" aria-pressed="false" title="Loop kept trim ranges"><span class="icon-mask icon-loop" aria-hidden="true"></span></button>
+          <button id="trimClearTransportBtn" type="button" class="transport-button trim-action-button" aria-label="Clear all trim points">Clear Trim</button>
+          <button id="trimPreviewTransportBtn" type="button" class="transport-button trim-action-button" aria-label="Render trim preview">Trim preview</button>
+          <button id="trimFullTransportBtn" type="button" class="transport-button trim-action-button" aria-label="Render full trimmed video">Trim full</button>
         </div>
       </div>
 
+      <button id="statusToggleBtn" type="button" class="status-toggle-button" aria-label="Hide status" aria-pressed="false">
+        <span class="icon-mask icon-hide" aria-hidden="true"></span>
+      </button>
       <div id="status" class="status"></div>
 
       <div class="hint">
@@ -1960,12 +2876,24 @@
     const muteBtn = document.getElementById('muteBtn');
     const volumeRange = document.getElementById('volumeRange');
     const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const burnCaptionsToggle = document.getElementById('burnCaptionsToggle');
+    const trimToggleBtn = document.getElementById('trimToggleBtn');
+    const trimLoopBtn = document.getElementById('trimLoopBtn');
+    const trimClearTransportBtn = document.getElementById('trimClearTransportBtn');
+    const trimPreviewTransportBtn = document.getElementById('trimPreviewTransportBtn');
+    const trimFullTransportBtn = document.getElementById('trimFullTransportBtn');
     const placeholder = document.getElementById('placeholder');
     const selectionMeta = document.getElementById('selectionMeta');
     const statusEl = document.getElementById('status');
+    const statusToggleBtn = document.getElementById('statusToggleBtn');
+    const sidebarDockToggle = document.getElementById('sidebarDockToggle');
+    const sidebarDockShowToggle = document.getElementById('sidebarDockShowToggle');
+    const appRoot = document.getElementById('appRoot');
     const openPreview = document.getElementById('openPreview');
     const openAss = document.getElementById('openAss');
     const videoShell = document.getElementById('videoShell');
+    const mediaFrameShell = document.getElementById('mediaFrameShell');
+    const processingRing = document.getElementById('processingRing');
     const mediaFrame = document.getElementById('mediaFrame');
     const helperLayer = document.getElementById('helperLayer');
     const helperCaption = document.getElementById('helperCaption');
@@ -1977,6 +2905,45 @@
     const cropOverlay = document.getElementById('cropOverlay');
     const cropRect = document.getElementById('cropRect');
     const cropHelp = document.getElementById('cropHelp');
+    const trimPanel = document.getElementById('trimPanel');
+    const trimStartInput = document.getElementById('trimStartInput');
+    const trimEndInput = document.getElementById('trimEndInput');
+    const trimSetStartBtn = document.getElementById('trimSetStartBtn');
+    const trimSetEndBtn = document.getElementById('trimSetEndBtn');
+    const trimAddSegmentBtn = document.getElementById('trimAddSegmentBtn');
+    const trimClearDraftBtn = document.getElementById('trimClearDraftBtn');
+    const trimSegmentList = document.getElementById('trimSegmentList');
+    const trimTimeline = document.getElementById('trimTimeline');
+    const trimTimelineTrack = document.getElementById('trimTimelineTrack');
+    const trimSegmentsLayer = document.getElementById('trimSegmentsLayer');
+    const trimDraftRange = document.getElementById('trimDraftRange');
+    const trimPlayhead = document.getElementById('trimPlayhead');
+    const trimDraftLabel = document.getElementById('trimDraftLabel');
+    const trimTimelineStartLabel = document.getElementById('trimTimelineStartLabel');
+    const trimTimelineEndLabel = document.getElementById('trimTimelineEndLabel');
+    const trimScrubTimeline = document.getElementById('trimScrubTimeline');
+    const trimScrubTrack = document.getElementById('trimScrubTrack');
+    const trimScrubPlayhead = document.getElementById('trimScrubPlayhead');
+    const trimWaveformStrip = document.getElementById('trimWaveformStrip');
+    const trimWaveformCanvas = document.getElementById('trimWaveformCanvas');
+    const trimWaveformPlayhead = document.getElementById('trimWaveformPlayhead');
+    const trimAudioMixStrip = document.getElementById('trimAudioMixStrip');
+    const trimAudioMixCanvas = document.getElementById('trimAudioMixCanvas');
+    const trimAudioMixPlayhead = document.getElementById('trimAudioMixPlayhead');
+    const addAudioMixBtn = document.getElementById('addAudioMixBtn');
+    const audioMixInput = document.getElementById('audioMixInput');
+    const activeAudioTrackSelect = document.getElementById('activeAudioTrackSelect');
+    const audioVolumeToggleBtn = document.getElementById('audioVolumeToggleBtn');
+    const audioPanToggleBtn = document.getElementById('audioPanToggleBtn');
+    const audioVolumePopover = document.getElementById('audioVolumePopover');
+    const audioPanPopover = document.getElementById('audioPanPopover');
+    const audioSourceVolumeRange = document.getElementById('audioSourceVolumeRange');
+    const audioTrackVolumeRange = document.getElementById('audioTrackVolumeRange');
+    const audioTrackPanRange = document.getElementById('audioTrackPanRange');
+    const audioMixReadout = document.getElementById('audioMixReadout');
+    const trimFilmstripStrip = document.getElementById('trimFilmstripStrip');
+    const trimFilmstripCanvas = document.getElementById('trimFilmstripCanvas');
+    const trimFilmstripPlayhead = document.getElementById('trimFilmstripPlayhead');
     const presetSelect = document.getElementById('presetSelect');
     const savePresetBtn = document.getElementById('savePresetBtn');
     const saveAsPresetBtn = document.getElementById('saveAsPresetBtn');
@@ -1999,6 +2966,7 @@
     const easyGetCaptionsBtn = document.getElementById('easyGetCaptionsBtn');
     const easyRenderPreviewBtn = document.getElementById('easyRenderPreviewBtn');
     const easyRenderFullBtn = document.getElementById('easyRenderFullBtn');
+    const easyBurnCaptionsToggle = document.getElementById('easyBurnCaptionsToggle');
     const easyFontGalleryBtn = document.getElementById('easyFontGalleryBtn');
     const easyFontSizeInput = document.getElementById('easyFontSizeInput');
     const easyTextColourInput = document.getElementById('easyTextColourInput');
@@ -2106,11 +3074,35 @@
     let availableFonts = [];    
 /* Keep metadata for the last cached source video available across reloads. */
     let cachedVideoMeta = readCachedVideoMetaFromStorage();
+    let trimDragState = null;
+    let trimScrubDragState = null;
+    let trimDraftStart = null;
+    let trimActiveSegmentIndex = -1;
+    let trimActiveEdge = null;
+    let trimLastNudgedPoint = null;
+    let trimPlaybackSegmentIndex = -1;
+    let trimMediaRenderToken = 0;
+    const trimWaveformCache = new Map();
+    const trimFilmstripCache = new Map();
+    const audioTrackWaveformCache = new Map();
+    const audioTrackBufferCache = new Map();
+    let audioMixTracks = [];
+    let activeAudioTrackId = null;
+    let liveAudioContext = null;
+    let liveVideoSourceNode = null;
+    let liveMasterGainNode = null;
+    let liveSourceGainNode = null;
+    let liveTrackNodes = [];
+    let liveAudioRestartTimer = null;
     let showingRenderedOutput = false;
     let cropDraft = null;
     let cropDrawState = null;
     const cropUndoStack = [];
     const cropRedoStack = [];
+    const appUndoStack = [];
+    const appRedoStack = [];
+    let appHistoryRestoring = false;
+    let appHistoryInteractionOpen = false;
 
 
 
@@ -2187,6 +3179,7 @@
 
       preview_start: 0,
       preview_duration: 8,
+      render_burn_captions: true,
 
       silence_threshold: -40,
       min_silence_duration: 0.4,
@@ -2211,6 +3204,34 @@
       crop_overlay_enabled: false,
       crop_draw_enabled: false,
       crop_readout: 'Load a video to set a crop area.',
+
+      trim_panel_enabled: false,
+      trim_play_ranges_only: true,
+      trim_loop_playback: false,
+      trim_waveform_enabled: true,
+      trim_filmstrip_enabled: true,
+      trim_caption_mode: 'adjust',
+      trim_start: 0,
+      trim_end: 0,
+      trim_segments_json: '[]',
+      trim_readout: 'No trim ranges.',
+
+      grading_preset: 'none',
+      grading_tint_colour: '#f59e0b',
+      grading_tint_strength: 0.35,
+      grading_contrast: 1,
+      grading_saturation: 1,
+      grading_exposure: 0,
+      grading_sharpness: 0,
+      grading_blur: 0,
+      grading_vignette: 0,
+      grading_vignette_strength: 0,
+      grading_vignette_colour: '#000000',
+      grading_vignette_radius: 0.56,
+      grading_vignette_feather: 0.38,
+      grading_vignette_center_x: 0.5,
+      grading_vignette_center_y: 0.5,
+      grading_readout: 'No grading changes.',
 
       aspect_enabled: false,
       aspect_live_preview: false,
@@ -2267,6 +3288,13 @@
       global_overlay_stop_colour: '#000000',
       global_overlay_readout: 'Global overlay disabled.',
 
+      audio_mix_enabled: false,
+      audio_source_volume: 1,
+      audio_track_volume: 1,
+      audio_track_pan: 0,
+      audio_tracks_json: '[]',
+      audio_readout: 'No additional audio.',
+
       caption_model: 'small',
       caption_language: 'en',
       caption_word_timestamps: true,
@@ -2310,7 +3338,12 @@
       'global_overlay_enabled', 'global_overlay_kind', 'global_overlay_solid_colour',
       'global_overlay_opacity', 'global_overlay_blend_mode', 'global_overlay_angle',
       'global_overlay_radial_x', 'global_overlay_radial_y', 'global_overlay_stops_json',
-      'global_overlay_selected_stop', 'global_overlay_stop_position', 'global_overlay_stop_colour'
+      'global_overlay_selected_stop', 'global_overlay_stop_position', 'global_overlay_stop_colour',
+      'grading_preset', 'grading_tint_colour', 'grading_tint_strength', 'grading_contrast',
+      'grading_saturation', 'grading_exposure', 'grading_sharpness', 'grading_blur',
+      'grading_vignette', 'grading_vignette_strength', 'grading_vignette_colour',
+      'grading_vignette_radius', 'grading_vignette_feather',
+      'grading_vignette_center_x', 'grading_vignette_center_y'
     ];
 
     let projectVisualSettingsSaveTimer = null;
@@ -2522,14 +3555,23 @@
 
     /* Show status panel with current state or error. */
     function showStatus(kind, message) {
-      statusEl.className = `status show ${kind}`;
+      statusEl.className = `status show ${kind}${statusEl.classList.contains('is-user-hidden') ? ' is-user-hidden' : ''}`;
       statusEl.innerHTML = message;
     }
 
     /* Hide status panel. */
     function clearStatus() {
-      statusEl.className = 'status';
+      statusEl.className = statusEl.classList.contains('is-user-hidden') ? 'status is-user-hidden' : 'status';
       statusEl.innerHTML = '';
+    }
+
+    /* Toggle animated processing chrome around the current video stage while a backend job is active. */
+    function setProcessingChrome(active) {
+      if (!mediaFrameShell) return;
+      mediaFrameShell.classList.toggle('is-processing', Boolean(active));
+      if (processingRing) {
+        processingRing.setAttribute('aria-hidden', active ? 'false' : 'true');
+      }
     }
 
     let activeAppModal = null;
@@ -2905,6 +3947,8 @@
       if (easyTextColourInput) easyTextColourInput.value = /^#[0-9a-fA-F]{6}$/.test(String(controls.primary_colour || ''))
         ? controls.primary_colour
         : '#ffffff';
+      if (easyBurnCaptionsToggle) easyBurnCaptionsToggle.checked = Boolean(controls.render_burn_captions);
+      if (burnCaptionsToggle) burnCaptionsToggle.checked = Boolean(controls.render_burn_captions);
     }
 
 
@@ -2927,6 +3971,17 @@
     function updateTransportControls() {
       const hasVideo = previewVideo.style.display !== 'none' && Boolean(previewVideo.currentSrc || previewVideo.src);
       setCustomControlsVisible(hasVideo);
+      customVideoControls?.classList.toggle('trim-mode-active', Boolean(hasVideo && controls.trim_panel_enabled));
+      if (trimToggleBtn) {
+        trimToggleBtn.classList.toggle('is-active', Boolean(controls.trim_panel_enabled));
+        trimToggleBtn.setAttribute('aria-pressed', controls.trim_panel_enabled ? 'true' : 'false');
+        trimToggleBtn.setAttribute('aria-label', controls.trim_panel_enabled ? 'Hide trim timeline' : 'Show trim timeline');
+      }
+
+      if (trimLoopBtn) {
+        trimLoopBtn.classList.toggle('is-active', Boolean(controls.trim_loop_playback));
+        trimLoopBtn.setAttribute('aria-pressed', controls.trim_loop_playback ? 'true' : 'false');
+      }
 
       if (!hasVideo) {
         return;
@@ -2944,6 +3999,14 @@
 
       if (hasDuration && document.activeElement !== transportSeek) {
         transportSeek.value = String(Math.max(0, Math.min(1000, Math.round((current / duration) * 1000))));
+      }
+
+      updateTrimPlayhead();
+
+      if (hasDuration && (!Number(controls.trim_end) || Number(controls.trim_end) <= Number(controls.trim_start || 0))) {
+        controls.trim_end = Number(duration.toFixed(2));
+        updateTrimReadout();
+        renderTrimPanel();
       }
 
       muteBtn.textContent = previewVideo.muted || Number(previewVideo.volume || 0) === 0 ? 'Unmute' : 'Mute';
@@ -2964,6 +4027,14 @@
       previewVideo.style.maxWidth = 'min(92vw, 1600px)';
       previewVideo.style.maxHeight = 'min(calc(88vh - 58px), 902px)';
       previewVideo.controls = false;
+    }
+
+    /* Recalculate the displayed video frame after layout changes without changing the selected source or render settings. */
+    function positionVideoFrameToActualSize() {
+      if (!previewVideo || previewVideo.style.display === 'none') return;
+      syncOverlayToVideo();
+      applyHelperPreview();
+      updateTransportControls();
     }
 
     /* Put dropped file into a hidden file input. */
@@ -3555,6 +4626,8 @@
       if (type === 'speed') return `Speed ${settings.speed_factor || controls.speed_factor || ''}x`.trim();
       if (type === 'scale' || type === 'upscale') return `Scale ${settings.video_scale_factor || settings.upscale_factor || controls.video_scale_factor || controls.upscale_factor || ''}x`.trim();
       if (type === 'crop') return `Crop ${settings.crop_width || controls.crop_width || ''}×${settings.crop_height || controls.crop_height || ''}`.trim();
+      if (type === 'trim') return 'Trimmed edit';
+      if (type === 'grade') return `Grade ${settings.grading_preset || controls.grading_preset || ''}`.trim();
       if (type === 'upload') return 'Original upload';
       return String(type || 'Video output');
     }
@@ -3828,12 +4901,107 @@
       await loadSourceVideoPreview(file);
       await loadCaptionsForSelectedAsset();
       deactivateCropOverlay();
+      trimMediaRenderToken += 1;
+      renderTrimPanel();
       updateMeta();
       refreshGui();
 
       if (!options.silent) {
         showStatus('ok', `Source selected: <strong>${asset.name}</strong>`);
       }
+    }
+
+
+    /* Build caption metadata for a trimmed asset by moving kept cue timing onto the concatenated output timeline.
+       Supports adjust, recaption, and no-caption modes without changing the source asset captions. */
+    function buildCaptionsForTrimmedOutput(sourceCaptions, settings = {}) {
+      const mode = String(settings.trim_caption_mode || controls.trim_caption_mode || 'adjust');
+      if (mode !== 'adjust') return null;
+      if (!sourceCaptions || !Array.isArray(sourceCaptions.cues) || !sourceCaptions.cues.length) return null;
+
+      let segments = [];
+      try {
+        segments = JSON.parse(settings.trim_segments_json || controls.trim_segments_json || '[]');
+      } catch {
+        segments = [];
+      }
+
+      segments = (Array.isArray(segments) ? segments : [])
+        .map(item => ({
+          start: Math.max(0, Number(item?.start || 0)),
+          end: Math.max(0, Number(item?.end || 0))
+        }))
+        .filter(item => Number.isFinite(item.start) && Number.isFinite(item.end) && item.end > item.start)
+        .sort((a, b) => a.start - b.start);
+
+      if (!segments.length) return null;
+
+      const adjustedCues = [];
+      let outputOffsetMs = 0;
+
+      segments.forEach(segment => {
+        const segmentStartMs = Math.round(segment.start * 1000);
+        const segmentEndMs = Math.round(segment.end * 1000);
+        const segmentDurationMs = Math.max(0, segmentEndMs - segmentStartMs);
+
+        sourceCaptions.cues.forEach(cue => {
+          const cueStart = Math.max(0, Math.floor(Number(cue.start || 0)));
+          const cueEnd = Math.max(cueStart, Math.floor(Number(cue.end || 0)));
+          const overlapStart = Math.max(cueStart, segmentStartMs);
+          const overlapEnd = Math.min(cueEnd, segmentEndMs);
+
+          if (overlapEnd <= overlapStart) return;
+
+          const timedWords = Array.isArray(cue.timed_words) ? cue.timed_words : [];
+          const trimmedWords = timedWords
+            .filter(item => {
+              const wordStart = Math.floor(Number(item?.start || 0));
+              return Number.isFinite(wordStart) && wordStart >= overlapStart && wordStart < overlapEnd && String(item?.word || '').trim();
+            })
+            .map(item => ({
+              start: Math.max(0, Math.floor(Number(item.start || 0)) - segmentStartMs + outputOffsetMs),
+              word: String(item.word || '').trim()
+            }));
+
+          const text = trimmedWords.length
+            ? trimmedWords.map(item => item.word).join(' ')
+            : String(cue.text || '').trim();
+
+          if (!text) return;
+
+          adjustedCues.push({
+            start: Math.max(0, overlapStart - segmentStartMs + outputOffsetMs),
+            end: Math.max(0, overlapEnd - segmentStartMs + outputOffsetMs),
+            text,
+            timed_words: trimmedWords
+          });
+        });
+
+        outputOffsetMs += segmentDurationMs;
+      });
+
+      const normalizedCues = normalizeEditorCues(adjustedCues);
+      if (!normalizedCues.length) return null;
+
+      const hasWordTimings = normalizedCues.some(cue => cueHasWordTimings(cue));
+      const filenameBase = String(sourceCaptions.filename || 'trimmed_captions').replace(/\.(srt|vtt)$/i, '') || 'trimmed_captions';
+      const filename = `${filenameBase}_trimmed.${hasWordTimings ? 'vtt' : 'srt'}`;
+      const text = hasWordTimings ? cuesToVttText(normalizedCues) : cuesToSrtText(normalizedCues);
+
+      return {
+        filename,
+        format: hasWordTimings ? 'vtt' : 'srt',
+        text,
+        cues: normalizedCues.map(cue => ({
+          start: cue.start,
+          end: cue.end,
+          text: cue.text,
+          timed_words: Array.isArray(cue.timed_words) ? cue.timed_words : []
+        })),
+        cueCount: normalizedCues.length,
+        updatedAt: Date.now(),
+        source: 'trim-adjusted'
+      };
     }
 
     async function addRenderedOutputToProject(outputUrl, context = {}) {
@@ -3846,6 +5014,9 @@
       const sourceAsset = getProjectAsset(context.sourceAssetId);
       const opId = makeProjectId('op');
       const operationType = context.operationType || 'render';
+      const outputCaptions = operationType === 'trim'
+        ? buildCaptionsForTrimmedOutput(sourceAsset?.captions, context.settings || {})
+        : (sourceAsset?.captions || null);
       const label = createOperationLabel(operationType, context.settings || {});
       const baseName = (sourceAsset?.name || 'video').replace(/\.[^.]+$/, '');
       const outputName = `${baseName}_${label.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').toLowerCase()}_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.mp4`;
@@ -3870,7 +5041,7 @@
         operation,
         serverOutputFilename,
         serverOutputUrl: outputUrl,
-        captions: sourceAsset?.captions || null
+        captions: outputCaptions
       });
 
       if (asset) {
@@ -3878,6 +5049,15 @@
         const saved = currentProject.operations.find(item => item.id === opId);
         if (saved) saved.outputAssetId = asset.id;
         await saveCurrentProject();
+      }
+
+      if (asset && operationType === 'trim' && String(context.settings?.trim_caption_mode || controls.trim_caption_mode || 'adjust') === 'recaption') {
+        setTimeout(() => {
+          if (currentProject?.selectedAssetId === asset.id) {
+            setSidebarTab('captions');
+            generateCaptions();
+          }
+        }, 160);
       }
 
       return asset;
@@ -3973,7 +5153,7 @@
         const revealButton = document.createElement('button');
         revealButton.type = 'button';
         revealButton.className = 'asset-mini-button';
-        revealButton.textContent = asset.serverOutputFilename ? 'Reveal' : 'Export copy';
+        revealButton.innerHTML = `<span class="icon-mask icon-show" aria-hidden="true"></span><span>${asset.serverOutputFilename ? 'Reveal' : 'Export copy'}</span>`;
         revealButton.title = asset.serverOutputFilename
           ? 'Reveal the original generated output file in Finder / file manager'
           : 'Browser-only project asset: export a copy to the app output folder, then reveal it';
@@ -3987,7 +5167,7 @@
         const deleteButton = document.createElement('button');
         deleteButton.type = 'button';
         deleteButton.className = 'asset-mini-button danger';
-        deleteButton.textContent = 'Delete';
+        deleteButton.innerHTML = '<span class="icon-mask icon-delete" aria-hidden="true"></span><span>Delete</span>';
         deleteButton.title = 'Delete this video from the project, with optional disk-file deletion for generated outputs';
         deleteButton.addEventListener('click', event => {
           event.preventDefault();
@@ -4683,6 +5863,140 @@
     };
   }
 
+
+  const APP_EDIT_HISTORY_KEYS = [
+    'font_name', 'font_size', 'helper_font_scale', 'bold', 'italic', 'all_caps',
+    'primary_colour', 'primary_colour_mode', 'primary_palette',
+    'active_word_colour', 'active_word_colour_mode', 'active_palette',
+    'active_word_lead_ms', 'reveal_offset_ms',
+    'outline_colour', 'shadow_colour', 'background_colour', 'background_colour_mode', 'background_palette',
+    'use_background', 'background_alpha', 'background_pad_x', 'random_position_jitter', 'position_jitter_x', 'position_jitter_y',
+    'random_timing_jitter', 'timing_jitter_ms', 'variation_seed', 'outline', 'shadow', 'blur', 'word_display_mode',
+    'alignment', 'margin_v', 'margin_h', 'anchor_x', 'anchor_y', 'offset_x', 'offset_y', 'rotation_z', 'letter_spacing',
+    'animation_type', 'intro_ms', 'outro_ms', 'start_scale', 'end_scale', 'start_alpha', 'mid_alpha', 'end_alpha',
+    'in_offset_x', 'in_offset_y', 'out_offset_x', 'out_offset_y', 'overshoot_amount', 'overshoot_ms', 'settle_ms', 'out_mode',
+    'crop_width', 'crop_height', 'crop_x', 'crop_y', 'crop_anchor', 'crop_overlay_enabled', 'crop_draw_enabled',
+    'trim_panel_enabled', 'trim_play_ranges_only', 'trim_loop_playback', 'trim_waveform_enabled', 'trim_filmstrip_enabled',
+    'trim_caption_mode', 'trim_start', 'trim_end', 'trim_segments_json',
+    'grading_preset', 'grading_tint_colour', 'grading_tint_strength', 'grading_contrast', 'grading_saturation', 'grading_exposure',
+    'grading_sharpness', 'grading_blur', 'grading_vignette', 'grading_vignette_strength', 'grading_vignette_colour',
+    'grading_vignette_radius', 'grading_vignette_feather', 'grading_vignette_center_x', 'grading_vignette_center_y',
+    'aspect_enabled', 'aspect_live_preview', 'aspect_ratio', 'aspect_border_colour', 'aspect_size_mode',
+    'aspect_target_width', 'aspect_target_height', 'aspect_width_nudge', 'aspect_height_nudge',
+    'overlay_enabled', 'overlay_text', 'overlay_font_name', 'overlay_font_size', 'overlay_bold', 'overlay_italic', 'overlay_all_caps',
+    'overlay_colour', 'overlay_outline_colour', 'overlay_shadow_colour', 'overlay_background_colour', 'overlay_use_background',
+    'overlay_background_alpha', 'overlay_background_pad_x', 'overlay_outline', 'overlay_shadow', 'overlay_blur',
+    'overlay_alignment', 'overlay_margin_v', 'overlay_margin_h', 'overlay_anchor_x', 'overlay_anchor_y', 'overlay_offset_x',
+    'overlay_offset_y', 'overlay_rotation_z', 'overlay_letter_spacing',
+    'global_overlay_enabled', 'global_overlay_kind', 'global_overlay_colour', 'global_overlay_opacity', 'global_overlay_blend_mode',
+    'global_overlay_gradient_angle', 'global_overlay_gradient_stops_json'
+  ];
+
+  /* Capture one reversible editor state covering visual, crop, trim, grading, and overlay settings. */
+  function captureAppEditState(label = 'Edit') {
+    const values = {};
+    APP_EDIT_HISTORY_KEYS.forEach(key => {
+      values[key] = controls[key];
+    });
+
+    return {
+      label,
+      values,
+      trimDraftStart,
+      trimActiveSegmentIndex,
+      trimActiveEdge,
+      trimLastNudgedPoint: trimLastNudgedPoint ? { ...trimLastNudgedPoint } : null,
+      cropDraft: cropDraft ? JSON.parse(JSON.stringify(cropDraft)) : null
+    };
+  }
+
+  /* Restore a captured editor state and repaint all preview layers affected by it. */
+  function restoreAppEditState(state) {
+    if (!state) return;
+
+    appHistoryRestoring = true;
+    Object.entries(state.values || {}).forEach(([key, value]) => {
+      if (Object.prototype.hasOwnProperty.call(controls, key)) {
+        controls[key] = value;
+      }
+    });
+
+    trimDraftStart = state.trimDraftStart ?? null;
+    trimActiveSegmentIndex = Number.isFinite(Number(state.trimActiveSegmentIndex)) ? Number(state.trimActiveSegmentIndex) : -1;
+    trimActiveEdge = state.trimActiveEdge || null;
+    trimLastNudgedPoint = state.trimLastNudgedPoint ? { ...state.trimLastNudgedPoint } : null;
+    cropDraft = state.cropDraft ? JSON.parse(JSON.stringify(state.cropDraft)) : null;
+
+    updateTrimReadout();
+    updateCropPreview();
+    updateAspectReadout();
+    updateGradingReadout();
+    syncGlobalOverlaySelectedStopFields?.();
+    applyGlobalColourOverlayPreview?.();
+    renderTrimPanel();
+    updateTransportControls();
+    applyHelperPreview();
+    refreshGui();
+    scheduleProjectVisualSettingsSave();
+    appHistoryRestoring = false;
+  }
+
+  /* Push the current editor state before a user mutation so Cmd/Ctrl+Z works beyond crop. */
+  function pushAppUndoState(label = 'Edit') {
+    if (appHistoryRestoring) return;
+
+    const state = captureAppEditState(label);
+    const encoded = JSON.stringify(state);
+    const previous = appUndoStack.length ? JSON.stringify(appUndoStack[appUndoStack.length - 1]) : '';
+
+    if (encoded === previous) return;
+
+    appUndoStack.push(state);
+    if (appUndoStack.length > 120) {
+      appUndoStack.shift();
+    }
+    appRedoStack.length = 0;
+  }
+
+  /* Undo the most recent editor mutation across crop, trim, grading, overlays, and placement. */
+  function undoAppEdit() {
+    const previous = appUndoStack.pop();
+    if (!previous) {
+      showStatus('info', 'No edit to undo.');
+      return;
+    }
+
+    appRedoStack.push(captureAppEditState('Redo'));
+    restoreAppEditState(previous);
+    showStatus('info', 'Undo applied.');
+  }
+
+  /* Redo the most recently undone editor mutation across the same shared edit history. */
+  function redoAppEdit() {
+    const next = appRedoStack.pop();
+    if (!next) {
+      showStatus('info', 'No edit to redo.');
+      return;
+    }
+
+    appUndoStack.push(captureAppEditState('Undo'));
+    restoreAppEditState(next);
+    showStatus('info', 'Redo applied.');
+  }
+
+  /* Register one undo snapshot before lil-gui controllers mutate production settings. */
+  function armAppHistoryFromGuiInteraction(event) {
+    if (!event.target?.closest?.('.lil-gui')) return;
+    if (event.target?.closest?.('.function')) return;
+    if (appHistoryInteractionOpen) return;
+
+    appHistoryInteractionOpen = true;
+    pushAppUndoState('Settings');
+    window.setTimeout(() => {
+      appHistoryInteractionOpen = false;
+    }, 350);
+  }
+
   function setCropControlsFromBox(box, pushUndo = true) {
     if (!box) return;
 
@@ -4702,17 +6016,7 @@
   }
 
   function pushCropUndoState() {
-    cropUndoStack.push({
-      width: controls.crop_width,
-      height: controls.crop_height,
-      x: controls.crop_x,
-      y: controls.crop_y,
-      anchor: controls.crop_anchor
-    });
-
-    if (cropUndoStack.length > 80) {
-      cropUndoStack.shift();
-    }
+    pushAppUndoState('Crop');
   }
 
   function restoreCropState(state) {
@@ -4728,31 +6032,11 @@
   }
 
   function undoCrop() {
-    const previous = cropUndoStack.pop();
-    if (!previous) {
-      showStatus('info', 'No crop change to undo.');
-      return;
-    }
-
-    cropRedoStack.push({
-      width: controls.crop_width,
-      height: controls.crop_height,
-      x: controls.crop_x,
-      y: controls.crop_y,
-      anchor: controls.crop_anchor
-    });
-    restoreCropState(previous);
+    undoAppEdit();
   }
 
   function redoCrop() {
-    const next = cropRedoStack.pop();
-    if (!next) {
-      showStatus('info', 'No crop change to redo.');
-      return;
-    }
-
-    pushCropUndoState();
-    restoreCropState(next);
+    redoAppEdit();
   }
 
   function setCropToFullSource() {
@@ -5430,6 +6714,13 @@
     const helperPadX = controls.use_background
     ? Math.max(4, helperFontSize * 0.35 + (controls.background_pad_x * scale))
     : Math.max(2, helperFontSize * 0.16);
+    const alignmentValue = Number(controls.alignment);
+    const horizontalMarginShift = [1, 4, 7].includes(alignmentValue)
+    ? controls.margin_h
+    : ([3, 6, 9].includes(alignmentValue) ? -controls.margin_h : 0);
+    const verticalMarginShift = [7, 8, 9].includes(alignmentValue)
+    ? controls.margin_v
+    : ([1, 2, 3].includes(alignmentValue) ? -controls.margin_v : 0);
 
     const previewBackgroundColour = pickVariantColour(
       controls.background_colour_mode,
@@ -5486,7 +6777,7 @@
     helperCaption.style.left = `${controls.anchor_x * 100}%`;
     helperCaption.style.top = `${controls.anchor_y * 100}%`;
     helperCaption.style.transform =
-  `translate(${helperTranslate}) translate(${(controls.offset_x + jitterX) * scale}px, ${(controls.offset_y + jitterY) * scale}px) rotate(${-controls.rotation_z}deg) scale(${controls.end_scale / 100})`;
+  `translate(${helperTranslate}) translate(${(controls.offset_x + jitterX + horizontalMarginShift) * scale}px, ${(controls.offset_y + jitterY + verticalMarginShift) * scale}px) rotate(${-controls.rotation_z}deg) scale(${controls.end_scale / 100})`;
 
   applyHelpersVisibility();
   applyOverlayHelperPreview();
@@ -5534,6 +6825,13 @@ function applyOverlayHelperPreview() {
   const scale = getPreviewScaleFactor();
   const helperFontSize = Math.max(10, controls.overlay_font_size * scale);
   const helperTranslate = getHelperTranslateForAlignment(controls.overlay_alignment);
+  const overlayAlignmentValue = Number(controls.overlay_alignment);
+  const overlayHorizontalMarginShift = [1, 4, 7].includes(overlayAlignmentValue)
+  ? controls.overlay_margin_h
+  : ([3, 6, 9].includes(overlayAlignmentValue) ? -controls.overlay_margin_h : 0);
+  const overlayVerticalMarginShift = [7, 8, 9].includes(overlayAlignmentValue)
+  ? controls.overlay_margin_v
+  : ([1, 2, 3].includes(overlayAlignmentValue) ? -controls.overlay_margin_v : 0);
   const bgHex = String(controls.overlay_background_colour || '#000000').replace('#', '');
   const rr = parseInt(bgHex.slice(0, 2) || '00', 16);
   const gg = parseInt(bgHex.slice(2, 4) || '00', 16);
@@ -5561,7 +6859,7 @@ function applyOverlayHelperPreview() {
   overlayHelper.style.textShadow = `${controls.overlay_outline * scale}px 0 ${controls.overlay_outline_colour}, ${-controls.overlay_outline * scale}px 0 ${controls.overlay_outline_colour}, 0 ${controls.overlay_outline * scale}px ${controls.overlay_outline_colour}, 0 ${-controls.overlay_outline * scale}px ${controls.overlay_outline_colour}, ${controls.overlay_shadow * scale}px ${controls.overlay_shadow * scale}px ${controls.overlay_shadow_colour}`;
   overlayHelper.style.left = `${controls.overlay_anchor_x * 100}%`;
   overlayHelper.style.top = `${controls.overlay_anchor_y * 100}%`;
-  overlayHelper.style.transform = `translate(${helperTranslate}) translate(${controls.overlay_offset_x * scale}px, ${controls.overlay_offset_y * scale}px) rotate(${-controls.overlay_rotation_z}deg)`;
+  overlayHelper.style.transform = `translate(${helperTranslate}) translate(${(controls.overlay_offset_x + overlayHorizontalMarginShift) * scale}px, ${(controls.overlay_offset_y + overlayVerticalMarginShift) * scale}px) rotate(${-controls.overlay_rotation_z}deg)`;
 }
 
 
@@ -5643,6 +6941,1424 @@ function shouldExportAspectCanvasWithCaptions() {
   return Boolean(controls.aspect_enabled);
 }
 
+function markAspectCanvasForExport() {
+  controls.aspect_enabled = true;
+  applyHelperPreview();
+  scheduleProjectVisualSettingsSave();
+  refreshGui();
+}
+
+function getTrimSegments() {
+  try {
+    const parsed = JSON.parse(controls.trim_segments_json || '[]');
+    const duration = getTrimDuration();
+    return Array.isArray(parsed)
+      ? normalizeTrimSegmentsWithBounds(parsed, duration)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+/* Return the active video duration used to map trim seconds to timeline positions. */
+function getTrimDuration() {
+  const duration = Number(previewVideo?.duration || 0);
+  if (Number.isFinite(duration) && duration > 0) {
+    return duration;
+  }
+
+  const selectedAsset = getSelectedProjectAsset?.();
+  const assetDuration = Number(selectedAsset?.duration || 0);
+  return Number.isFinite(assetDuration) && assetDuration > 0 ? assetDuration : 0;
+}
+
+/* Normalize trim ranges, clamp them to video duration, and prevent overlapping keep sections. */
+function normalizeTrimSegmentsWithBounds(segments, duration = getTrimDuration()) {
+  const maxDuration = Number.isFinite(duration) && duration > 0 ? duration : 86400;
+  const minGap = 0.05;
+  const normalized = [];
+
+  (Array.isArray(segments) ? segments : [])
+    .map(item => ({
+      start: Math.max(0, Math.min(maxDuration, Number(item?.start || 0))),
+      end: Math.max(0, Math.min(maxDuration, Number(item?.end || 0)))
+    }))
+    .filter(item => Number.isFinite(item.start) && Number.isFinite(item.end) && item.end - item.start >= minGap)
+    .sort((a, b) => a.start - b.start)
+    .forEach(item => {
+      const previous = normalized[normalized.length - 1];
+      const start = previous ? Math.max(item.start, previous.end + minGap) : item.start;
+      const end = Math.max(start + minGap, item.end);
+      if (end <= maxDuration) {
+        normalized.push({
+          start: Number(start.toFixed(3)),
+          end: Number(end.toFixed(3))
+        });
+      }
+    });
+
+  return normalized;
+}
+
+/* Store trim ranges as project-safe JSON and refresh the trim controls. */
+function saveTrimSegments(segments, options = {}) {
+  const shouldRecordHistory = options.history !== false;
+  const label = options.label || 'Trim';
+
+  if (shouldRecordHistory) {
+    pushAppUndoState(label);
+  }
+
+  controls.trim_segments_json = JSON.stringify(normalizeTrimSegmentsWithBounds(segments));
+  updateTrimReadout();
+  renderTrimPanel();
+  refreshGui();
+}
+
+function updateTrimReadout() {
+  const segments = getTrimSegments();
+  const total = segments.reduce((sum, item) => sum + Math.max(0, item.end - item.start), 0);
+  controls.trim_readout = segments.length
+    ? `${segments.length} keep range${segments.length === 1 ? '' : 's'} · ${formatTransportTime(total)} kept`
+    : 'No trim ranges.';
+}
+
+
+/* Draw compact audio waveform and filmstrip previews for the trim timeline using cached browser-side media data. */
+function renderTrimMediaStrips() {
+  const visible = Boolean(controls.trim_panel_enabled);
+  const hasExtraAudio = Boolean(controls.audio_mix_enabled && audioMixTracks.length);
+  trimWaveformStrip?.classList.toggle('show', visible && Boolean(controls.trim_waveform_enabled));
+  trimAudioMixStrip?.classList.toggle('show', visible && hasExtraAudio);
+  trimFilmstripStrip?.classList.toggle('show', visible && Boolean(controls.trim_filmstrip_enabled));
+
+  if (!visible) return;
+
+  const token = ++trimMediaRenderToken;
+
+  if (controls.trim_waveform_enabled) {
+    void renderTrimWaveformCanvas(token);
+  }
+
+  if (hasExtraAudio) {
+    void renderTrimAudioMixCanvas(token);
+  }
+
+  if (controls.trim_filmstrip_enabled) {
+    void renderTrimFilmstripCanvas(token);
+  }
+}
+
+/* Build a normalized peak array from the selected project video audio and reuse it while the asset is selected. */
+async function getTrimWaveformPeaks(asset, file) {
+  const cacheKey = `${asset?.id || ''}:${asset?.size || 0}:${Math.round(Number(asset?.duration || 0) * 1000)}`;
+  const cached = trimWaveformCache.get(cacheKey);
+  if (cached) return cached;
+
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) throw new Error('Audio analysis is not supported.');
+
+  const audioContext = new AudioCtx();
+  try {
+    const buffer = await file.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(buffer.slice(0));
+    const channelCount = Math.max(1, audioBuffer.numberOfChannels || 1);
+    const bucketCount = 1400;
+    const peaks = new Float32Array(bucketCount);
+    const samples = audioBuffer.length;
+
+    for (let bucket = 0; bucket < bucketCount; bucket += 1) {
+      const start = Math.floor((bucket / bucketCount) * samples);
+      const end = Math.max(start + 1, Math.floor(((bucket + 1) / bucketCount) * samples));
+      let peak = 0;
+
+      for (let channel = 0; channel < channelCount; channel += 1) {
+        const data = audioBuffer.getChannelData(channel);
+        for (let index = start; index < end; index += 1) {
+          const value = Math.abs(data[index] || 0);
+          if (value > peak) peak = value;
+        }
+      }
+
+      peaks[bucket] = peak;
+    }
+
+    const maxPeak = Math.max(...peaks, 0.001);
+    for (let index = 0; index < peaks.length; index += 1) {
+      peaks[index] = Math.min(1, peaks[index] / maxPeak);
+    }
+
+    const payload = { peaks, duration: audioBuffer.duration };
+    trimWaveformCache.set(cacheKey, payload);
+    return payload;
+  } finally {
+    if (typeof audioContext.close === 'function') {
+      void audioContext.close();
+    }
+  }
+}
+
+/* Render the cached waveform peaks to the current timeline width without creating media files. */
+async function renderTrimWaveformCanvas(token = trimMediaRenderToken) {
+  if (!trimWaveformCanvas || !trimWaveformStrip?.classList.contains('show')) return;
+
+  const asset = getSelectedProjectAsset();
+  const file = await getProjectAssetFile(asset);
+  if (!asset || !file || token !== trimMediaRenderToken) return;
+
+  const rect = trimWaveformStrip.getBoundingClientRect();
+  const width = Math.max(2, Math.round(rect.width || 2));
+  const height = Math.max(2, Math.round(rect.height || 34));
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  trimWaveformCanvas.width = Math.round(width * dpr);
+  trimWaveformCanvas.height = Math.round(height * dpr);
+
+  const ctx = trimWaveformCanvas.getContext('2d');
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, trimWaveformCanvas.width, trimWaveformCanvas.height);
+  ctx.fillStyle = 'rgba(125, 211, 252, 0.16)';
+  ctx.fillRect(0, 0, trimWaveformCanvas.width, trimWaveformCanvas.height);
+
+  try {
+    const { peaks } = await getTrimWaveformPeaks(asset, file);
+    if (token !== trimMediaRenderToken) return;
+
+    const canvasWidth = trimWaveformCanvas.width;
+    const canvasHeight = trimWaveformCanvas.height;
+    const midY = canvasHeight / 2;
+    ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--accent').trim() || '#7dd3fc';
+    ctx.lineWidth = Math.max(1, dpr);
+    ctx.beginPath();
+
+    for (let x = 0; x < canvasWidth; x += Math.max(1, Math.round(dpr))) {
+      const peakIndex = Math.min(peaks.length - 1, Math.floor((x / canvasWidth) * peaks.length));
+      const amplitude = Math.max(1, peaks[peakIndex] * canvasHeight * 0.46);
+      ctx.moveTo(x, midY - amplitude);
+      ctx.lineTo(x, midY + amplitude);
+    }
+
+    ctx.stroke();
+  } catch {
+    ctx.fillStyle = 'rgba(255,255,255,0.42)';
+    ctx.font = `${Math.round(10 * dpr)}px Arial`;
+    ctx.fillText('No readable waveform for this browser codec', Math.round(10 * dpr), Math.round(21 * dpr));
+  }
+}
+
+function syncAudioMixState() {
+  controls.audio_mix_enabled = audioMixTracks.length > 0;
+  const activeTrack = audioMixTracks.find(track => track.id === activeAudioTrackId) || audioMixTracks[0] || null;
+  if (activeTrack) {
+    activeAudioTrackId = activeTrack.id;
+    controls.audio_track_volume = Number(activeTrack.volume ?? 1);
+    controls.audio_track_pan = Number(activeTrack.pan ?? 0);
+  } else {
+    activeAudioTrackId = null;
+    controls.audio_track_volume = 1;
+    controls.audio_track_pan = 0;
+  }
+
+  controls.audio_tracks_json = JSON.stringify(audioMixTracks.map(track => ({
+    id: track.id,
+    name: track.name,
+    volume: Number(track.volume ?? 1),
+    pan: Number(track.pan ?? 0)
+  })));
+
+  controls.audio_readout = audioMixTracks.length
+    ? `${audioMixTracks.length} extra audio track${audioMixTracks.length === 1 ? '' : 's'} · source ${Number(controls.audio_source_volume || 1).toFixed(2)}x`
+    : 'No additional audio.';
+
+  if (audioMixReadout) {
+    audioMixReadout.textContent = controls.audio_readout;
+  }
+
+  if (audioSourceVolumeRange) audioSourceVolumeRange.value = String(controls.audio_source_volume || 1);
+  if (audioTrackVolumeRange) audioTrackVolumeRange.value = String(controls.audio_track_volume || 1);
+  if (audioTrackPanRange) audioTrackPanRange.value = String(controls.audio_track_pan || 0);
+  if (removeAudioMixBtn) removeAudioMixBtn.disabled = !audioMixTracks.length;
+
+  if (activeAudioTrackSelect) {
+    activeAudioTrackSelect.innerHTML = '';
+    if (!audioMixTracks.length) {
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = 'No extra audio';
+      activeAudioTrackSelect.append(option);
+    } else {
+      audioMixTracks.forEach((track, index) => {
+        const option = document.createElement('option');
+        option.value = track.id;
+        option.textContent = `${index + 1}. ${track.name}`;
+        activeAudioTrackSelect.append(option);
+      });
+      activeAudioTrackSelect.value = activeAudioTrackId || audioMixTracks[0].id;
+    }
+  }
+
+  renderTrimMediaStrips();
+  updateLiveAudioPreviewGains();
+}
+
+function getSelectedAudioMixTrack() {
+  return audioMixTracks.find(track => track.id === activeAudioTrackId) || audioMixTracks[0] || null;
+}
+
+/* Keep added audio tracks audible in browser playback without waiting for an FFmpeg render. */
+async function getAudioMixDecodedBuffer(track) {
+  if (!track?.file) return null;
+
+  const cacheKey = `${track.id}:${track.file.name}:${track.file.size}:${track.file.lastModified}`;
+  const cached = audioTrackBufferCache.get(cacheKey);
+  if (cached) return cached;
+
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return null;
+
+  if (!liveAudioContext) {
+    liveAudioContext = new AudioCtx();
+  }
+
+  const buffer = await track.file.arrayBuffer();
+  const decoded = await liveAudioContext.decodeAudioData(buffer.slice(0));
+  audioTrackBufferCache.set(cacheKey, decoded);
+  return decoded;
+}
+
+function shouldUseLiveAudioPreviewMixer() {
+  return Boolean(audioMixTracks.length && !showingRenderedOutput && previewVideo && previewVideo.style.display !== 'none');
+}
+
+function ensureLiveAudioPreviewGraph() {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx || !previewVideo) return false;
+
+  if (!liveAudioContext) {
+    liveAudioContext = new AudioCtx();
+  }
+
+  if (!liveMasterGainNode) {
+    liveMasterGainNode = liveAudioContext.createGain();
+    liveMasterGainNode.connect(liveAudioContext.destination);
+  }
+
+  if (!liveSourceGainNode) {
+    liveSourceGainNode = liveAudioContext.createGain();
+    liveSourceGainNode.connect(liveMasterGainNode);
+  }
+
+  if (!liveVideoSourceNode) {
+    try {
+      liveVideoSourceNode = liveAudioContext.createMediaElementSource(previewVideo);
+      liveVideoSourceNode.connect(liveSourceGainNode);
+    } catch {
+      liveVideoSourceNode = null;
+    }
+  }
+
+  updateLiveAudioPreviewGains();
+  return true;
+}
+
+function updateLiveAudioPreviewGains() {
+  if (liveMasterGainNode) {
+    liveMasterGainNode.gain.value = previewVideo?.muted ? 0 : Math.max(0, Math.min(1, Number(previewVideo?.volume ?? 1)));
+  }
+
+  if (liveSourceGainNode) {
+    liveSourceGainNode.gain.value = Math.max(0, Math.min(3, Number(controls.audio_source_volume || 1)));
+  }
+
+  liveTrackNodes.forEach(nodeSet => {
+    const track = audioMixTracks.find(item => item.id === nodeSet.trackId);
+    if (track && nodeSet.gain) {
+      nodeSet.gain.gain.value = Math.max(0, Math.min(3, Number(track.volume ?? 1)));
+    }
+    if (track && nodeSet.panner) {
+      nodeSet.panner.pan.value = Math.max(-1, Math.min(1, Number(track.pan ?? 0)));
+    }
+  });
+}
+
+function stopLiveAudioPreviewTracks() {
+  liveTrackNodes.forEach(nodeSet => {
+    try { nodeSet.source.stop(); } catch {}
+    try { nodeSet.source.disconnect(); } catch {}
+    try { nodeSet.gain?.disconnect(); } catch {}
+    try { nodeSet.panner?.disconnect(); } catch {}
+  });
+  liveTrackNodes = [];
+}
+
+async function startLiveAudioPreviewTracks() {
+  if (!shouldUseLiveAudioPreviewMixer() || !ensureLiveAudioPreviewGraph()) return;
+
+  if (liveAudioContext?.state === 'suspended') {
+    try { await liveAudioContext.resume(); } catch {}
+  }
+
+  stopLiveAudioPreviewTracks();
+
+  const offset = Math.max(0, Number(previewVideo.currentTime || 0));
+  const playbackRate = Number(previewVideo.playbackRate || 1) || 1;
+
+  for (const track of audioMixTracks) {
+    try {
+      const buffer = await getAudioMixDecodedBuffer(track);
+      if (!buffer || previewVideo.paused || !shouldUseLiveAudioPreviewMixer()) continue;
+      if (offset >= Math.max(0, buffer.duration - 0.025)) continue;
+
+      const source = liveAudioContext.createBufferSource();
+      const gain = liveAudioContext.createGain();
+      const panner = typeof liveAudioContext.createStereoPanner === 'function'
+        ? liveAudioContext.createStereoPanner()
+        : null;
+
+      source.buffer = buffer;
+      source.playbackRate.value = playbackRate;
+      gain.gain.value = Math.max(0, Math.min(3, Number(track.volume ?? 1)));
+      if (panner) {
+        panner.pan.value = Math.max(-1, Math.min(1, Number(track.pan ?? 0)));
+      }
+
+      source.connect(gain);
+      if (panner) {
+        gain.connect(panner);
+        panner.connect(liveMasterGainNode);
+      } else {
+        gain.connect(liveMasterGainNode);
+      }
+
+      source.start(0, offset);
+      liveTrackNodes.push({ trackId: track.id, source, gain, panner });
+    } catch {
+      continue;
+    }
+  }
+
+  updateLiveAudioPreviewGains();
+}
+
+function restartLiveAudioPreviewTracks() {
+  window.clearTimeout(liveAudioRestartTimer);
+  if (!shouldUseLiveAudioPreviewMixer() || previewVideo.paused) {
+    stopLiveAudioPreviewTracks();
+    return;
+  }
+
+  liveAudioRestartTimer = window.setTimeout(() => {
+    void startLiveAudioPreviewTracks();
+  }, 60);
+}
+
+function removeSelectedAudioMixTrack() {
+  const index = audioMixTracks.findIndex(track => track.id === activeAudioTrackId);
+  if (index < 0) return;
+
+  pushAppUndoState('Audio Mix');
+  const [removedTrack] = audioMixTracks.splice(index, 1);
+  if (removedTrack) {
+    Array.from(audioTrackWaveformCache.keys()).forEach(key => {
+      if (key.startsWith(`${removedTrack.id}:`)) audioTrackWaveformCache.delete(key);
+    });
+    Array.from(audioTrackBufferCache.keys()).forEach(key => {
+      if (key.startsWith(`${removedTrack.id}:`)) audioTrackBufferCache.delete(key);
+    });
+  }
+
+  activeAudioTrackId = audioMixTracks[Math.min(index, audioMixTracks.length - 1)]?.id || null;
+  syncAudioMixState();
+  restartLiveAudioPreviewTracks();
+  refreshGui();
+}
+
+function selectAudioMixTrackFromStripEvent(event) {
+  if (!trimAudioMixStrip || !audioMixTracks.length) return;
+
+  const rect = trimAudioMixStrip.getBoundingClientRect();
+  if (!rect.height) return;
+
+  const y = Math.max(0, Math.min(rect.height - 1, Number(event.clientY || 0) - rect.top));
+  const index = Math.max(0, Math.min(audioMixTracks.length - 1, Math.floor((y / rect.height) * audioMixTracks.length)));
+  activeAudioTrackId = audioMixTracks[index]?.id || activeAudioTrackId;
+  syncAudioMixState();
+  refreshGui();
+}
+
+/* Add one or more audio files as mixer tracks and prepare them for browser waveform rendering and FFmpeg upload. */
+async function addAudioMixFiles(files) {
+  const pickedFiles = Array.from(files || []).filter(file => isAudioMixFile(file));
+  if (!pickedFiles.length) return;
+
+  if (!getSelectedProjectAsset?.()) {
+    showStatus('err', 'Select or import a project video before adding audio.');
+    return;
+  }
+
+  pushAppUndoState('Audio Mix');
+  for (const file of pickedFiles) {
+    const id = `audio_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    audioMixTracks.push({
+      id,
+      file,
+      name: file.name || `Audio ${audioMixTracks.length + 1}`,
+      volume: 1,
+      pan: 0
+    });
+    activeAudioTrackId = id;
+  }
+
+  controls.trim_panel_enabled = true;
+  syncAudioMixState();
+  restartLiveAudioPreviewTracks();
+  refreshGui();
+  showStatus('ok', `${pickedFiles.length} audio file${pickedFiles.length === 1 ? '' : 's'} added to the current video.`);
+}
+
+/* Detect audio files accepted by the extra-audio mixer from drag/drop or picker input. */
+function isAudioMixFile(file) {
+  const name = String(file?.name || '');
+  const type = String(file?.type || '').toLowerCase();
+  return type.startsWith('audio/') || /\.(mp3|wav|m4a|aac|flac|ogg|opus)$/i.test(name);
+}
+
+/* Decode a selected audio track once and cache normalized peaks for the additional audio strip. */
+async function getAudioTrackPeaks(track) {
+  if (!track?.file) return null;
+  const cacheKey = `${track.id}:${track.file.name}:${track.file.size}:${track.file.lastModified}`;
+  const cached = audioTrackWaveformCache.get(cacheKey);
+  if (cached) return cached;
+
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) throw new Error('Audio analysis is not supported.');
+
+  const audioContext = new AudioCtx();
+  try {
+    const buffer = await track.file.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(buffer.slice(0));
+    const channelCount = Math.max(1, audioBuffer.numberOfChannels || 1);
+    const bucketCount = 1400;
+    const peaks = new Float32Array(bucketCount);
+    const samples = audioBuffer.length;
+
+    for (let bucket = 0; bucket < bucketCount; bucket += 1) {
+      const start = Math.floor((bucket / bucketCount) * samples);
+      const end = Math.max(start + 1, Math.floor(((bucket + 1) / bucketCount) * samples));
+      let peak = 0;
+      for (let channel = 0; channel < channelCount; channel += 1) {
+        const data = audioBuffer.getChannelData(channel);
+        for (let index = start; index < end; index += 1) {
+          const value = Math.abs(data[index] || 0);
+          if (value > peak) peak = value;
+        }
+      }
+      peaks[bucket] = peak;
+    }
+
+    const maxPeak = Math.max(...peaks, 0.001);
+    for (let index = 0; index < peaks.length; index += 1) {
+      peaks[index] = Math.min(1, peaks[index] / maxPeak);
+    }
+
+    const payload = { peaks, duration: audioBuffer.duration };
+    audioTrackWaveformCache.set(cacheKey, payload);
+    return payload;
+  } finally {
+    if (typeof audioContext.close === 'function') {
+      void audioContext.close();
+    }
+  }
+}
+
+/* Render all additional audio tracks into the purple mixer strip without writing temporary files. */
+async function renderTrimAudioMixCanvas(token = trimMediaRenderToken) {
+  if (!trimAudioMixCanvas || !trimAudioMixStrip?.classList.contains('show')) return;
+
+  const rect = trimAudioMixStrip.getBoundingClientRect();
+  const width = Math.max(2, Math.round(rect.width || 2));
+  const height = Math.max(2, Math.round(rect.height || 30));
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  trimAudioMixCanvas.width = Math.round(width * dpr);
+  trimAudioMixCanvas.height = Math.round(height * dpr);
+
+  const ctx = trimAudioMixCanvas.getContext('2d');
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, trimAudioMixCanvas.width, trimAudioMixCanvas.height);
+  ctx.fillStyle = 'rgba(88, 28, 135, 0.20)';
+  ctx.fillRect(0, 0, trimAudioMixCanvas.width, trimAudioMixCanvas.height);
+
+  const visibleTracks = audioMixTracks.slice(0, 6);
+  if (!visibleTracks.length) return;
+
+  const rowHeight = trimAudioMixCanvas.height / visibleTracks.length;
+  for (let trackIndex = 0; trackIndex < visibleTracks.length; trackIndex += 1) {
+    const track = visibleTracks[trackIndex];
+    try {
+      const payload = await getAudioTrackPeaks(track);
+      if (!payload || token !== trimMediaRenderToken) return;
+
+      const midY = rowHeight * trackIndex + rowHeight / 2;
+      const active = track.id === activeAudioTrackId;
+      ctx.strokeStyle = active ? 'rgba(216, 180, 254, 0.98)' : 'rgba(168, 85, 247, 0.70)';
+      ctx.lineWidth = Math.max(1, dpr);
+      ctx.beginPath();
+
+      for (let x = 0; x < trimAudioMixCanvas.width; x += Math.max(1, Math.round(dpr))) {
+        const peakIndex = Math.min(payload.peaks.length - 1, Math.floor((x / trimAudioMixCanvas.width) * payload.peaks.length));
+        const amplitude = Math.max(1, payload.peaks[peakIndex] * rowHeight * 0.42 * Number(track.volume || 1));
+        ctx.moveTo(x, midY - amplitude);
+        ctx.lineTo(x, midY + amplitude);
+      }
+      ctx.stroke();
+    } catch {
+      ctx.fillStyle = 'rgba(216,180,254,0.78)';
+      ctx.font = `${Math.round(10 * dpr)}px Inter, Arial`;
+      ctx.fillText('Additional audio waveform unavailable', Math.round(10 * dpr), Math.round(18 * dpr));
+      return;
+    }
+  }
+}
+
+/* Create small in-memory frame samples for the selected project video and reuse them for the filmstrip. */
+async function getTrimFilmstripFrames(asset, file, targetCount) {
+  const frameCount = Math.max(6, Math.min(36, Math.round(targetCount || 16)));
+  const cacheKey = `${asset?.id || ''}:${asset?.size || 0}:${Math.round(Number(asset?.duration || 0) * 1000)}:${frameCount}`;
+  const cached = trimFilmstripCache.get(cacheKey);
+  if (cached) return cached;
+
+  const url = URL.createObjectURL(file);
+  const video = document.createElement('video');
+  video.preload = 'auto';
+  video.muted = true;
+  video.playsInline = true;
+
+  const payload = await new Promise((resolve, reject) => {
+    const frames = [];
+    const frameWidth = 96;
+    const frameHeight = 54;
+    let index = 0;
+
+    const cleanup = () => URL.revokeObjectURL(url);
+
+    const capture = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = frameWidth;
+        canvas.height = frameHeight;
+        const ctx = canvas.getContext('2d');
+        const sourceW = Number(video.videoWidth || 16);
+        const sourceH = Number(video.videoHeight || 9);
+        const scale = Math.max(frameWidth / sourceW, frameHeight / sourceH);
+        const drawW = sourceW * scale;
+        const drawH = sourceH * scale;
+        ctx.drawImage(video, (frameWidth - drawW) / 2, (frameHeight - drawH) / 2, drawW, drawH);
+        frames.push(canvas);
+      } catch {
+        frames.push(null);
+      }
+
+      index += 1;
+      if (index >= frameCount) {
+        cleanup();
+        resolve({ frames, frameWidth, frameHeight });
+        return;
+      }
+
+      const duration = Math.max(0.1, Number(video.duration || asset?.duration || 0.1));
+      video.currentTime = Math.min(duration - 0.05, (index / Math.max(1, frameCount - 1)) * duration);
+    };
+
+    video.onloadedmetadata = () => {
+      const duration = Math.max(0.1, Number(video.duration || asset?.duration || 0.1));
+      video.currentTime = Math.min(duration - 0.05, 0.05);
+    };
+    video.onseeked = capture;
+    video.onerror = () => {
+      cleanup();
+      reject(new Error('Could not read video frames.'));
+    };
+    video.src = url;
+  });
+
+  trimFilmstripCache.set(cacheKey, payload);
+  return payload;
+}
+
+/* Render cached frame samples across the full trim timeline width. */
+async function renderTrimFilmstripCanvas(token = trimMediaRenderToken) {
+  if (!trimFilmstripCanvas || !trimFilmstripStrip?.classList.contains('show')) return;
+
+  const asset = getSelectedProjectAsset();
+  const file = await getProjectAssetFile(asset);
+  if (!asset || !file || token !== trimMediaRenderToken) return;
+
+  const rect = trimFilmstripStrip.getBoundingClientRect();
+  const width = Math.max(2, Math.round(rect.width || 2));
+  const height = Math.max(2, Math.round(rect.height || 42));
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  trimFilmstripCanvas.width = Math.round(width * dpr);
+  trimFilmstripCanvas.height = Math.round(height * dpr);
+
+  const ctx = trimFilmstripCanvas.getContext('2d');
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, trimFilmstripCanvas.width, trimFilmstripCanvas.height);
+  ctx.fillStyle = 'rgba(0,0,0,0.24)';
+  ctx.fillRect(0, 0, trimFilmstripCanvas.width, trimFilmstripCanvas.height);
+
+  try {
+    const frameCount = Math.max(8, Math.min(32, Math.ceil(width / 72)));
+    const payload = await getTrimFilmstripFrames(asset, file, frameCount);
+    if (token !== trimMediaRenderToken) return;
+
+    const frameWidth = trimFilmstripCanvas.width / Math.max(1, payload.frames.length);
+    payload.frames.forEach((frame, index) => {
+      if (!frame) return;
+      ctx.drawImage(frame, Math.round(index * frameWidth), 0, Math.ceil(frameWidth), trimFilmstripCanvas.height);
+    });
+  } catch {
+    ctx.fillStyle = 'rgba(255,255,255,0.42)';
+    ctx.font = `${Math.round(10 * dpr)}px Arial`;
+    ctx.fillText('No filmstrip preview available', Math.round(10 * dpr), Math.round(25 * dpr));
+  }
+}
+
+/* Convert pointer position on the trim scrub line into playback time and seek the preview. */
+function setTrimScrubTimeFromEvent(event) {
+  if (!trimScrubTrack) return;
+
+  const duration = getTrimDuration();
+  if (!Number.isFinite(duration) || duration <= 0) return;
+
+  const rect = trimScrubTrack.getBoundingClientRect();
+  if (!rect.width) return;
+
+  const x = Math.max(0, Math.min(rect.width, Number(event.clientX || 0) - rect.left));
+  seekTrimPreviewTo((x / rect.width) * duration);
+}
+
+/* Seek from clicks on media strips that share the same left-to-right time mapping as the scrub line. */
+function setTrimScrubTimeFromStripEvent(event, stripElement) {
+  const duration = getTrimDuration();
+  if (!stripElement || !Number.isFinite(duration) || duration <= 0) return;
+
+  const rect = stripElement.getBoundingClientRect();
+  if (!rect.width) return;
+
+  const x = Math.max(0, Math.min(rect.width, Number(event.clientX || 0) - rect.left));
+  seekTrimPreviewTo((x / rect.width) * duration);
+}
+
+function renderTrimPanel() {
+  const duration = getTrimDuration();
+  const hasDuration = Number.isFinite(duration) && duration > 0;
+  const segments = getTrimSegments();
+
+  if (!trimPanel) return;
+
+  trimPanel.classList.toggle('show', Boolean(controls.trim_panel_enabled));
+  customVideoControls?.classList.toggle('trim-mode-active', Boolean(controls.trim_panel_enabled));
+
+  if (trimToggleBtn) {
+    trimToggleBtn.classList.toggle('is-active', Boolean(controls.trim_panel_enabled));
+    trimToggleBtn.setAttribute('aria-pressed', controls.trim_panel_enabled ? 'true' : 'false');
+    trimToggleBtn.setAttribute('aria-label', controls.trim_panel_enabled ? 'Hide trim timeline' : 'Show trim timeline');
+  }
+
+  if (trimLoopBtn) {
+    trimLoopBtn.classList.toggle('is-active', Boolean(controls.trim_loop_playback));
+    trimLoopBtn.setAttribute('aria-pressed', controls.trim_loop_playback ? 'true' : 'false');
+  }
+
+  if (trimStartInput) {
+    trimStartInput.value = Number(controls.trim_start || 0).toFixed(2);
+  }
+
+  if (trimEndInput) {
+    trimEndInput.value = Number(controls.trim_end || 0).toFixed(2);
+  }
+
+  if (trimTimelineStartLabel) {
+    trimTimelineStartLabel.textContent = '0:00';
+  }
+
+  if (trimTimelineEndLabel) {
+    trimTimelineEndLabel.textContent = hasDuration ? formatTransportTime(duration) : '0:00';
+  }
+
+  updateTrimDraftVisual();
+  updateTrimPlayhead();
+  renderTrimMediaStrips();
+
+  if (!trimSegmentsLayer) return;
+
+  trimSegmentsLayer.innerHTML = '';
+
+  segments.forEach((segment, index) => {
+    const left = hasDuration ? Math.max(0, Math.min(100, (segment.start / duration) * 100)) : 0;
+    const width = hasDuration ? Math.max(0.2, Math.min(100 - left, ((segment.end - segment.start) / duration) * 100)) : 0;
+
+    const visual = document.createElement('div');
+    visual.className = 'trim-segment-visual';
+    visual.style.left = `${left}%`;
+    visual.style.width = `${width}%`;
+    visual.dataset.segmentIndex = String(index);
+    visual.setAttribute('role', 'button');
+    visual.setAttribute('tabindex', '0');
+    visual.setAttribute('aria-label', `Select trim range ${index + 1}`);
+    visual.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      setDraftTrimFromSegment(index);
+    });
+
+    const startHandle = document.createElement('button');
+    startHandle.type = 'button';
+    startHandle.className = `trim-handle trim-handle-start ${trimActiveSegmentIndex === index && trimActiveEdge === 'start' ? 'is-active' : ''} ${trimLastNudgedPoint?.index === index && trimLastNudgedPoint?.edge === 'start' ? 'is-last-nudged' : ''}`;
+    startHandle.style.left = '0%';
+    startHandle.dataset.segmentIndex = String(index);
+    startHandle.dataset.edge = 'start';
+    startHandle.setAttribute('aria-label', `Move trim range ${index + 1} start`);
+
+    const endHandle = document.createElement('button');
+    endHandle.type = 'button';
+    endHandle.className = `trim-handle trim-handle-end ${trimActiveSegmentIndex === index && trimActiveEdge === 'end' ? 'is-active' : ''} ${trimLastNudgedPoint?.index === index && trimLastNudgedPoint?.edge === 'end' ? 'is-last-nudged' : ''}`;
+    endHandle.style.left = '100%';
+    endHandle.dataset.segmentIndex = String(index);
+    endHandle.dataset.edge = 'end';
+    endHandle.setAttribute('aria-label', `Move trim range ${index + 1} end`);
+
+    const startLabel = document.createElement('span');
+    startLabel.className = 'trim-point-label';
+    startLabel.style.left = '0%';
+    startLabel.textContent = String(index + 1);
+
+    const endLabel = document.createElement('span');
+    endLabel.className = 'trim-point-label';
+    endLabel.style.left = '100%';
+    endLabel.textContent = String(index + 1);
+
+    visual.append(startHandle, endHandle, startLabel, endLabel);
+
+    if (trimActiveSegmentIndex === index && (trimActiveEdge === 'start' || trimActiveEdge === 'end')) {
+      const activeTime = trimActiveEdge === 'end' ? segment.end : segment.start;
+      const timeEditor = document.createElement('label');
+      timeEditor.className = `trim-point-time-editor trim-point-time-editor-${trimActiveEdge}`;
+      timeEditor.addEventListener('pointerdown', event => event.stopPropagation());
+      timeEditor.addEventListener('click', event => event.stopPropagation());
+
+      const labelText = document.createElement('span');
+      labelText.textContent = `${trimActiveEdge} ${index + 1}`;
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.inputMode = 'decimal';
+      input.autocomplete = 'off';
+      input.spellcheck = false;
+      input.value = formatTrimEditorTime(activeTime);
+      input.setAttribute('aria-label', `Trim range ${index + 1} ${trimActiveEdge} time`);
+      input.addEventListener('change', () => updateActiveTrimPointFromInput(input.value));
+      input.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          updateActiveTrimPointFromInput(input.value);
+          input.blur();
+        }
+      });
+
+      timeEditor.append(labelText, input);
+      visual.append(timeEditor);
+    }
+
+    trimSegmentsLayer.append(visual);
+  });
+
+  if (hasDuration && trimDraftStart !== null) {
+    const draftLeft = Math.max(0, Math.min(100, (Number(trimDraftStart || 0) / duration) * 100));
+    const draftHandle = document.createElement('button');
+    draftHandle.type = 'button';
+    draftHandle.className = 'trim-handle trim-draft-handle is-active';
+    draftHandle.style.left = `${draftLeft}%`;
+    draftHandle.dataset.draftEdge = 'start';
+    draftHandle.setAttribute('aria-label', 'Move draft trim start');
+
+    const draftLabel = document.createElement('span');
+    draftLabel.className = 'trim-point-label';
+    draftLabel.style.left = `${draftLeft}%`;
+    draftLabel.textContent = '+';
+
+    trimSegmentsLayer.append(draftHandle, draftLabel);
+  }
+}
+
+function setTrimStartAtPlayhead() {
+  pushAppUndoState('Trim');
+  controls.trim_start = Number(previewVideo.currentTime || 0);
+  trimDraftStart = controls.trim_start;
+  if (!Number(controls.trim_end) || Number(controls.trim_end) <= Number(controls.trim_start)) {
+    controls.trim_end = Math.min(Number(previewVideo.duration || controls.trim_start + 1), Number(controls.trim_start) + 1);
+  }
+  updateTrimReadout();
+  renderTrimPanel();
+  refreshGui();
+}
+
+function setTrimEndAtPlayhead() {
+  pushAppUndoState('Trim');
+  controls.trim_end = Math.max(Number(controls.trim_start || 0) + 0.05, Number(previewVideo.currentTime || 0));
+  updateTrimReadout();
+  renderTrimPanel();
+  refreshGui();
+}
+
+function addTrimSegmentFromControls(options = {}) {
+  const duration = getTrimDuration();
+  const maxDuration = Number.isFinite(duration) && duration > 0 ? duration : 86400;
+  const start = Math.max(0, Math.min(maxDuration, Number(controls.trim_start || trimStartInput?.value || 0)));
+  const end = Math.max(start + 0.05, Math.min(maxDuration, Number(controls.trim_end || trimEndInput?.value || 0)));
+
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    showStatus('err', 'Trim end must be after trim start.');
+    return;
+  }
+
+  const segments = getTrimSegments();
+  segments.push({ start, end });
+  trimDraftStart = null;
+  trimActiveSegmentIndex = segments.length - 1;
+  saveTrimSegments(segments, { history: options.history !== false, label: 'Trim' });
+}
+
+function clearTrimDraft() {
+  pushAppUndoState('Trim');
+  trimDraftStart = null;
+  controls.trim_start = 0;
+  controls.trim_end = getTrimDuration() || 0;
+  updateTrimReadout();
+  renderTrimPanel();
+  refreshGui();
+}
+
+function updateTrimDraftVisual() {
+  const duration = getTrimDuration();
+  const hasDuration = Number.isFinite(duration) && duration > 0;
+  const start = Math.max(0, Math.min(duration || 0, Number(controls.trim_start || 0)));
+  const end = Math.max(0, Math.min(duration || 0, Number(controls.trim_end || 0)));
+  const shouldShow = Boolean(hasDuration && end > start && trimDraftStart !== null);
+
+  if (trimDraftLabel) {
+    trimDraftLabel.textContent = trimDraftStart !== null
+      ? `start ${formatTransportTime(Number(trimDraftStart || 0))}`
+      : controls.trim_readout;
+  }
+
+  if (!trimDraftRange) return;
+
+  trimDraftRange.classList.toggle('show', shouldShow);
+  if (!shouldShow) return;
+
+  const left = (start / duration) * 100;
+  const width = ((end - start) / duration) * 100;
+  trimDraftRange.style.left = `${left}%`;
+  trimDraftRange.style.width = `${width}%`;
+}
+
+function updateTrimPlayhead() {
+  const duration = getTrimDuration();
+  const current = Math.max(0, Number(previewVideo.currentTime || 0));
+  const percent = Number.isFinite(duration) && duration > 0 ? Math.max(0, Math.min(100, (current / duration) * 100)) : 0;
+
+  if (trimPlayhead) {
+    trimPlayhead.style.left = `${percent}%`;
+  }
+
+  if (trimScrubPlayhead) {
+    trimScrubPlayhead.style.left = `${percent}%`;
+  }
+
+  if (trimWaveformPlayhead) {
+    trimWaveformPlayhead.style.left = `${percent}%`;
+  }
+
+  if (trimAudioMixPlayhead) {
+    trimAudioMixPlayhead.style.left = `${percent}%`;
+  }
+
+  if (trimFilmstripPlayhead) {
+    trimFilmstripPlayhead.style.left = `${percent}%`;
+  }
+}
+
+function trimTimeFromTimelineEvent(event) {
+  if (!trimTimelineTrack) return null;
+
+  const duration = getTrimDuration();
+  if (!Number.isFinite(duration) || duration <= 0) return null;
+
+  const rect = trimTimelineTrack.getBoundingClientRect();
+  if (!rect.width) return null;
+
+  const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+  return Number((ratio * duration).toFixed(3));
+}
+
+function seekTrimPreviewTo(time) {
+  const duration = getTrimDuration();
+  if (!Number.isFinite(duration) || duration <= 0) return;
+
+  const safeTime = Math.max(0, Math.min(duration, Number(time || 0)));
+  trimPlaybackSegmentIndex = -1;
+  previewVideo.currentTime = safeTime;
+  updateTransportControls();
+  syncNativeCaptionPreview();
+  updateTrimPlayhead();
+}
+
+/* Parse trim editor time from seconds or HH:MM:SS.mmm into timeline seconds. */
+function parseTrimEditorTime(value) {
+  const raw = String(value || '').trim().replace(',', '.');
+  if (!raw) return null;
+
+  if (!raw.includes(':')) {
+    const seconds = Number(raw);
+    return Number.isFinite(seconds) ? seconds : null;
+  }
+
+  const parts = raw.split(':').map(part => part.trim());
+  if (parts.some(part => part === '')) return null;
+
+  let seconds = 0;
+  let multiplier = 1;
+  while (parts.length) {
+    const part = Number(parts.pop());
+    if (!Number.isFinite(part)) return null;
+    seconds += part * multiplier;
+    multiplier *= 60;
+  }
+
+  return seconds;
+}
+
+/* Format trim editor time with millisecond precision for handle nudging. */
+function formatTrimEditorTime(value) {
+  const safe = Math.max(0, Number(value || 0));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = Math.floor(safe % 60);
+  const millis = Math.round((safe - Math.floor(safe)) * 1000);
+  const prefix = hours > 0 ? `${hours}:` : '';
+  return `${prefix}${String(minutes).padStart(hours > 0 ? 2 : 1, '0')}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+}
+
+/* Update the active trim diamond from the precision time input without crossing neighbour handles. */
+function updateActiveTrimPointFromInput(value) {
+  if (trimActiveSegmentIndex < 0 || !trimActiveEdge) return;
+  pushAppUndoState('Trim');
+
+  const duration = getTrimDuration();
+  const parsed = parseTrimEditorTime(value);
+  if (!Number.isFinite(duration) || duration <= 0 || parsed === null) return;
+
+  const minGap = 0.05;
+  const segments = getTrimSegments();
+  const endpointIndex = trimActiveSegmentIndex * 2 + (trimActiveEdge === 'end' ? 1 : 0);
+  const endpoints = segments.flatMap(segment => [segment.start, segment.end]);
+
+  if (endpointIndex < 0 || endpointIndex >= endpoints.length) return;
+
+  const minTime = endpointIndex === 0 ? 0 : endpoints[endpointIndex - 1] + minGap;
+  const maxTime = endpointIndex === endpoints.length - 1 ? duration : endpoints[endpointIndex + 1] - minGap;
+  endpoints[endpointIndex] = Math.max(minTime, Math.min(maxTime, parsed));
+
+  const updatedSegments = [];
+  for (let index = 0; index < endpoints.length; index += 2) {
+    updatedSegments.push({
+      start: Number(Math.max(0, endpoints[index]).toFixed(3)),
+      end: Number(Math.min(duration, endpoints[index + 1]).toFixed(3))
+    });
+  }
+
+  const activeSegment = updatedSegments[trimActiveSegmentIndex];
+  if (activeSegment) {
+    controls.trim_start = activeSegment.start;
+    controls.trim_end = activeSegment.end;
+    trimLastNudgedPoint = { index: trimActiveSegmentIndex, edge: trimActiveEdge };
+    seekTrimPreviewTo(trimActiveEdge === 'end' ? activeSegment.end : activeSegment.start);
+  }
+
+  saveTrimSegments(updatedSegments, { history: false });
+}
+
+/* Add trim start/end points from the playhead with I, ignoring duplicate stationary positions. */
+function addTrimPointFromPlayheadShortcut() {
+  if (!controls.trim_panel_enabled) return;
+
+  const duration = getTrimDuration();
+  if (!Number.isFinite(duration) || duration <= 0) return;
+
+  const minGap = 0.05;
+  const current = Number(Math.max(0, Math.min(duration, previewVideo.currentTime || 0)).toFixed(3));
+  const segments = getTrimSegments();
+
+  if (trimDraftStart === null) {
+    const lastEnd = segments.length ? segments[segments.length - 1].end : -Infinity;
+    if (current <= lastEnd + minGap) return;
+    addTrimPointFromTimeline(current);
+    return;
+  }
+
+  if (current <= Number(trimDraftStart || 0) + minGap) return;
+  addTrimPointFromTimeline(current);
+}
+
+
+/* Add a trim start/end point from the active caption cue while preserving trim range order. */
+function addTrimPointFromCaptionCue(index) {
+  const cue = subtitleCues[index];
+  const duration = getTrimDuration();
+  if (!cue || !Number.isFinite(duration) || duration <= 0) return;
+
+  controls.trim_panel_enabled = true;
+
+  const minGap = 0.05;
+  const startTime = Number(Math.max(0, Math.min(duration, Number(cue.start || 0) / 1000)).toFixed(3));
+  const endTime = Number(Math.max(0, Math.min(duration, Number(cue.end || 0) / 1000)).toFixed(3));
+
+  if (trimDraftStart === null) {
+    const segments = getTrimSegments();
+    const lastEnd = segments.length ? segments[segments.length - 1].end : -Infinity;
+    if (startTime <= lastEnd + minGap) return;
+    addTrimPointFromTimeline(startTime);
+    return;
+  }
+
+  if (endTime <= Number(trimDraftStart || 0) + minGap) return;
+  addTrimPointFromTimeline(endTime);
+}
+
+
+/* Keep playback inside selected trim ranges while preserving free manual seeking. */
+function prepareTrimPlaybackStart() {
+  trimPlaybackSegmentIndex = -1;
+
+  if (!controls.trim_panel_enabled || !controls.trim_play_ranges_only) return;
+
+  const segments = getTrimSegments();
+  if (!segments.length) return;
+
+  const current = Number(previewVideo.currentTime || 0);
+  const currentSegmentIndex = segments.findIndex(segment => current >= segment.start && current < segment.end - 0.025);
+  trimPlaybackSegmentIndex = currentSegmentIndex >= 0 ? currentSegmentIndex : -1;
+}
+
+/* Keep playback bounded only when playback starts inside an existing trim range. */
+function enforceTrimPlaybackRange() {
+  if (!controls.trim_panel_enabled || !controls.trim_play_ranges_only || previewVideo.paused) return;
+
+  const segments = getTrimSegments();
+  if (!segments.length || trimPlaybackSegmentIndex < 0) return;
+
+  const segment = segments[trimPlaybackSegmentIndex];
+  if (!segment) {
+    trimPlaybackSegmentIndex = -1;
+    return;
+  }
+
+  const current = Number(previewVideo.currentTime || 0);
+
+  if (current >= segment.start - 0.025 && current < segment.end - 0.025) {
+    return;
+  }
+
+  if (current < segment.start - 0.025) {
+    trimPlaybackSegmentIndex = -1;
+    return;
+  }
+
+  if (controls.trim_loop_playback) {
+    previewVideo.currentTime = segment.start;
+    updateTrimPlayhead();
+    return;
+  }
+
+  previewVideo.pause();
+  previewVideo.currentTime = segment.end;
+  trimPlaybackSegmentIndex = -1;
+  updateTransportControls();
+}
+
+function previewTrimSegmentEdge(index, edge) {
+  const segments = getTrimSegments();
+  const segment = segments[index];
+  if (!segment) return;
+
+  trimActiveSegmentIndex = index;
+  trimActiveEdge = edge === 'end' ? 'end' : 'start';
+  controls.trim_start = segment.start;
+  controls.trim_end = segment.end;
+  seekTrimPreviewTo(trimActiveEdge === 'end' ? segment.end : segment.start);
+  renderTrimPanel();
+  refreshGui();
+}
+
+function setDraftTrimFromSegment(index) {
+  const segments = getTrimSegments();
+  const segment = segments[index];
+  if (!segment) return;
+
+  trimActiveSegmentIndex = index;
+  trimActiveEdge = 'start';
+  trimDraftStart = null;
+  controls.trim_start = segment.start;
+  controls.trim_end = segment.end;
+  seekTrimPreviewTo(segment.start);
+  renderTrimPanel();
+  refreshGui();
+}
+
+function removeTrimSegment(index) {
+  const segments = getTrimSegments();
+  const numericIndex = Number(index);
+  if (!Number.isInteger(numericIndex) || numericIndex < 0 || numericIndex >= segments.length) return;
+
+  segments.splice(numericIndex, 1);
+  trimDraftStart = null;
+  trimPlaybackSegmentIndex = -1;
+
+  if (segments.length) {
+    const nextIndex = Math.min(numericIndex, segments.length - 1);
+    trimActiveSegmentIndex = nextIndex;
+    trimActiveEdge = 'start';
+    trimLastNudgedPoint = null;
+    controls.trim_start = segments[nextIndex].start;
+    controls.trim_end = segments[nextIndex].end;
+  } else {
+    trimActiveSegmentIndex = -1;
+    trimActiveEdge = null;
+    trimLastNudgedPoint = null;
+    controls.trim_start = 0;
+    controls.trim_end = getTrimDuration() || 0;
+  }
+
+  saveTrimSegments(segments);
+}
+
+function getTrimSegmentIndexForRemoval() {
+  const segments = getTrimSegments();
+  const lastNudgedIndex = Number(trimLastNudgedPoint?.index);
+  if (Number.isInteger(lastNudgedIndex) && lastNudgedIndex >= 0 && lastNudgedIndex < segments.length) {
+    return lastNudgedIndex;
+  }
+
+  const activeIndex = Number(trimActiveSegmentIndex);
+  if (Number.isInteger(activeIndex) && activeIndex >= 0 && activeIndex < segments.length) {
+    return activeIndex;
+  }
+
+  return -1;
+}
+
+function clearTrimSegments() {
+  const segments = getTrimSegments();
+  const hasDraft = trimDraftStart !== null;
+
+  if (!segments.length && !hasDraft) return;
+
+  pushAppUndoState('Trim');
+  controls.trim_segments_json = '[]';
+  trimDraftStart = null;
+  trimActiveSegmentIndex = -1;
+  trimActiveEdge = null;
+  trimLastNudgedPoint = null;
+  controls.trim_start = 0;
+  controls.trim_end = getTrimDuration() || 0;
+  updateTrimReadout();
+  renderTrimPanel();
+  refreshGui();
+}
+
+function addTrimPointFromTimeline(time) {
+  const duration = getTrimDuration();
+  if (!Number.isFinite(duration) || duration <= 0) return;
+
+  const minGap = 0.05;
+  const safeTime = Number(Math.max(0, Math.min(duration, Number(time || 0))).toFixed(3));
+  seekTrimPreviewTo(safeTime);
+
+  if (trimDraftStart === null) {
+    pushAppUndoState('Trim');
+    const segments = getTrimSegments();
+    const lastEnd = segments.length ? segments[segments.length - 1].end : -Infinity;
+    if (safeTime <= lastEnd + minGap) return;
+
+    trimDraftStart = safeTime;
+    controls.trim_start = safeTime;
+    controls.trim_end = safeTime;
+  } else {
+    const start = Math.min(trimDraftStart, safeTime);
+    const end = Math.max(trimDraftStart, safeTime);
+
+    if (end - start < minGap) {
+      trimDraftStart = safeTime;
+      controls.trim_start = safeTime;
+      controls.trim_end = safeTime;
+      renderTrimPanel();
+      refreshGui();
+      return;
+    }
+
+    controls.trim_start = start;
+    controls.trim_end = end;
+    addTrimSegmentFromControls({ history: false });
+    trimActiveEdge = 'end';
+    trimLastNudgedPoint = { index: trimActiveSegmentIndex, edge: 'end' };
+  }
+
+  updateTrimReadout();
+  renderTrimPanel();
+  refreshGui();
+}
+
+function beginTrimHandleDrag(event) {
+  const handle = event.target.closest('.trim-handle');
+  if (!handle) return false;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  if (handle.dataset.draftEdge) {
+    pushAppUndoState('Trim');
+    trimDragState = { draft: true, edge: 'start' };
+    trimActiveSegmentIndex = -1;
+    trimActiveEdge = 'start';
+    trimTimeline?.setPointerCapture?.(event.pointerId);
+    seekTrimPreviewTo(trimDraftStart || 0);
+    renderTrimPanel();
+    return true;
+  }
+
+  const index = Number(handle.dataset.segmentIndex || -1);
+  const edge = handle.dataset.edge;
+  const segments = getTrimSegments();
+  const segment = segments[index];
+
+  if (!segment || !edge) return false;
+
+  pushAppUndoState('Trim');
+  trimDragState = { index, edge };
+  trimActiveSegmentIndex = index;
+  trimActiveEdge = edge;
+  trimLastNudgedPoint = { index, edge };
+  trimTimeline?.setPointerCapture?.(event.pointerId);
+  seekTrimPreviewTo(edge === 'end' ? segment.end : segment.start);
+  renderTrimPanel();
+  return true;
+}
+
+function updateTrimHandleDrag(event) {
+  if (!trimDragState) return;
+
+  const time = trimTimeFromTimelineEvent(event);
+  if (time === null) return;
+
+  const minGap = 0.05;
+  const duration = getTrimDuration();
+
+  if (trimDragState.draft) {
+    trimDraftStart = Math.max(0, Math.min(duration, time));
+    controls.trim_start = trimDraftStart;
+    controls.trim_end = trimDraftStart;
+    seekTrimPreviewTo(trimDraftStart);
+    renderTrimPanel();
+    refreshGui();
+    return;
+  }
+
+  const segments = getTrimSegments();
+  const endpointIndex = trimDragState.index * 2 + (trimDragState.edge === 'end' ? 1 : 0);
+  const endpoints = segments.flatMap(segment => [segment.start, segment.end]);
+
+  if (!Number.isFinite(duration) || duration <= 0 || endpointIndex < 0 || endpointIndex >= endpoints.length) return;
+
+  const minTime = minGap * endpointIndex;
+  const maxTime = duration - minGap * (endpoints.length - 1 - endpointIndex);
+  endpoints[endpointIndex] = Math.max(minTime, Math.min(maxTime, time));
+
+  for (let index = endpointIndex - 1; index >= 0; index -= 1) {
+    endpoints[index] = Math.min(endpoints[index], endpoints[index + 1] - minGap);
+  }
+
+  for (let index = endpointIndex + 1; index < endpoints.length; index += 1) {
+    endpoints[index] = Math.max(endpoints[index], endpoints[index - 1] + minGap);
+  }
+
+  const updatedSegments = [];
+  for (let index = 0; index < endpoints.length; index += 2) {
+    updatedSegments.push({
+      start: Number(Math.max(0, endpoints[index]).toFixed(3)),
+      end: Number(Math.min(duration, endpoints[index + 1]).toFixed(3))
+    });
+  }
+
+  const activeSegment = updatedSegments[trimDragState.index];
+  if (activeSegment) {
+    trimActiveSegmentIndex = trimDragState.index;
+    trimActiveEdge = trimDragState.edge;
+    trimLastNudgedPoint = { index: trimDragState.index, edge: trimDragState.edge };
+    controls.trim_start = activeSegment.start;
+    controls.trim_end = activeSegment.end;
+    seekTrimPreviewTo(trimDragState.edge === 'end' ? activeSegment.end : activeSegment.start);
+  }
+
+  controls.trim_segments_json = JSON.stringify(normalizeTrimSegmentsWithBounds(updatedSegments, duration));
+  updateTrimReadout();
+  renderTrimPanel();
+  refreshGui();
+}
+
+function endTrimHandleDrag(event) {
+  if (!trimDragState) return;
+
+  trimTimeline?.releasePointerCapture?.(event.pointerId);
+  trimDragState = null;
+  saveTrimSegments(getTrimSegments(), { history: false });
+}
+
+function updateGradingReadout() {
+  const parts = [];
+  if (controls.grading_preset !== 'none') parts.push(controls.grading_preset.replace(/_/g, ' '));
+  if (Math.abs(Number(controls.grading_contrast || 1) - 1) > 0.001) parts.push(`contrast ${Number(controls.grading_contrast).toFixed(2)}`);
+  if (Math.abs(Number(controls.grading_saturation || 1) - 1) > 0.001) parts.push(`saturation ${Number(controls.grading_saturation).toFixed(2)}`);
+  if (Math.abs(Number(controls.grading_exposure || 0)) > 0.001) parts.push(`exposure ${Number(controls.grading_exposure).toFixed(2)}`);
+  if (Number(controls.grading_sharpness || 0) > 0) parts.push(`sharp ${Number(controls.grading_sharpness).toFixed(2)}`);
+  if (Number(controls.grading_blur || 0) > 0) parts.push(`blur ${Number(controls.grading_blur).toFixed(1)}`);
+  const vignetteStrength = Number(controls.grading_vignette_strength ?? controls.grading_vignette ?? 0);
+  controls.grading_vignette = vignetteStrength;
+  if (vignetteStrength > 0) {
+    parts.push(`vignette ${vignetteStrength.toFixed(2)} · radius ${Number(controls.grading_vignette_radius || 0).toFixed(2)} · feather ${Number(controls.grading_vignette_feather || 0).toFixed(2)}`);
+  }
+  controls.grading_readout = parts.length ? parts.join(' · ') : 'No grading changes.';
+}
+
+/* Request cancellation for the currently running backend job. */
+async function cancelCurrentJob(jobId) {
+  if (!jobId) return;
+  try {
+    await fetch(`/api/cancel/${encodeURIComponent(jobId)}`, { method: 'POST' });
+    showStatus('info', 'Cancelling job...');
+  } catch (error) {
+    showStatus('err', error.message || 'Could not cancel job.');
+  }
+}
+
+function bindJobCancelButton(jobId) {
+  const button = statusEl.querySelector('[data-job-cancel]');
+  if (!button) return;
+  button.addEventListener('click', () => cancelCurrentJob(jobId), { once: true });
+}
+
 function collectSettings(formData, options = {}) {
   const values = { ...controls };
 
@@ -5650,9 +8366,25 @@ function collectSettings(formData, options = {}) {
      Aspect Canvas is exported only when the explicit `aspect_enabled` checkbox is on
      or when the current operation itself is the Aspect Canvas operation. */
   values.aspect_enabled = Boolean(controls.aspect_enabled);
+  values.trim_segments_json = controls.trim_segments_json || '[]';
+  if (values.grading_vignette_strength === undefined || values.grading_vignette_strength === null) {
+    values.grading_vignette_strength = Number(values.grading_vignette || 0);
+  }
+  values.grading_vignette = Number(values.grading_vignette_strength || 0);
+  updateGradingReadout();
+  syncAudioMixState();
+  values.audio_mix_enabled = Boolean(audioMixTracks.length);
+  values.audio_tracks_json = controls.audio_tracks_json || '[]';
+  values.audio_source_volume = Number(controls.audio_source_volume || 1);
 
   Object.entries(values).forEach(([key, value]) => {
     formData.append(key, String(value));
+  });
+
+  audioMixTracks.forEach(track => {
+    if (track?.file) {
+      formData.append('audio_tracks', track.file, track.file.name || track.name || 'audio');
+    }
   });
 }
 
@@ -6021,22 +8753,27 @@ function formatEtaSeconds(totalSeconds) {
 }
 
 function formatJobStatusMessage(data) {
-  const base = String(data?.message || '').trim() || 'Working...';
+  const base = escapeHtml(String(data?.message || '').trim() || 'Working...');
   const current = Number.isFinite(Number(data?.progress_current)) ? Number(data.progress_current) : null;
   const total = Number.isFinite(Number(data?.progress_total)) ? Number(data.progress_total) : null;
   const eta = Number.isFinite(Number(data?.eta_seconds)) ? Number(data.eta_seconds) : null;
+  const logs = Array.isArray(data?.logs) ? data.logs.slice(-8) : [];
+
+  let line = base;
 
   if (current !== null && total !== null && total > 0) {
     const percent = Math.max(0, Math.min(100, Math.round((current / total) * 100)));
     const etaText = eta !== null && current < total ? ` · ETA ${formatEtaSeconds(eta)}` : '';
-    return `${base} (${current}/${total}, ${percent}%)${etaText}`;
+    line = `${base} (${current}/${total}, ${percent}%)${etaText}`;
+  } else if (eta !== null && eta > 0) {
+    line = `${base} · ETA ${formatEtaSeconds(eta)}`;
   }
 
-  if (eta !== null && eta > 0) {
-    return `${base} · ETA ${formatEtaSeconds(eta)}`;
-  }
+  const logHtml = logs.length
+    ? `<div class="job-log">${logs.map(item => `<div class="job-log-row"><strong>${escapeHtml(item.time || '')}</strong> ${escapeHtml(item.message || '')}</div>`).join('')}</div>`
+    : '';
 
-  return base;
+  return `${line}<br><button type="button" class="job-cancel-button" data-job-cancel>Cancel job</button>${logHtml}`;
 }
 
 
@@ -6044,6 +8781,7 @@ function formatJobStatusMessage(data) {
 /* Caption jobs auto-load the generated VTT into the existing subtitle preview flow. */
 async function startPolling(jobId) {
   if (pollTimer) clearInterval(pollTimer);
+  setProcessingChrome(true);
 
   pollTimer = setInterval(async () => {
     try {
@@ -6056,6 +8794,7 @@ async function startPolling(jobId) {
 
       if (data.status === 'queued' || data.status === 'preparing' || data.status === 'rendering') {
         showStatus('info', formatJobStatusMessage(data));
+        bindJobCancelButton(jobId);
         return;
       }
 
@@ -6084,6 +8823,7 @@ async function startPolling(jobId) {
         }
 
         showingRenderedOutput = true;
+        stopLiveAudioPreviewTracks();
         controls.aspect_live_preview = false;
         previewVideo.src = `${data.preview_url}?t=${Date.now()}`;
         previewVideo.style.display = 'block';
@@ -6134,6 +8874,22 @@ async function startPolling(jobId) {
           applyHelperPreview();
         });
 
+        setProcessingChrome(false);
+        return;
+      }
+
+      if (data.status === 'cancelled') {
+        clearInterval(pollTimer);
+        pollTimer = null;
+
+        previewBtn.disabled = false;
+        renderFullBtn.disabled = false;
+        previewBtn.textContent = 'Render preview';
+        renderFullBtn.textContent = 'Render full';
+        pendingOutputContext = null;
+
+        setProcessingChrome(false);
+        showStatus('info', 'Job cancelled.');
         return;
       }
 
@@ -6146,6 +8902,7 @@ async function startPolling(jobId) {
         previewBtn.textContent = 'Render preview';
         renderFullBtn.textContent = 'Render full';
 
+        setProcessingChrome(false);
         showStatus('err', data.message || 'Render failed.');
       }
     } catch (err) {
@@ -6157,6 +8914,7 @@ async function startPolling(jobId) {
       previewBtn.textContent = 'Render preview';
       renderFullBtn.textContent = 'Render full';
 
+      setProcessingChrome(false);
       showStatus('err', err.message || 'Polling failed.');
     }
   }, 1000);
@@ -6432,10 +9190,18 @@ function renderCaptionsEditor(options = {}) {
     const rowActions = document.createElement('div');
     rowActions.className = 'caption-row-actions';
 
+    const trimPointButton = document.createElement('button');
+    trimPointButton.type = 'button';
+    trimPointButton.className = 'asset-mini-button caption-trim-point-button';
+    trimPointButton.textContent = '+ Trim point';
+    trimPointButton.title = 'Add trim start or end from this caption';
+
     const deleteButton = document.createElement('button');
     deleteButton.type = 'button';
     deleteButton.className = 'asset-mini-button danger';
     deleteButton.textContent = 'Delete cue';
+
+    rowActions.append(trimPointButton);
     rowActions.append(deleteButton);
 
     const focusCueInPreview = () => {
@@ -6478,6 +9244,10 @@ function renderCaptionsEditor(options = {}) {
 
     seekButton.addEventListener('click', () => {
       seekPreviewToCaptionEditorRow(index, { scroll: true });
+    });
+
+    trimPointButton.addEventListener('click', () => {
+      addTrimPointFromCaptionCue(index);
     });
 
     deleteButton.addEventListener('click', () => {
@@ -6920,6 +9690,7 @@ function seekPreviewToCaptionEditorRow(index, options = {}) {
   updateTransportControls();
   syncNativeCaptionPreview();
   applyHelperPreview();
+  updateTrimPlayhead();
   updateCaptionRowsActiveState(index);
 
   if (options.scroll) {
@@ -7123,22 +9894,31 @@ async function renderVideo(mode) {
   clearStatus();
 
   const sourceAsset = getSelectedProjectAsset();
+  const burnCaptions = Boolean(controls.render_burn_captions);
   let video = await getActiveSourceVideoFile();
-  if (captionsDirty && subtitleCues.length) {
-    await saveCurrentCaptionsToSelectedAsset({ silent: true, source: 'autosave-before-render' });
-  } else if (subtitleCues.length) {
-    syncEditedCaptionsToSubtitleInput();
+
+  if (burnCaptions) {
+    if (captionsDirty && subtitleCues.length) {
+      await saveCurrentCaptionsToSelectedAsset({ silent: true, source: 'autosave-before-render' });
+    } else if (subtitleCues.length) {
+      syncEditedCaptionsToSubtitleInput();
+    }
   }
+
   const srt = srtInput.files[0];
 
-  if (!video || !srt) {
-    showStatus('err', 'Choose subtitle and either load a new video or reuse the cached one.');
+  if (!video || (burnCaptions && !srt)) {
+    showStatus('err', burnCaptions
+      ? 'Choose subtitle and either load a new video or reuse the cached one.'
+      : 'Choose a video or reuse the cached one.');
     return;
   }
 
   const formData = new FormData();
   formData.append('video', video, video.name);
-  formData.append('srt', srt, srt.name);
+  if (burnCaptions && srt) {
+    formData.append('srt', srt, srt.name);
+  }
   formData.append('mode', mode);
   collectSettings(formData, { forCaptionRender: true });
 
@@ -7195,6 +9975,10 @@ async function processVideo(processKind, mode) {
     return;
   }
 
+  if (processKind === 'trim' && captionsDirty && subtitleCues.length) {
+    await saveCurrentCaptionsToSelectedAsset({ silent: true, source: 'autosave-before-trim' });
+  }
+
   const formData = new FormData();
   formData.append('video', video, video.name);
   formData.append('process_kind', processKind);
@@ -7236,6 +10020,14 @@ async function processVideo(processKind, mode) {
     aspect: {
       preview: 'Starting aspect-ratio preview...',
       full: 'Starting aspect-ratio conversion...'
+    },
+    trim: {
+      preview: 'Starting trim preview...',
+      full: 'Starting trim render...'
+    },
+    grade: {
+      preview: 'Starting grading preview...',
+      full: 'Starting grading render...'
     }
   };
 
@@ -7420,16 +10212,24 @@ async function renderPreview() {
 function updateFromDrag(clientX, clientY) {
   const rect = helperLayer.getBoundingClientRect();
   const boxRect = helperCaption.getBoundingClientRect();
-  if (!rect.width || !rect.height) return;
+  const scale = getPreviewScaleFactor();
+  if (!rect.width || !rect.height || !scale) return;
 
+  const alignmentValue = Number(controls.alignment);
+  const horizontalMarginShift = [1, 4, 7].includes(alignmentValue)
+  ? controls.margin_h
+  : ([3, 6, 9].includes(alignmentValue) ? -controls.margin_h : 0);
+  const verticalMarginShift = [7, 8, 9].includes(alignmentValue)
+  ? controls.margin_v
+  : ([1, 2, 3].includes(alignmentValue) ? -controls.margin_v : 0);
   const halfW = Math.min(boxRect.width / 2, rect.width / 2);
   const halfH = Math.min(boxRect.height / 2, rect.height / 2);
 
   const clampedX = Math.max(rect.left + halfW, Math.min(rect.right - halfW, clientX));
   const clampedY = Math.max(rect.top + halfH, Math.min(rect.bottom - halfH, clientY));
 
-  controls.anchor_x = Number(((clampedX - rect.left) / rect.width).toFixed(4));
-  controls.anchor_y = Number(((clampedY - rect.top) / rect.height).toFixed(4));
+  controls.anchor_x = Number(Math.max(0, Math.min(1, (clampedX - rect.left - (horizontalMarginShift * scale)) / rect.width)).toFixed(4));
+  controls.anchor_y = Number(Math.max(0, Math.min(1, (clampedY - rect.top - (verticalMarginShift * scale)) / rect.height)).toFixed(4));
   controls.offset_x = 0;
   controls.offset_y = 0;
 
@@ -7463,16 +10263,24 @@ helperCaption.addEventListener('pointercancel', () => {
 function updateOverlayFromDrag(clientX, clientY) {
   const rect = helperLayer.getBoundingClientRect();
   const boxRect = overlayHelper.getBoundingClientRect();
-  if (!rect.width || !rect.height) return;
+  const scale = getPreviewScaleFactor();
+  if (!rect.width || !rect.height || !scale) return;
 
+  const overlayAlignmentValue = Number(controls.overlay_alignment);
+  const overlayHorizontalMarginShift = [1, 4, 7].includes(overlayAlignmentValue)
+  ? controls.overlay_margin_h
+  : ([3, 6, 9].includes(overlayAlignmentValue) ? -controls.overlay_margin_h : 0);
+  const overlayVerticalMarginShift = [7, 8, 9].includes(overlayAlignmentValue)
+  ? controls.overlay_margin_v
+  : ([1, 2, 3].includes(overlayAlignmentValue) ? -controls.overlay_margin_v : 0);
   const halfW = Math.min(boxRect.width / 2, rect.width / 2);
   const halfH = Math.min(boxRect.height / 2, rect.height / 2);
 
   const clampedX = Math.max(rect.left + halfW, Math.min(rect.right - halfW, clientX));
   const clampedY = Math.max(rect.top + halfH, Math.min(rect.bottom - halfH, clientY));
 
-  controls.overlay_anchor_x = Number(((clampedX - rect.left) / rect.width).toFixed(4));
-  controls.overlay_anchor_y = Number(((clampedY - rect.top) / rect.height).toFixed(4));
+  controls.overlay_anchor_x = Number(Math.max(0, Math.min(1, (clampedX - rect.left - (overlayHorizontalMarginShift * scale)) / rect.width)).toFixed(4));
+  controls.overlay_anchor_y = Number(Math.max(0, Math.min(1, (clampedY - rect.top - (overlayVerticalMarginShift * scale)) / rect.height)).toFixed(4));
   controls.overlay_offset_x = 0;
   controls.overlay_offset_y = 0;
 
@@ -7540,6 +10348,11 @@ document.addEventListener('input', event => {
 document.addEventListener('change', event => {
   if (event.target?.closest?.('.lil-gui')) scheduleProjectVisualSettingsSave();
 });
+document.addEventListener('pointerdown', armAppHistoryFromGuiInteraction, true);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Tab') return;
+  armAppHistoryFromGuiInteraction(event);
+}, true);
 window.addEventListener('beforeunload', persistProjectVisualSettingsBeforeUnload);
 setInterval(scheduleProjectVisualSettingsSave, 1000);
 
@@ -7601,6 +10414,75 @@ let presetController = null;
 
 
 /* Expose backend bridge actions through lil-gui while safely handling missing DOM nodes. */
+
+/* Remove generated server trash and clear browser-side project, preset, cache, and app settings data. */
+async function flushDevData() {
+  const values = await openAppModal({
+    title: 'Flush app data',
+    description: 'Deletes browser projects, cached videos, presets, generated output cache, uploads, and stuck processing trash for this local app.',
+    icon: '!',
+    confirmText: 'Flush data',
+    danger: true,
+    fields: [
+      {
+        name: 'confirmText',
+        label: 'Type FLUSH to confirm',
+        placeholder: 'FLUSH',
+        required: true,
+        maxLength: 16
+      }
+    ],
+    validator(values) {
+      return String(values.confirmText || '').trim().toUpperCase() === 'FLUSH'
+        ? ''
+        : 'Type FLUSH exactly to confirm.';
+    }
+  });
+
+  if (!values) return;
+
+  showStatus('info', 'Flushing app data...');
+
+  try {
+    if (pollTimer) {
+      window.clearInterval(pollTimer);
+      pollTimer = null;
+    }
+
+    await fetch('/api/dev_flush', { method: 'POST' }).catch(() => null);
+
+    await Promise.allSettled([
+      new Promise(resolve => {
+        const request = indexedDB.deleteDatabase(PROJECT_DB_NAME);
+        request.onsuccess = request.onerror = request.onblocked = resolve;
+      }),
+      new Promise(resolve => {
+        const request = indexedDB.deleteDatabase(PRESET_DB_NAME);
+        request.onsuccess = request.onerror = request.onblocked = resolve;
+      }),
+      new Promise(resolve => {
+        const request = indexedDB.deleteDatabase(VIDEO_CACHE_DB_NAME);
+        request.onsuccess = request.onerror = request.onblocked = resolve;
+      })
+    ]);
+
+    localStorage.removeItem(PROJECT_LAST_KEY);
+    localStorage.removeItem(PRESET_LOCALSTORAGE_KEY);
+    localStorage.removeItem(VIDEO_CACHE_META_KEY);
+    localStorage.removeItem(APP_SETTINGS_LOCAL_KEY);
+
+    if ('caches' in window) {
+      const names = await caches.keys();
+      await Promise.allSettled(names.map(name => caches.delete(name)));
+    }
+
+    showStatus('ok', 'App data flushed. Reloading...');
+    window.setTimeout(() => window.location.reload(), 450);
+  } catch (error) {
+    showStatus('err', error.message || 'Could not flush app data.');
+  }
+}
+
 const actionState = {
   /* Return the selected video filename for lil-gui display. */
   get video_file() {
@@ -7748,6 +10630,12 @@ const actionState = {
   /* Reset the full UI state. */
   reset_all() {
     resetUI();
+    refreshGui();
+  },
+
+  /* Flush local development caches, IndexedDB app data, generated outputs, and stuck job trash. */
+  async flush_dev_data() {
+    await flushDevData();
     refreshGui();
   }
 };
@@ -7999,6 +10887,9 @@ globalOverlayStopsFolder.close();
 globalOverlayFolder.close();
 syncGlobalOverlaySelectedStopFields();
 renderGlobalOverlayStopsPanel();
+updateTrimReadout();
+updateGradingReadout();
+renderTrimPanel();
 
 const overlayFolder = gui.addFolder('Overlay Layer');
 overlayFolder.add(controls, 'overlay_enabled').name('enabled').onChange(applyHelperPreview);
@@ -8158,8 +11049,13 @@ aspectFolder.add(controls, 'aspect_ratio', {
   'Portrait 9:16': '9:16',
   'Portrait 4:5': '4:5',
   'Landscape 16:9': '16:9'
-}).name('ratio').onChange(syncAspectDimensionsFromRatio);
-aspectFolder.addColor(controls, 'aspect_border_colour').name('border colour').onChange(applyHelperPreview);
+}).name('ratio').onChange(() => {
+  syncAspectDimensionsFromRatio();
+  markAspectCanvasForExport();
+});
+aspectFolder.addColor(controls, 'aspect_border_colour').name('border colour').onChange(() => {
+  markAspectCanvasForExport();
+});
 aspectFolder.add(controls, 'aspect_size_mode', {
   'Keep source size — pad only': 'none',
   'Resize by canvas width': 'width',
@@ -8167,18 +11063,31 @@ aspectFolder.add(controls, 'aspect_size_mode', {
   'Custom exact canvas': 'custom'
 }).name('sizing mode').onChange(value => {
   if (value === 'none') {
-    showStatus('info', 'Live preview is CSS only. Export keeps source pixels unchanged and only adds coloured padding. Use the deviation sliders to add/remove pixels after the ratio baseline is calculated.');
+    showStatus('info', 'Aspect Canvas export is enabled. Export keeps source pixels unchanged and adds coloured padding. Use deviation sliders to add/remove pixels after ratio baseline.');
   } else if (value === 'custom') {
-    showStatus('info', 'Live preview uses the baseline width/height plus any deviation pixels. Export scales the source to fit that final canvas.');
+    showStatus('info', 'Aspect Canvas export is enabled. Export scales the source to fit the final custom canvas.');
   } else {
-    showStatus('info', 'Live preview updates instantly. Export scales the source to fit the ratio baseline plus any width/height deviation.');
+    showStatus('info', 'Aspect Canvas export is enabled. Export scales the source to fit the ratio baseline plus deviation pixels.');
   }
   syncAspectDimensionsFromRatio();
+  markAspectCanvasForExport();
 });
-aspectFolder.add(controls, 'aspect_target_width', 2, 7680, 2).name('ratio baseline width px').onChange(() => updateLinkedAspectDimension('width'));
-aspectFolder.add(controls, 'aspect_target_height', 2, 7680, 2).name('ratio baseline height px').onChange(() => updateLinkedAspectDimension('height'));
-aspectFolder.add(controls, 'aspect_width_nudge', -1000, 1000, 2).name('deviate width ±px').onChange(updateAspectNudge);
-aspectFolder.add(controls, 'aspect_height_nudge', -1000, 1000, 2).name('deviate height ±px').onChange(updateAspectNudge);
+aspectFolder.add(controls, 'aspect_target_width', 2, 7680, 2).name('ratio baseline width px').onChange(() => {
+  updateLinkedAspectDimension('width');
+  markAspectCanvasForExport();
+});
+aspectFolder.add(controls, 'aspect_target_height', 2, 7680, 2).name('ratio baseline height px').onChange(() => {
+  updateLinkedAspectDimension('height');
+  markAspectCanvasForExport();
+});
+aspectFolder.add(controls, 'aspect_width_nudge', -1000, 1000, 2).name('deviate width ±px').onChange(() => {
+  updateAspectNudge();
+  markAspectCanvasForExport();
+});
+aspectFolder.add(controls, 'aspect_height_nudge', -1000, 1000, 2).name('deviate height ±px').onChange(() => {
+  updateAspectNudge();
+  markAspectCanvasForExport();
+});
 const aspectReadoutController = aspectFolder.add(controls, 'aspect_readout').name('live size').listen();
 if (aspectReadoutController.disable) {
   aspectReadoutController.disable();
@@ -8186,11 +11095,13 @@ if (aspectReadoutController.disable) {
 aspectFolder.add({
   set_from_ratio() {
     syncAspectDimensionsFromRatio();
+    markAspectCanvasForExport();
   }
 }, 'set_from_ratio').name('Set baseline from ratio/source');
 aspectFolder.add({
   reset_deviation() {
     resetAspectNudge();
+    markAspectCanvasForExport();
   }
 }, 'reset_deviation').name('Reset deviation to ratio');
 aspectFolder.add({
@@ -8338,8 +11249,8 @@ if (cropReadoutController.disable) {
 cropFolder.add({ set_full_source: setCropToFullSource }, 'set_full_source').name('Set full source');
 cropFolder.add({ set_half_center: setCropToHalfCenter }, 'set_half_center').name('Set half center');
 cropFolder.add({ confirm_drawn_rectangle: confirmCropDraft }, 'confirm_drawn_rectangle').name('Confirm drawn rectangle');
-cropFolder.add({ undo_crop: undoCrop }, 'undo_crop').name('Undo crop');
-cropFolder.add({ redo_crop: redoCrop }, 'redo_crop').name('Redo crop');
+cropFolder.add({ undo_crop: undoCrop }, 'undo_crop').name('Undo edit');
+cropFolder.add({ redo_crop: redoCrop }, 'redo_crop').name('Redo edit');
 cropFolder.add({
   crop_preview() {
     return processVideo('crop', 'preview');
@@ -8352,6 +11263,125 @@ cropFolder.add({
 }, 'crop_full').name('Crop full');
 cropFolder.close();
 
+const historyFolder = gui.addFolder('History');
+historyFolder.add({ undo_edit: undoAppEdit }, 'undo_edit').name('Undo edit');
+historyFolder.add({ redo_edit: redoAppEdit }, 'redo_edit').name('Redo edit');
+historyFolder.close();
+
+const trimFolder = gui.addFolder('Trim Video');
+trimFolder.add(controls, 'trim_panel_enabled').name('show trim line').onChange(() => {
+  pushAppUndoState('Trim');
+  renderTrimPanel();
+  updateTransportControls();
+});
+trimFolder.add(controls, 'trim_play_ranges_only').name('play kept ranges only').onChange(() => {
+  pushAppUndoState('Trim');
+  updateTransportControls();
+});
+trimFolder.add(controls, 'trim_loop_playback').name('loop kept ranges').onChange(() => {
+  pushAppUndoState('Trim');
+  renderTrimPanel();
+  updateTransportControls();
+});
+trimFolder.add(controls, 'trim_waveform_enabled').name('show waveform').onChange(() => {
+  pushAppUndoState('Trim');
+  renderTrimPanel();
+});
+trimFolder.add(controls, 'trim_filmstrip_enabled').name('show frames').onChange(() => {
+  pushAppUndoState('Trim');
+  renderTrimPanel();
+});
+trimFolder.add(controls, 'trim_caption_mode', {
+  'Adjust captions to trimmed timeline': 'adjust',
+  'Generate new captions after trim': 'recaption',
+  'No captions on trimmed output': 'none'
+}).name('captions after trim');
+trimFolder.add({ remove_selected_range() {
+  if (trimActiveSegmentIndex >= 0) {
+    removeTrimSegment(trimActiveSegmentIndex);
+  }
+} }, 'remove_selected_range').name('Remove selected');
+trimFolder.add({ clear_draft() { clearTrimDraft(); } }, 'clear_draft').name('Clear draft');
+trimFolder.add({ clear_ranges() { clearTrimSegments(); } }, 'clear_ranges').name('Clear Trim');
+trimFolder.add(controls, 'trim_readout').name('ranges').listen();
+trimFolder.add({
+  trim_preview() {
+    return processVideo('trim', 'preview');
+  }
+}, 'trim_preview').name('Trim preview');
+trimFolder.add({
+  trim_full() {
+    return processVideo('trim', 'full');
+  }
+}, 'trim_full').name('Trim full');
+trimFolder.close();
+
+
+const gradingFolder = gui.addFolder('Grading');
+gradingFolder.add(controls, 'grading_preset', {
+  'None': 'none',
+  'Black and white': 'black_white',
+  'Invert': 'invert',
+  'Sepia': 'sepia',
+  'Tint': 'tint'
+}).name('preset').onChange(() => { updateGradingReadout(); refreshGui(); scheduleProjectVisualSettingsSave(); });
+gradingFolder.addColor(controls, 'grading_tint_colour').name('tint colour').onChange(() => { updateGradingReadout(); scheduleProjectVisualSettingsSave(); });
+gradingFolder.add(controls, 'grading_tint_strength', 0, 1, 0.01).name('tint strength').onChange(() => { updateGradingReadout(); scheduleProjectVisualSettingsSave(); });
+gradingFolder.add(controls, 'grading_contrast', 0, 3, 0.01).name('contrast').onChange(() => { updateGradingReadout(); scheduleProjectVisualSettingsSave(); });
+gradingFolder.add(controls, 'grading_saturation', 0, 3, 0.01).name('saturation').onChange(() => { updateGradingReadout(); scheduleProjectVisualSettingsSave(); });
+gradingFolder.add(controls, 'grading_exposure', -2, 2, 0.01).name('exposure').onChange(() => { updateGradingReadout(); scheduleProjectVisualSettingsSave(); });
+gradingFolder.add(controls, 'grading_sharpness', 0, 3, 0.01).name('sharpness').onChange(() => { updateGradingReadout(); scheduleProjectVisualSettingsSave(); });
+gradingFolder.add(controls, 'grading_blur', 0, 20, 0.1).name('blur').onChange(() => { updateGradingReadout(); scheduleProjectVisualSettingsSave(); });
+const vignetteFolder = gradingFolder.addFolder('Vignette');
+vignetteFolder.add(controls, 'grading_vignette_strength', 0, 1, 0.01).name('strength').onChange(value => {
+  controls.grading_vignette = Number(value || 0);
+  updateGradingReadout();
+  scheduleProjectVisualSettingsSave();
+});
+vignetteFolder.addColor(controls, 'grading_vignette_colour').name('colour').onChange(() => { updateGradingReadout(); scheduleProjectVisualSettingsSave(); });
+vignetteFolder.add(controls, 'grading_vignette_radius', 0.05, 1.2, 0.01).name('clear centre radius').onChange(() => { updateGradingReadout(); scheduleProjectVisualSettingsSave(); });
+vignetteFolder.add(controls, 'grading_vignette_feather', 0.02, 1.2, 0.01).name('soft feather').onChange(() => { updateGradingReadout(); scheduleProjectVisualSettingsSave(); });
+vignetteFolder.add(controls, 'grading_vignette_center_x', -0.5, 1.5, 0.01).name('centre x').onChange(() => { updateGradingReadout(); scheduleProjectVisualSettingsSave(); });
+vignetteFolder.add(controls, 'grading_vignette_center_y', -0.5, 1.5, 0.01).name('centre y').onChange(() => { updateGradingReadout(); scheduleProjectVisualSettingsSave(); });
+vignetteFolder.close();
+gradingFolder.add(controls, 'grading_readout').name('readout').listen();
+gradingFolder.add({
+  grading_preview() {
+    updateGradingReadout();
+    return processVideo('grade', 'preview');
+  }
+}, 'grading_preview').name('Grading preview');
+gradingFolder.add({
+  grading_full() {
+    updateGradingReadout();
+    return processVideo('grade', 'full');
+  }
+}, 'grading_full').name('Grading full');
+gradingFolder.close();
+
+
+const audioMixFolder = gui.addFolder('Audio Mix');
+audioMixFolder.add({ add_audio_file() { audioMixInput?.click(); } }, 'add_audio_file').name('Add audio file');
+audioMixFolder.add(controls, 'audio_source_volume', 0, 3, 0.01).name('source volume').onChange(() => { pushAppUndoState('Audio Mix'); syncAudioMixState(); });
+audioMixFolder.add(controls, 'audio_track_volume', 0, 3, 0.01).name('selected volume').onChange(value => {
+  const track = audioMixTracks.find(item => item.id === activeAudioTrackId);
+  if (track) {
+    pushAppUndoState('Audio Mix');
+    track.volume = Number(value || 0);
+    syncAudioMixState();
+  }
+});
+audioMixFolder.add(controls, 'audio_track_pan', -1, 1, 0.01).name('selected pan L/R').onChange(value => {
+  const track = audioMixTracks.find(item => item.id === activeAudioTrackId);
+  if (track) {
+    pushAppUndoState('Audio Mix');
+    track.pan = Number(value || 0);
+    syncAudioMixState();
+  }
+});
+audioMixFolder.add({ remove_selected_audio() { removeSelectedAudioMixTrack(); } }, 'remove_selected_audio').name('Remove selected');
+audioMixFolder.add(controls, 'audio_readout').name('readout').listen();
+audioMixFolder.close();
 
 const captionsFolder = gui.addFolder('Captions');
 captionsFolder.add(controls, 'caption_model', {
@@ -8459,6 +11489,10 @@ actionsFolder.add(actionState, 'save_as_preset').name('Save preset as');
 actionsFolder.add(actionState, 'delete_preset').name('Delete preset');
 actionsFolder.add(actionState, 'export_preset').name('Export preset');
 actionsFolder.add(actionState, 'import_preset').name('Import preset');
+actionsFolder.add(controls, 'render_burn_captions').name('Burn captions').onChange(() => {
+  syncEasyToolbarControls();
+  scheduleProjectVisualSettingsSave();
+});
 
 actionsFolder.add(actionState, 'render_full').name('Render full');
 
@@ -8480,6 +11514,7 @@ if (typeof assReadyController.disable === 'function') {
 actionsFolder.add(actionState, 'open_preview').name('Open preview');
 actionsFolder.add(actionState, 'open_ass').name('Open ASS');
 actionsFolder.add(actionState, 'reset_all').name('Reset');
+actionsFolder.add(actionState, 'flush_dev_data').name('Dev flush data');
 //actionsFolder.close();
 
 presetSelect.addEventListener('change', () => {
@@ -8583,6 +11618,24 @@ if (easyRenderFullBtn) {
   easyRenderFullBtn.addEventListener('click', () => renderVideo('full'));
 }
 
+if (easyBurnCaptionsToggle) {
+  easyBurnCaptionsToggle.addEventListener('change', () => {
+    controls.render_burn_captions = Boolean(easyBurnCaptionsToggle.checked);
+    syncEasyToolbarControls();
+    refreshGui();
+    scheduleProjectVisualSettingsSave();
+  });
+}
+
+if (burnCaptionsToggle) {
+  burnCaptionsToggle.addEventListener('change', () => {
+    controls.render_burn_captions = Boolean(burnCaptionsToggle.checked);
+    syncEasyToolbarControls();
+    refreshGui();
+    scheduleProjectVisualSettingsSave();
+  });
+}
+
 if (easyFontGalleryBtn) {
   easyFontGalleryBtn.addEventListener('click', openFontGallery);
 }
@@ -8640,6 +11693,17 @@ captionEditorList?.addEventListener('focusin', event => {
     seekPreviewToCaptionEditorRow(rowIndex);
   }
 });
+
+captionEditorList?.addEventListener('pointerdown', event => {
+  const target = event.target;
+  if (!target?.matches?.('.caption-time-input, .caption-textarea')) return;
+
+  const row = target.closest('.caption-row');
+  const rowIndex = Number(row?.dataset.index ?? -1);
+  if (rowIndex >= 0) {
+    seekPreviewToCaptionEditorRow(rowIndex);
+  }
+});
 captionEditorList?.addEventListener('wheel', () => {
   captionsManualScrollPauseUntil = Date.now() + 1800;
 }, { passive: true });
@@ -8661,11 +11725,12 @@ captionEditorList?.addEventListener('touchstart', () => {
   });
 });
 
-/* Accept dropped source video and subtitle files, including WebM, then persist the video in the chosen project. */
+/* Accept dropped source video, subtitle, and extra audio files, then persist them into the active project workflow. */
 document.body.addEventListener('drop', async event => {
   const files = [...event.dataTransfer.files];
   const videoFile = files.find(file => /\.(mp4|mov|m4v|webm)$/i.test(file.name));
   const srtFile = files.find(file => /\.(srt|vtt)$/i.test(file.name));
+  const audioFiles = files.filter(file => isAudioMixFile(file));
 
   if (videoFile) {
     setFileInput(videoInput, videoFile);
@@ -8678,6 +11743,10 @@ document.body.addEventListener('drop', async event => {
     captionsDirty = true;
     await saveCurrentCaptionsToSelectedAsset({ silent: true, source: 'dropped' });
     setSidebarTab('captions');
+  }
+
+  if (audioFiles.length) {
+    await addAudioMixFiles(audioFiles);
   }
 
   updateMeta();
@@ -8714,6 +11783,7 @@ srtInput.addEventListener('change', async () => {
 playPauseBtn.addEventListener('click', async () => {
   try {
     if (previewVideo.paused) {
+      prepareTrimPlaybackStart();
       await previewVideo.play();
     } else {
       previewVideo.pause();
@@ -8727,18 +11797,139 @@ playPauseBtn.addEventListener('click', async () => {
 transportSeek.addEventListener('input', () => {
   const duration = Number(previewVideo.duration || 0);
   if (!Number.isFinite(duration) || duration <= 0) return;
+  trimPlaybackSegmentIndex = -1;
   previewVideo.currentTime = (Number(transportSeek.value || 0) / 1000) * duration;
   updateTransportControls();
 });
 
+trimToggleBtn?.addEventListener('click', () => {
+  pushAppUndoState('Trim');
+  controls.trim_panel_enabled = !controls.trim_panel_enabled;
+  renderTrimPanel();
+  updateTransportControls();
+  refreshGui();
+});
+
+trimLoopBtn?.addEventListener('click', () => {
+  pushAppUndoState('Trim');
+  controls.trim_loop_playback = !controls.trim_loop_playback;
+  renderTrimPanel();
+  updateTransportControls();
+  refreshGui();
+});
+
+trimScrubTimeline?.addEventListener('pointerdown', event => {
+  event.preventDefault();
+  trimScrubDragState = true;
+  trimScrubTimeline.setPointerCapture?.(event.pointerId);
+  setTrimScrubTimeFromEvent(event);
+});
+
+trimScrubTimeline?.addEventListener('pointermove', event => {
+  if (!trimScrubDragState) return;
+  event.preventDefault();
+  setTrimScrubTimeFromEvent(event);
+});
+
+trimScrubTimeline?.addEventListener('pointerup', event => {
+  if (!trimScrubDragState) return;
+  event.preventDefault();
+  trimScrubDragState = null;
+  trimScrubTimeline.releasePointerCapture?.(event.pointerId);
+});
+
+trimScrubTimeline?.addEventListener('pointercancel', event => {
+  trimScrubDragState = null;
+  trimScrubTimeline.releasePointerCapture?.(event.pointerId);
+});
+
+addAudioMixBtn?.addEventListener('click', () => audioMixInput?.click());
+removeAudioMixBtn?.addEventListener('click', removeSelectedAudioMixTrack);
+
+audioMixInput?.addEventListener('change', event => {
+  void addAudioMixFiles(event.target.files);
+  event.target.value = '';
+});
+
+activeAudioTrackSelect?.addEventListener('change', () => {
+  activeAudioTrackId = activeAudioTrackSelect.value || null;
+  syncAudioMixState();
+  restartLiveAudioPreviewTracks();
+  refreshGui();
+});
+
+audioVolumeToggleBtn?.addEventListener('click', () => {
+  const nextOpen = !audioVolumePopover?.classList.contains('show');
+  audioVolumePopover?.classList.toggle('show', nextOpen);
+  audioPanPopover?.classList.remove('show');
+  audioVolumeToggleBtn.classList.toggle('is-open', nextOpen);
+  audioPanToggleBtn?.classList.remove('is-open');
+  audioVolumeToggleBtn.setAttribute('aria-pressed', nextOpen ? 'true' : 'false');
+  audioPanToggleBtn?.setAttribute('aria-pressed', 'false');
+});
+
+audioPanToggleBtn?.addEventListener('click', () => {
+  const nextOpen = !audioPanPopover?.classList.contains('show');
+  audioPanPopover?.classList.toggle('show', nextOpen);
+  audioVolumePopover?.classList.remove('show');
+  audioPanToggleBtn.classList.toggle('is-open', nextOpen);
+  audioVolumeToggleBtn?.classList.remove('is-open');
+  audioPanToggleBtn.setAttribute('aria-pressed', nextOpen ? 'true' : 'false');
+  audioVolumeToggleBtn?.setAttribute('aria-pressed', 'false');
+});
+
+audioSourceVolumeRange?.addEventListener('input', () => {
+  controls.audio_source_volume = Number(audioSourceVolumeRange.value || 1);
+  syncAudioMixState();
+  updateLiveAudioPreviewGains();
+  refreshGui();
+});
+
+audioTrackVolumeRange?.addEventListener('input', () => {
+  const track = audioMixTracks.find(item => item.id === activeAudioTrackId);
+  if (!track) return;
+  track.volume = Number(audioTrackVolumeRange.value || 0);
+  controls.audio_track_volume = track.volume;
+  syncAudioMixState();
+  updateLiveAudioPreviewGains();
+  refreshGui();
+});
+
+audioTrackPanRange?.addEventListener('input', () => {
+  const track = audioMixTracks.find(item => item.id === activeAudioTrackId);
+  if (!track) return;
+  track.pan = Number(audioTrackPanRange.value || 0);
+  controls.audio_track_pan = track.pan;
+  syncAudioMixState();
+  updateLiveAudioPreviewGains();
+  refreshGui();
+});
+
+[trimWaveformStrip, trimAudioMixStrip, trimFilmstripStrip].forEach(stripElement => {
+  stripElement?.addEventListener('pointerdown', event => {
+    if (!controls.trim_panel_enabled) return;
+    event.preventDefault();
+    if (stripElement === trimAudioMixStrip) {
+      selectAudioMixTrackFromStripEvent(event);
+    }
+    setTrimScrubTimeFromStripEvent(event, stripElement);
+  });
+});
+
+trimClearTransportBtn?.addEventListener('click', clearTrimSegments);
+trimPreviewTransportBtn?.addEventListener('click', () => processVideo('trim', 'preview'));
+trimFullTransportBtn?.addEventListener('click', () => processVideo('trim', 'full'));
+
 muteBtn.addEventListener('click', () => {
   previewVideo.muted = !previewVideo.muted;
   updateTransportControls();
+  updateLiveAudioPreviewGains();
 });
 
 volumeRange.addEventListener('input', () => {
   const value = Math.max(0, Math.min(1, Number(volumeRange.value || 0)));
   previewVideo.volume = value;
+  updateLiveAudioPreviewGains();
   previewVideo.muted = value === 0;
   updateTransportControls();
 });
@@ -8755,6 +11946,113 @@ fullscreenBtn.addEventListener('click', async () => {
     showStatus('err', error.message || 'Fullscreen is not available.');
   }
 });
+
+if (trimStartInput) {
+  trimStartInput.addEventListener('change', () => {
+    pushAppUndoState('Trim');
+    controls.trim_start = Math.max(0, Number(trimStartInput.value || 0));
+    updateTrimReadout();
+    renderTrimPanel();
+    refreshGui();
+  });
+}
+
+if (trimEndInput) {
+  trimEndInput.addEventListener('change', () => {
+    pushAppUndoState('Trim');
+    controls.trim_end = Math.max(0, Number(trimEndInput.value || 0));
+    updateTrimReadout();
+    renderTrimPanel();
+    refreshGui();
+  });
+}
+
+if (trimSetStartBtn) {
+  trimSetStartBtn.addEventListener('click', setTrimStartAtPlayhead);
+}
+
+if (trimSetEndBtn) {
+  trimSetEndBtn.addEventListener('click', setTrimEndAtPlayhead);
+}
+
+if (trimAddSegmentBtn) {
+  trimAddSegmentBtn.addEventListener('click', addTrimSegmentFromControls);
+}
+
+if (trimClearDraftBtn) {
+  trimClearDraftBtn.addEventListener('click', clearTrimDraft);
+}
+
+if (statusToggleBtn) {
+  statusToggleBtn.addEventListener('click', () => {
+    const hidden = !statusEl.classList.contains('is-user-hidden');
+    statusEl.classList.toggle('is-user-hidden', hidden);
+    statusToggleBtn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+    statusToggleBtn.setAttribute('aria-label', hidden ? 'Show status' : 'Hide status');
+    statusToggleBtn.innerHTML = `<span class="icon-mask ${hidden ? 'icon-show' : 'icon-hide'}" aria-hidden="true"></span>`;
+  });
+}
+
+if (appRoot && sidebarDockToggle && sidebarDockShowToggle) {
+  const setProjectDockCollapsed = collapsed => {
+    appRoot.classList.toggle('sidebar-collapsed', collapsed);
+    sidebarDockToggle.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
+    sidebarDockShowToggle.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
+    sidebarDockToggle.setAttribute('aria-label', collapsed ? 'Show project dock' : 'Hide project dock');
+    sidebarDockShowToggle.setAttribute('aria-label', collapsed ? 'Show project dock' : 'Hide project dock');
+    sidebarDockToggle.innerHTML = `<span class="icon-mask ${collapsed ? 'icon-show' : 'icon-hide'}" aria-hidden="true"></span>`;
+    sidebarDockShowToggle.innerHTML = `<span class="icon-mask ${collapsed ? 'icon-show' : 'icon-hide'}" aria-hidden="true"></span>`;
+    window.requestAnimationFrame(() => {
+      positionVideoFrameToActualSize();
+      renderTrimPanel();
+    });
+  };
+
+  sidebarDockToggle.addEventListener('click', () => {
+    setProjectDockCollapsed(!appRoot.classList.contains('sidebar-collapsed'));
+  });
+
+  sidebarDockShowToggle.addEventListener('click', () => {
+    setProjectDockCollapsed(false);
+  });
+}
+
+if (trimTimeline) {
+  trimTimeline.addEventListener('pointerdown', event => {
+    if (beginTrimHandleDrag(event)) return;
+
+    const time = trimTimeFromTimelineEvent(event);
+    if (time === null) return;
+
+    event.preventDefault();
+    addTrimPointFromTimeline(time);
+  });
+
+  trimTimeline.addEventListener('pointermove', updateTrimHandleDrag);
+  trimTimeline.addEventListener('pointerup', endTrimHandleDrag);
+  trimTimeline.addEventListener('pointercancel', endTrimHandleDrag);
+  trimTimeline.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      clearTrimDraft();
+      return;
+    }
+
+    if (event.key.toLowerCase() === 'i') {
+      event.preventDefault();
+      addTrimPointFromPlayheadShortcut();
+      return;
+    }
+
+    if (event.key === 'Delete' || event.key === 'Backspace' || event.key.toLowerCase() === 'x') {
+      const removalIndex = getTrimSegmentIndexForRemoval();
+      if (removalIndex >= 0) {
+        event.preventDefault();
+        removeTrimSegment(removalIndex);
+      }
+    }
+  });
+}
 
 if (cropOverlay) {
   cropOverlay.addEventListener('pointerdown', event => {
@@ -8824,7 +12122,9 @@ previewVideo.addEventListener('loadeddata', () => {
 
 /* Keep native subtitle preview synchronized with local video playback. */
 previewVideo.addEventListener('timeupdate', () => {
+  enforceTrimPlaybackRange();
   updateTransportControls();
+  updateTrimPlayhead();
   syncNativeCaptionPreview();
   if (captionsSidePanel?.classList.contains('active')) {
     const activeIndex = getActiveSubtitleCueIndex(Math.max(0, Math.floor((previewVideo.currentTime || 0) * 1000)));
@@ -8842,7 +12142,9 @@ previewVideo.addEventListener('timeupdate', () => {
 /* Recompute visible caption text when playback state changes. */
 previewVideo.addEventListener('seeked', () => {
   updateTransportControls();
+  updateTrimPlayhead();
   syncNativeCaptionPreview();
+  restartLiveAudioPreviewTracks();
 
   const activeIndex = getActiveSubtitleCueIndex(Math.max(0, Math.floor((previewVideo.currentTime || 0) * 1000)));
   if (isCaptionEditorTextFieldActive() || Date.now() < captionsEditorFocusSeekUntil) {
@@ -8858,17 +12160,23 @@ previewVideo.addEventListener('seeked', () => {
 previewVideo.addEventListener('pause', () => {
   updateTransportControls();
   syncNativeCaptionPreview();
+  stopLiveAudioPreviewTracks();
 });
 
 /* Refresh native preview when playback resumes. */
 previewVideo.addEventListener('play', () => {
   updateTransportControls();
   syncNativeCaptionPreview();
+  void startLiveAudioPreviewTracks();
 });
 
 
 previewVideo.addEventListener('durationchange', updateTransportControls);
-previewVideo.addEventListener('volumechange', updateTransportControls);
+previewVideo.addEventListener('ratechange', restartLiveAudioPreviewTracks);
+previewVideo.addEventListener('volumechange', () => {
+  updateTransportControls();
+  updateLiveAudioPreviewGains();
+});
 
 
 
@@ -8877,6 +12185,7 @@ window.addEventListener('resize', () => {
   requestAnimationFrame(() => {
     syncOverlayToVideo();
     applyHelperPreview();
+    renderTrimMediaStrips();
   });
 });
 
@@ -8898,16 +12207,29 @@ document.addEventListener('keydown', event => {
   if ((event.metaKey || event.ctrlKey) && key === 'z') {
     event.preventDefault();
     if (event.shiftKey) {
-      redoCrop();
+      redoAppEdit();
     } else {
-      undoCrop();
+      undoAppEdit();
     }
     return;
   }
 
   if ((event.metaKey || event.ctrlKey) && key === 'y') {
     event.preventDefault();
-    redoCrop();
+    redoAppEdit();
+    return;
+  }
+
+  if ((event.code === 'Space' || event.key === ' ') && previewVideo && previewVideo.style.display !== 'none') {
+    event.preventDefault();
+    event.stopPropagation();
+    if (previewVideo.paused) {
+      prepareTrimPlaybackStart();
+      previewVideo.play().catch(error => showStatus('err', error.message || 'Playback could not start.'));
+    } else {
+      previewVideo.pause();
+    }
+    updateTransportControls();
     return;
   }
 
@@ -8926,6 +12248,21 @@ document.addEventListener('keydown', event => {
   if (key === 'h') {
     helpersVisible = !helpersVisible;
     applyHelpersVisibility();
+    return;
+  }
+
+  if (key === 'i' && controls.trim_panel_enabled) {
+    event.preventDefault();
+    addTrimPointFromPlayheadShortcut();
+    return;
+  }
+
+  if ((key === 'x' || event.key === 'Delete' || event.key === 'Backspace') && controls.trim_panel_enabled) {
+    const removalIndex = getTrimSegmentIndexForRemoval();
+    if (removalIndex >= 0) {
+      event.preventDefault();
+      removeTrimSegment(removalIndex);
+    }
   }
 });
 
@@ -8939,6 +12276,7 @@ applyAppSettings(readAppSettings());
 await loadPresets();
 await bootProjects();
 updateMeta();
+syncAudioMixState();
 applyHelperPreview();
 </script>
 </body>

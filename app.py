@@ -64,18 +64,31 @@ JOBS = {}
 # Manage uploaded custom fonts for browser preview and FFmpeg/libass rendering.
 FONTS_DIR = os.path.join(APP_ROOT, "fonts")
 ALLOWED_FONT_EXTENSIONS = {".ttf", ".otf", ".woff", ".woff2"}
+ALLOWED_AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus"}
 
 
 # Ensure all runtime directories exist, including the custom font store.
 def ensure_dirs():
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    os.makedirs(os.path.join(ASSETS_DIR, "images", "icons"), exist_ok=True)
+    icons_dir = os.path.join(ASSETS_DIR, "images", "icons")
+    os.makedirs(icons_dir, exist_ok=True)
+    os.makedirs(os.path.join(ASSETS_DIR, "fonts"), exist_ok=True)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(REVEAL_DIR, exist_ok=True)
     os.makedirs(GLOBAL_OVERLAY_CACHE_DIR, exist_ok=True)
     os.makedirs(FONTS_DIR, exist_ok=True)
     os.makedirs(TOOLS_DIR, exist_ok=True)
     os.makedirs(REALESRGAN_DIR, exist_ok=True)
+
+    default_icons = {
+        "volume.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16 8.5a5 5 0 0 1 0 7"/><path d="M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>',
+        "headphone.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><path d="M6 14h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2Z"/><path d="M16 14h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2Z"/></svg>',
+    }
+    for filename, svg in default_icons.items():
+        icon_path = os.path.join(icons_dir, filename)
+        if not os.path.exists(icon_path):
+            with open(icon_path, "w", encoding="utf-8") as handle:
+                handle.write(svg)
 
 
 # Validate uploaded font file extensions before saving or serving them.
@@ -325,10 +338,12 @@ def render_preview(video_path, ass_path, output_path, preview_start=0, preview_s
 
             shutil.copy2(source_font_path, os.path.join(temp_fonts_dir, safe_name))
 
-        ass_filter = (
-            f"ass='{_escape_ffmpeg_filter_path(ass_path)}'"
-            f":fontsdir='{_escape_ffmpeg_filter_path(temp_fonts_dir)}'"
-        )
+        ass_filter = None
+        if ass_path:
+            ass_filter = (
+                f"ass='{_escape_ffmpeg_filter_path(ass_path)}'"
+                f":fontsdir='{_escape_ffmpeg_filter_path(temp_fonts_dir)}'"
+            )
 
         source_info = get_video_info(video_path)
         overlay_png_path = None
@@ -337,9 +352,18 @@ def render_preview(video_path, ass_path, output_path, preview_start=0, preview_s
         output_video_info = _video_info_after_aspect(source_info, aspect_settings) if _aspect_layer_enabled(aspect_settings) else source_info
 
         if use_global_overlay:
-            overlay_png_path = os.path.join(OUTPUT_DIR, f"global_overlay_{uuid.uuid4().hex[:12]}.png")
-            _create_global_overlay_png(global_overlay_settings, output_video_info["width"], output_video_info["height"], overlay_png_path)
-            extra_input_args = ["-loop", "1", "-i", overlay_png_path]
+            overlay_duration = max(0.1, requested_end - requested_start) if preview_seconds is not None else source_duration
+            if _global_overlay_uses_bitmap(global_overlay_settings):
+                overlay_png_path = os.path.join(OUTPUT_DIR, f"global_overlay_{uuid.uuid4().hex[:12]}.png")
+                _create_global_overlay_png(global_overlay_settings, output_video_info["width"], output_video_info["height"], overlay_png_path)
+                extra_input_args = ["-loop", "1", "-i", overlay_png_path]
+            else:
+                extra_input_args = _build_solid_global_overlay_input_args(
+                    global_overlay_settings,
+                    output_video_info["width"],
+                    output_video_info["height"],
+                    overlay_duration,
+                )
 
         video_filters = []
         if preview_seconds is not None:
@@ -358,7 +382,10 @@ def render_preview(video_path, ass_path, output_path, preview_start=0, preview_s
             _append_global_overlay_filter(filter_parts, "basev", "gradedv", "1:v", global_overlay_settings)
             caption_input_label = "gradedv"
 
-        filter_parts.append(f"[{caption_input_label}]{ass_filter}[v]")
+        if ass_filter:
+            filter_parts.append(f"[{caption_input_label}]{ass_filter}[v]")
+        else:
+            filter_parts.append(f"[{caption_input_label}]null[v]")
 
         if has_audio:
             if preview_seconds is not None:
@@ -388,7 +415,7 @@ def render_preview(video_path, ass_path, output_path, preview_start=0, preview_s
         cmd += [
             "-c:v", "libx264",
             "-crf", "18",
-            "-preset", "medium",
+            "-preset", "veryfast" if preview_seconds is not None else "medium",
             "-pix_fmt", "yuv420p",
         ]
 
@@ -417,8 +444,6 @@ def render_preview(video_path, ass_path, output_path, preview_start=0, preview_s
             shutil.rmtree(temp_fonts_dir, ignore_errors=True)
         except Exception:
             pass
-
-
 
 
 def _hex_to_ass_bgr(value, alpha_hex="00"):
@@ -1266,6 +1291,27 @@ def _global_overlay_layer_enabled(settings):
     return bool(settings and settings.get("enabled") and float(settings.get("opacity", 0)) > 0)
 
 
+# Return True only for overlay types that require a generated bitmap asset.
+def _global_overlay_uses_bitmap(settings):
+    return _normalise_global_overlay_kind((settings or {}).get("kind", "solid")) != "solid"
+
+
+# Build a lavfi colour source for solid global overlays without generating a PNG file.
+def _build_solid_global_overlay_input_args(settings, width, height, duration):
+    blend_mode = _normalise_global_overlay_blend((settings or {}).get("blend_mode", "normal"))
+    opacity = max(0.0, min(1.0, float((settings or {}).get("opacity", 0.25))))
+    colour = _safe_hex_colour((settings or {}).get("solid_colour", "#000000"), "#000000").replace("#", "0x")
+    alpha_suffix = f"@{opacity:.6f}" if blend_mode == "normal" else ""
+    safe_width = _even_size(max(2, min(7680, int(width))))
+    safe_height = _even_size(max(2, min(7680, int(height))))
+    safe_duration = max(0.1, float(duration or 0.1))
+
+    return [
+        "-f", "lavfi",
+        "-i", f"color=c={colour}{alpha_suffix}:s={safe_width}x{safe_height}:d={safe_duration:.6f},format=rgba",
+    ]
+
+
 def _hex_to_rgb_tuple(value):
     value = _safe_hex_colour(value, "#000000").lstrip("#")
     return tuple(int(value[i:i + 2], 16) for i in (0, 2, 4))
@@ -1308,11 +1354,10 @@ def _global_overlay_cache_key(settings, width, height):
 
 
 def _create_global_overlay_png(settings, width, height, output_path):
-    """Create a cached RGBA overlay image for FFmpeg.
+    """Create a cached RGBA bitmap for gradient global overlays.
 
-    The preview uses CSS gradients and mix-blend-mode. The export path now creates the
-    same kind of RGB/RGBA overlay once, caches it, and blends in FFmpeg in RGBA space.
-    That avoids repeated Python pixel loops and prevents the old YUV blend mismatch.
+    Solid overlays use an FFmpeg lavfi colour source. This function is reserved for
+    linear and radial gradients that need an image-backed overlay input.
     """
     from PIL import Image
     import math
@@ -1322,21 +1367,15 @@ def _create_global_overlay_png(settings, width, height, output_path):
     kind = _normalise_global_overlay_kind(settings.get("kind", "solid"))
     opacity = max(0.0, min(1.0, float(settings.get("opacity", 0.25))))
     blend_mode = _normalise_global_overlay_blend(settings.get("blend_mode", "normal"))
-    # For non-normal blend modes, opacity belongs to the blend filter, not the bitmap alpha.
-    # For normal mode, alpha belongs to the overlay image so FFmpeg overlay matches CSS opacity.
     alpha = 255 if blend_mode != "normal" else int(round(opacity * 255))
+
+    if kind == "solid":
+        raise RuntimeError("Solid global overlays must use the FFmpeg colour source path.")
 
     ensure_dirs()
     cache_key = _global_overlay_cache_key(settings, width, height)
     cache_path = os.path.join(GLOBAL_OVERLAY_CACHE_DIR, f"{cache_key}.png")
     if os.path.exists(cache_path):
-        shutil.copy2(cache_path, output_path)
-        return output_path
-
-    if kind == "solid":
-        rgb = _hex_to_rgb_tuple(settings.get("solid_colour", "#000000"))
-        image = Image.new("RGBA", (width, height), (*rgb, alpha))
-        image.save(cache_path)
         shutil.copy2(cache_path, output_path)
         return output_path
 
@@ -1419,24 +1458,37 @@ def _append_global_overlay_filter(filter_parts, input_label, output_label, image
     filter_parts.append(f"[{image_label}]format=rgba[{overlay_rgba}]")
 
     if blend_mode == "normal":
-        # Normal mode uses PNG alpha and FFmpeg overlay, matching CSS opacity on a normal overlay.
+        # Normal mode uses input alpha so CSS opacity and FFmpeg overlay match.
         filter_parts.append(f"[{base_rgba}][{overlay_rgba}]overlay=0:0:shortest=1,format=yuv420p[{output_label}]")
     else:
-        # Non-normal modes use an opaque overlay image and FFmpeg's blend opacity.
-        # Keeping both inputs in RGBA avoids the old browser-preview-vs-YUV-export mismatch.
+        # Non-normal modes use FFmpeg blend opacity in RGBA space.
         filter_parts.append(
-            f"[{base_rgba}][{overlay_rgba}]blend=all_mode={blend_mode}:all_opacity={opacity:.6f},format=yuv420p[{output_label}]"
+            f"[{base_rgba}][{overlay_rgba}]blend=all_mode={blend_mode}:all_opacity={opacity:.6f}:shortest=1,format=yuv420p[{output_label}]"
         )
 
-def apply_global_overlay_to_video(video_path, output_path, global_overlay_settings):
+def apply_global_overlay_to_video(video_path, output_path, global_overlay_settings, preview_seconds=None, job_id=None):
     if not _global_overlay_layer_enabled(global_overlay_settings):
         shutil.copy2(video_path, output_path)
         return
 
     info = get_video_info(video_path)
-    overlay_png_path = os.path.join(OUTPUT_DIR, f"global_overlay_{uuid.uuid4().hex[:12]}.png")
+    duration = get_video_duration(video_path)
+    overlay_png_path = None
+    extra_input_args = []
+
     try:
-        _create_global_overlay_png(global_overlay_settings, info["width"], info["height"], overlay_png_path)
+        if _global_overlay_uses_bitmap(global_overlay_settings):
+            overlay_png_path = os.path.join(OUTPUT_DIR, f"global_overlay_{uuid.uuid4().hex[:12]}.png")
+            _create_global_overlay_png(global_overlay_settings, info["width"], info["height"], overlay_png_path)
+            extra_input_args = ["-loop", "1", "-i", overlay_png_path]
+        else:
+            extra_input_args = _build_solid_global_overlay_input_args(
+                global_overlay_settings,
+                info["width"],
+                info["height"],
+                duration,
+            )
+
         filter_parts = []
         _append_global_overlay_filter(filter_parts, "0:v", "v", "1:v", global_overlay_settings)
         cmd = [
@@ -1445,29 +1497,26 @@ def apply_global_overlay_to_video(video_path, output_path, global_overlay_settin
             "-nostdin",
             "-hwaccel", "none",
             "-i", video_path,
-            "-loop", "1",
-            "-i", overlay_png_path,
+            *extra_input_args,
             "-filter_complex", ";".join(filter_parts),
             "-map", "[v]",
             "-map", "0:a:0?",
             "-c:v", "libx264",
             "-crf", "18",
-            "-preset", "medium",
+            "-preset", "veryfast" if preview_seconds is not None else "medium",
             "-pix_fmt", "yuv420p",
             "-c:a", "copy",
             "-shortest",
             "-movflags", "+faststart",
             output_path,
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            raise RuntimeError(result.stderr.strip() or "Global colour overlay failed")
+        _run_job_subprocess(cmd, job_id=job_id, failure_message="Global colour overlay failed")
     finally:
         try:
-            os.remove(overlay_png_path)
+            if overlay_png_path:
+                os.remove(overlay_png_path)
         except Exception:
             pass
-
 
 def _video_info_after_aspect(source_info, aspect_settings):
     if not _aspect_layer_enabled(aspect_settings):
@@ -1508,6 +1557,450 @@ def _set_job_progress(
     if eta_seconds is not _JOB_PROGRESS_UNSET:
         job["eta_seconds"] = None if eta_seconds is None else max(0, int(eta_seconds))
 
+
+
+
+def _append_job_log(job_id, message):
+    """Keep a compact server-side timeline for a running job."""
+    if not job_id or job_id not in JOBS:
+        return
+    text = str(message or "").strip()
+    if not text:
+        return
+    entry = {
+        "time": time.strftime("%H:%M:%S"),
+        "message": text[-600:],
+    }
+    logs = JOBS[job_id].setdefault("logs", [])
+    logs.append(entry)
+    del logs[:-80]
+
+
+def _job_cancel_requested(job_id):
+    return bool(job_id and JOBS.get(job_id, {}).get("cancel_requested"))
+
+
+def _raise_if_job_cancelled(job_id):
+    if _job_cancel_requested(job_id):
+        raise RuntimeError("Job cancelled by user.")
+
+
+def _run_job_subprocess(cmd, job_id=None, failure_message="FFmpeg command failed"):
+    """Run a subprocess while streaming stderr into job logs and allowing cancellation."""
+    started_at = time.monotonic()
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    )
+
+    if job_id and job_id in JOBS:
+        JOBS[job_id]["process"] = process
+        _append_job_log(job_id, "Started: " + " ".join(str(part) for part in cmd[:6]) + (" ..." if len(cmd) > 6 else ""))
+
+    stderr_lines = []
+
+    try:
+        while True:
+            _raise_if_job_cancelled(job_id)
+
+            line = process.stderr.readline() if process.stderr else ""
+            if line:
+                clean_line = line.strip()
+                if clean_line:
+                    stderr_lines.append(clean_line)
+                    if len(stderr_lines) > 30:
+                        stderr_lines = stderr_lines[-30:]
+                    if job_id and (
+                        "frame=" in clean_line
+                        or "time=" in clean_line
+                        or "speed=" in clean_line
+                        or "error" in clean_line.lower()
+                        or "warning" in clean_line.lower()
+                    ):
+                        _append_job_log(job_id, clean_line)
+
+            if process.poll() is not None:
+                break
+
+            if job_id and int(time.monotonic() - started_at) % 5 == 0:
+                JOBS[job_id]["eta_seconds"] = None
+
+            time.sleep(0.02)
+
+        if process.stdout:
+            process.stdout.read()
+
+        if process.returncode != 0:
+            raise RuntimeError("\n".join(stderr_lines[-12:]) or failure_message)
+
+        if job_id:
+            _append_job_log(job_id, "Finished subprocess successfully.")
+
+    except Exception:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=4)
+            except subprocess.TimeoutExpired:
+                process.kill()
+        raise
+    finally:
+        if job_id and job_id in JOBS and JOBS[job_id].get("process") is process:
+            JOBS[job_id]["process"] = None
+
+
+def _video_has_audio(video_path):
+    """Return True when the source has at least one audio stream."""
+    result = subprocess.run(
+        [
+            FFPROBE_BIN,
+            "-v", "error",
+            "-select_streams", "a:0",
+            "-show_entries", "stream=index",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            video_path,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0 and bool((result.stdout or "").strip())
+
+
+def _safe_json_list(value):
+    try:
+        parsed = json.loads(value or "[]")
+    except Exception:
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+
+def _allowed_audio_file(filename):
+    ext = os.path.splitext(filename or "")[1].lower()
+    return ext in ALLOWED_AUDIO_EXTENSIONS
+
+
+# Parse extra audio-track mixer settings from a request form.
+def _build_audio_mix_settings_from_form(form):
+    tracks = []
+    for index, item in enumerate(_safe_json_list(form.get("audio_tracks_json", ""))):
+        if not isinstance(item, dict):
+            continue
+        tracks.append({
+            "index": index,
+            "name": str(item.get("name", f"Audio {index + 1}") or f"Audio {index + 1}"),
+            "volume": max(0.0, min(3.0, _safe_float(item.get("volume", 1.0), 1.0))),
+            "pan": max(-1.0, min(1.0, _safe_float(item.get("pan", 0.0), 0.0))),
+        })
+
+    return {
+        "enabled": _safe_bool(form.get("audio_mix_enabled", "0")),
+        "source_volume": max(0.0, min(3.0, _safe_float(form.get("audio_source_volume", 1.0), 1.0))),
+        "tracks": tracks,
+    }
+
+
+# Save uploaded extra audio tracks and return paths aligned with audio mixer track metadata.
+def _save_audio_track_uploads(files, job_id):
+    audio_paths = []
+    for index, audio_file in enumerate(files or []):
+        if not audio_file or not audio_file.filename:
+            continue
+        if not _allowed_audio_file(audio_file.filename):
+            raise RuntimeError("Audio files must be mp3, wav, m4a, aac, flac, ogg, or opus.")
+
+        audio_bytes = audio_file.read()
+        audio_hash = hashlib.sha1(audio_bytes).hexdigest()[:16]
+        audio_ext = os.path.splitext(secure_filename(audio_file.filename))[1].lower() or ".m4a"
+        audio_name = f"audio_{job_id}_{index}_{audio_hash}{audio_ext}"
+        audio_path = os.path.join(UPLOAD_DIR, audio_name)
+        if not os.path.exists(audio_path):
+            with open(audio_path, "wb") as handle:
+                handle.write(audio_bytes)
+        audio_paths.append(audio_path)
+    return audio_paths
+
+
+# Mix additional uploaded audio tracks with the rendered video audio while preserving video duration.
+def mix_audio_into_video(video_path, audio_paths, output_path, audio_settings=None, job_id=None):
+    settings = audio_settings or {}
+    tracks = list(settings.get("tracks") or [])
+    paths = list(audio_paths or [])
+
+    if not settings.get("enabled") or not paths or not tracks:
+        shutil.copy2(video_path, output_path)
+        return False
+
+    duration = max(0.1, get_video_duration(video_path))
+    has_source_audio = _video_has_audio(video_path)
+    source_volume = max(0.0, min(3.0, float(settings.get("source_volume", 1.0))))
+
+    input_args = ["-i", video_path]
+    for audio_path in paths:
+        input_args += ["-stream_loop", "-1", "-i", audio_path]
+
+    filter_parts = []
+    mix_inputs = []
+
+    if has_source_audio:
+        filter_parts.append(f"[0:a]aformat=channel_layouts=stereo,volume={source_volume:.6f}[basea]")
+    else:
+        filter_parts.append(f"anullsrc=channel_layout=stereo:sample_rate=48000,atrim=duration={duration:.6f}[basea]")
+    mix_inputs.append("[basea]")
+
+    for index, audio_path in enumerate(paths):
+        track = tracks[index] if index < len(tracks) else {}
+        volume = max(0.0, min(3.0, float(track.get("volume", 1.0))))
+        pan = max(-1.0, min(1.0, float(track.get("pan", 0.0))))
+        left_gain = 1.0 if pan <= 0 else max(0.0, 1.0 - pan)
+        right_gain = 1.0 if pan >= 0 else max(0.0, 1.0 + pan)
+        input_index = index + 1
+        filter_parts.append(
+            f"[{input_index}:a]atrim=duration={duration:.6f},asetpts=PTS-STARTPTS,"
+            f"aformat=channel_layouts=stereo,volume={volume:.6f},"
+            f"pan=stereo|c0={left_gain:.6f}*c0|c1={right_gain:.6f}*c1[aextra{index}]"
+        )
+        mix_inputs.append(f"[aextra{index}]")
+
+    filter_parts.append("".join(mix_inputs) + f"amix=inputs={len(mix_inputs)}:duration=first:dropout_transition=0,alimiter=limit=0.98[aout]")
+
+    cmd = [
+        FFMPEG_BIN,
+        "-y",
+        "-nostdin",
+        *input_args,
+        "-filter_complex", ";".join(filter_parts),
+        "-map", "0:v:0",
+        "-map", "[aout]",
+        "-c:v", "copy",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-t", f"{duration:.6f}",
+        "-movflags", "+faststart",
+        output_path,
+    ]
+
+    _run_job_subprocess(cmd, job_id=job_id, failure_message="Audio mix failed")
+    return True
+
+
+def _build_trim_settings_from_form(form):
+    segments = []
+    for item in _safe_json_list(form.get("trim_segments_json", "")):
+        if not isinstance(item, dict):
+            continue
+        start = max(0.0, _safe_float(item.get("start", 0), 0))
+        end = max(start + 0.05, _safe_float(item.get("end", start + 0.05), start + 0.05))
+        segments.append({"start": start, "end": end})
+
+    if not segments:
+        start = max(0.0, _safe_float(form.get("trim_start", 0), 0))
+        end = max(start + 0.05, _safe_float(form.get("trim_end", 0), 0))
+        if end > start + 0.05:
+            segments.append({"start": start, "end": end})
+
+    segments.sort(key=lambda item: item["start"])
+    return {"segments": segments}
+
+
+def _build_grading_settings_from_form(form):
+    vignette_strength = form.get("grading_vignette_strength", form.get("grading_vignette", 0.0))
+    return {
+        "preset": str(form.get("grading_preset", "none") or "none"),
+        "tint_colour": _safe_hex_colour(form.get("grading_tint_colour", "#f59e0b"), "#f59e0b"),
+        "tint_strength": max(0.0, min(1.0, _safe_float(form.get("grading_tint_strength", 0.0), 0.0))),
+        "contrast": max(-1.0, min(3.0, _safe_float(form.get("grading_contrast", 1.0), 1.0))),
+        "saturation": max(0.0, min(3.0, _safe_float(form.get("grading_saturation", 1.0), 1.0))),
+        "exposure": max(-2.0, min(2.0, _safe_float(form.get("grading_exposure", 0.0), 0.0))),
+        "sharpness": max(0.0, min(3.0, _safe_float(form.get("grading_sharpness", 0.0), 0.0))),
+        "blur": max(0.0, min(20.0, _safe_float(form.get("grading_blur", 0.0), 0.0))),
+        "vignette_strength": max(0.0, min(1.0, _safe_float(vignette_strength, 0.0))),
+        "vignette_colour": _safe_hex_colour(form.get("grading_vignette_colour", "#000000"), "#000000"),
+        "vignette_radius": max(0.05, min(1.2, _safe_float(form.get("grading_vignette_radius", 0.56), 0.56))),
+        "vignette_feather": max(0.02, min(1.2, _safe_float(form.get("grading_vignette_feather", 0.38), 0.38))),
+        "vignette_center_x": max(-0.5, min(1.5, _safe_float(form.get("grading_vignette_center_x", 0.5), 0.5))),
+        "vignette_center_y": max(-0.5, min(1.5, _safe_float(form.get("grading_vignette_center_y", 0.5), 0.5))),
+    }
+
+
+def process_trim_video(video_path, output_path, trim_settings, preview_start=0, preview_seconds=None, job_id=None):
+    """Render one or more kept ranges from the selected source video into a new asset."""
+    segments = list((trim_settings or {}).get("segments") or [])
+    if not segments:
+        raise RuntimeError("Add at least one trim range before rendering.")
+
+    duration = get_video_duration(video_path)
+    clean_segments = []
+    for item in segments:
+        start = max(0.0, min(duration, float(item.get("start", 0))))
+        end = max(start + 0.05, min(duration, float(item.get("end", start + 0.05))))
+        if end > start:
+            clean_segments.append({"start": start, "end": end})
+
+    if not clean_segments:
+        raise RuntimeError("Trim ranges are outside the video duration.")
+
+    has_audio = _video_has_audio(video_path)
+    filter_parts = []
+    concat_inputs = []
+
+    for index, segment in enumerate(clean_segments):
+        filter_parts.append(
+            f"[0:v]trim=start={segment['start']:.6f}:end={segment['end']:.6f},setpts=PTS-STARTPTS[v{index}]"
+        )
+        concat_inputs.append(f"[v{index}]")
+        if has_audio:
+            filter_parts.append(
+                f"[0:a]atrim=start={segment['start']:.6f}:end={segment['end']:.6f},asetpts=PTS-STARTPTS[a{index}]"
+            )
+            concat_inputs.append(f"[a{index}]")
+
+    filter_parts.append(
+        "".join(concat_inputs) + f"concat=n={len(clean_segments)}:v=1:a={1 if has_audio else 0}[vout]" + ("[aout]" if has_audio else "")
+    )
+
+    cmd = [
+        FFMPEG_BIN,
+        "-y",
+        "-nostdin",
+        "-hwaccel", "none",
+        "-i", video_path,
+        "-filter_complex", ";".join(filter_parts),
+        "-map", "[vout]",
+    ]
+
+    if has_audio:
+        cmd += ["-map", "[aout]"]
+
+    cmd += [
+        "-c:v", "libx264",
+        "-crf", "18",
+        "-preset", "veryfast" if preview_seconds is not None else "medium",
+        "-pix_fmt", "yuv420p",
+    ]
+
+    if has_audio:
+        cmd += ["-c:a", "aac", "-b:a", "192k"]
+
+    if preview_seconds is not None:
+        cmd += ["-t", f"{max(0.1, float(preview_seconds)):.6f}"]
+
+    cmd += ["-movflags", "+faststart", output_path]
+    _run_job_subprocess(cmd, job_id=job_id, failure_message="Trim render failed")
+
+
+def _grading_filter(settings):
+    preset = str((settings or {}).get("preset", "none") or "none")
+    filters = []
+
+    if preset == "black_white":
+        filters.append("hue=s=0")
+    elif preset == "invert":
+        filters.append("negate")
+    elif preset == "sepia":
+        filters.append("colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131")
+    elif preset == "tint":
+        rr, gg, bb = _hex_to_rgb_tuple((settings or {}).get("tint_colour", "#f59e0b"))
+        strength = max(0.0, min(1.0, float((settings or {}).get("tint_strength", 0.35))))
+        rs = ((rr / 255.0) - 0.5) * strength
+        gs = ((gg / 255.0) - 0.5) * strength
+        bs = ((bb / 255.0) - 0.5) * strength
+        filters.append(f"colorbalance=rs={rs:.6f}:gs={gs:.6f}:bs={bs:.6f}")
+
+    contrast = float((settings or {}).get("contrast", 1.0))
+    saturation = float((settings or {}).get("saturation", 1.0))
+    exposure = float((settings or {}).get("exposure", 0.0))
+    if abs(contrast - 1.0) > 0.001 or abs(saturation - 1.0) > 0.001 or abs(exposure) > 0.001:
+        filters.append(f"eq=contrast={contrast:.6f}:saturation={saturation:.6f}:brightness={exposure / 4.0:.6f}")
+
+    sharpness = float((settings or {}).get("sharpness", 0.0))
+    if sharpness > 0.001:
+        amount = min(5.0, sharpness * 0.9)
+        filters.append(f"unsharp=5:5:{amount:.6f}:5:5:0.0")
+
+    blur = float((settings or {}).get("blur", 0.0))
+    if blur > 0.001:
+        radius = max(1, min(20, int(round(blur))))
+        filters.append(f"boxblur={radius}:1")
+
+    return ",".join(filters) if filters else "null"
+
+
+def process_grading_video(video_path, output_path, grading_settings, preview_start=0, preview_seconds=None, job_id=None):
+    """Apply non-destructive colour, lens, sharpness, blur, and soft vignette grading into a new project video."""
+    source_meta = get_video_stream_meta(video_path)
+    source_duration = get_video_duration(video_path)
+    render_start = max(0.0, float(preview_start or 0.0)) if preview_seconds is not None else 0.0
+    render_duration = max(0.1, float(preview_seconds)) if preview_seconds is not None else source_duration
+    vignette_strength = max(0.0, min(1.0, float((grading_settings or {}).get("vignette_strength", 0.0))))
+
+    base_filters = []
+    if preview_seconds is not None:
+        base_filters.append(f"trim=start={render_start:.6f}:duration={render_duration:.6f}")
+        base_filters.append("setpts=PTS-STARTPTS")
+
+    grade_filter = _grading_filter(grading_settings)
+    if grade_filter:
+        base_filters.append(grade_filter)
+
+    if vignette_strength > 0.001:
+        width = max(2, int(source_meta.get("width") or 2))
+        height = max(2, int(source_meta.get("height") or 2))
+        fps = str(source_meta.get("fps") or "30")
+        vignette_hex = _safe_hex_colour((grading_settings or {}).get("vignette_colour", "#000000"), "#000000").lstrip("#")
+        vignette_colour = f"0x{vignette_hex}"
+        radius = max(0.05, min(1.2, float((grading_settings or {}).get("vignette_radius", 0.56))))
+        feather = max(0.02, min(1.2, float((grading_settings or {}).get("vignette_feather", 0.38))))
+        center_x = max(-0.5, min(1.5, float((grading_settings or {}).get("vignette_center_x", 0.5))))
+        center_y = max(-0.5, min(1.5, float((grading_settings or {}).get("vignette_center_y", 0.5))))
+        distance_expression = f"sqrt(((X/W)-{center_x:.6f})*((X/W)-{center_x:.6f})+((Y/H)-{center_y:.6f})*((Y/H)-{center_y:.6f}))"
+        alpha_expression = f"255*{vignette_strength:.6f}*min(max((({distance_expression})-{radius:.6f})/{feather:.6f}\\,0)\\,1)"
+        base_chain = ",".join(base_filters) if base_filters else "null"
+        filter_complex = (
+            f"[0:v]{base_chain},format=rgba[basev];"
+            f"[1:v]format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='{alpha_expression}'[vig];"
+            f"[basev][vig]overlay=shortest=1:format=auto,format=yuv420p[vout]"
+        )
+        cmd = [
+            FFMPEG_BIN,
+            "-y",
+            "-nostdin",
+            "-hwaccel", "none",
+            "-i", video_path,
+            "-f", "lavfi",
+            "-i", f"color=c={vignette_colour}:s={width}x{height}:r={fps}:d={render_duration:.6f}",
+            "-filter_complex", filter_complex,
+            "-map", "[vout]",
+            "-map", "0:a:0?",
+        ]
+    else:
+        cmd = [
+            FFMPEG_BIN,
+            "-y",
+            "-nostdin",
+            "-hwaccel", "none",
+            "-i", video_path,
+            "-vf", ",".join(base_filters) if base_filters else grade_filter,
+            "-map", "0:v:0",
+            "-map", "0:a:0?",
+        ]
+
+    if preview_seconds is not None:
+        cmd += ["-af", f"atrim=start={render_start:.6f}:duration={render_duration:.6f},asetpts=PTS-STARTPTS"]
+
+    cmd += [
+        "-c:v", "libx264",
+        "-crf", "18",
+        "-preset", "veryfast" if preview_seconds is not None else "medium",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "192k",
+        "-movflags", "+faststart",
+        output_path,
+    ]
+    _run_job_subprocess(cmd, job_id=job_id, failure_message="Grading render failed")
 
 def _count_png_frames(directory_path):
     if not directory_path or not os.path.isdir(directory_path):
@@ -1779,7 +2272,7 @@ def process_upscale_video(video_path, output_path, upscale_factor=2, upscale_mod
             "-map", "0:a:0?",
             "-c:v", "libx264",
             "-crf", "18",
-            "-preset", "medium",
+            "-preset", "veryfast" if preview_seconds is not None else "medium",
             "-pix_fmt", "yuv420p",
             "-c:a", "aac",
             "-b:a", "192k",
@@ -2095,7 +2588,7 @@ def process_silence_video(video_path, output_path, silence_threshold=-40.0, min_
         "-map", "[a]",
         "-c:v", "libx264",
         "-crf", "18",
-        "-preset", "medium",
+        "-preset", "veryfast" if preview_seconds is not None else "medium",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         "-b:a", "192k",
@@ -2152,7 +2645,7 @@ def process_speed_video(video_path, output_path, speed_factor=1.25, preview_star
         "-map", "[a]",
         "-c:v", "libx264",
         "-crf", "18",
-        "-preset", "medium",
+        "-preset", "veryfast" if preview_seconds is not None else "medium",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         "-b:a", "192k",
@@ -2192,7 +2685,7 @@ def process_aspect_ratio_video(video_path, output_path, aspect_settings, preview
         "-map", "0:a:0?",
         "-c:v", "libx264",
         "-crf", "18",
-        "-preset", "medium",
+        "-preset", "veryfast" if preview_seconds is not None else "medium",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         "-b:a", "192k",
@@ -2291,7 +2784,7 @@ def process_crop_video(video_path, output_path, crop_settings, preview_start=0, 
         "-map", "0:a:0?",
         "-c:v", "libx264",
         "-crf", "18",
-        "-preset", "medium",
+        "-preset", "veryfast" if preview_seconds is not None else "medium",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         "-b:a", "192k",
@@ -2308,9 +2801,11 @@ def process_crop_video(video_path, output_path, crop_settings, preview_start=0, 
 # Reuses the app’s preview_url player loading instead of inventing a second status system.
 def process_video_job(job_id, video_path, output_path, process_kind, settings, preview_start=0, preview_seconds=None):
     try:
+        _append_job_log(job_id, f"Queued {process_kind} job.")
+        _raise_if_job_cancelled(job_id)
+
         if process_kind == "silence":
-            JOBS[job_id]["status"] = "preparing"
-            JOBS[job_id]["message"] = "Analyzing silence..."
+            _set_job_progress(job_id, status="preparing", message="Analyzing silence...", phase="silence")
             process_silence_video(
                 video_path,
                 output_path,
@@ -2321,8 +2816,7 @@ def process_video_job(job_id, video_path, output_path, process_kind, settings, p
                 preview_seconds=preview_seconds,
             )
         elif process_kind == "speed":
-            JOBS[job_id]["status"] = "rendering"
-            JOBS[job_id]["message"] = "Processing video speed..."
+            _set_job_progress(job_id, status="rendering", message="Processing video speed...", phase="speed")
             process_speed_video(
                 video_path,
                 output_path,
@@ -2331,8 +2825,7 @@ def process_video_job(job_id, video_path, output_path, process_kind, settings, p
                 preview_seconds=preview_seconds,
             )
         elif process_kind == "aspect":
-            JOBS[job_id]["status"] = "rendering"
-            JOBS[job_id]["message"] = "Converting aspect ratio..."
+            _set_job_progress(job_id, status="rendering", message="Converting aspect ratio...", phase="aspect")
             process_aspect_ratio_video(
                 video_path,
                 output_path,
@@ -2341,8 +2834,7 @@ def process_video_job(job_id, video_path, output_path, process_kind, settings, p
                 preview_seconds=preview_seconds,
             )
         elif process_kind in ("upscale", "scale"):
-            JOBS[job_id]["status"] = "preparing"
-            JOBS[job_id]["message"] = "Preparing video scale..."
+            _set_job_progress(job_id, status="preparing", message="Preparing video scale...", phase="scale")
             process_upscale_video(
                 video_path,
                 output_path,
@@ -2353,8 +2845,7 @@ def process_video_job(job_id, video_path, output_path, process_kind, settings, p
                 job_id=job_id,
             )
         elif process_kind == "crop":
-            JOBS[job_id]["status"] = "rendering"
-            JOBS[job_id]["message"] = "Cropping video..."
+            _set_job_progress(job_id, status="rendering", message="Cropping video...", phase="crop")
             process_crop_video(
                 video_path,
                 output_path,
@@ -2362,23 +2853,58 @@ def process_video_job(job_id, video_path, output_path, process_kind, settings, p
                 preview_start=preview_start,
                 preview_seconds=preview_seconds,
             )
+        elif process_kind == "trim":
+            _set_job_progress(job_id, status="rendering", message="Trimming selected ranges...", phase="trim")
+            process_trim_video(
+                video_path,
+                output_path,
+                trim_settings=settings["trim"],
+                preview_start=preview_start,
+                preview_seconds=preview_seconds,
+                job_id=job_id,
+            )
+        elif process_kind == "grade":
+            _set_job_progress(job_id, status="rendering", message="Applying grading...", phase="grading")
+            process_grading_video(
+                video_path,
+                output_path,
+                grading_settings=settings["grading"],
+                preview_start=preview_start,
+                preview_seconds=preview_seconds,
+                job_id=job_id,
+            )
         else:
             raise RuntimeError("Unsupported processing mode.")
 
+        _raise_if_job_cancelled(job_id)
+
+        aspect_settings = settings.get("aspect")
+        if process_kind != "aspect" and _aspect_layer_enabled(aspect_settings):
+            _set_job_progress(job_id, status="rendering", message="Applying Aspect Canvas...", phase="aspect")
+            aspect_output_path = os.path.join(OUTPUT_DIR, f"{job_id}_{process_kind}_aspect.mp4")
+            process_aspect_ratio_video(
+                output_path,
+                aspect_output_path,
+                aspect_settings=aspect_settings,
+                preview_start=0,
+                preview_seconds=None,
+            )
+            _raise_if_job_cancelled(job_id)
+            os.replace(aspect_output_path, output_path)
+
         global_overlay_settings = settings.get("global_overlay")
         if _global_overlay_layer_enabled(global_overlay_settings):
-            JOBS[job_id]["status"] = "rendering"
-            JOBS[job_id]["message"] = "Applying global colour overlay..."
+            _set_job_progress(job_id, status="rendering", message="Applying global colour overlay...", phase="global_overlay")
             graded_output_path = os.path.join(OUTPUT_DIR, f"{job_id}_{process_kind}_global_overlay.mp4")
-            apply_global_overlay_to_video(output_path, graded_output_path, global_overlay_settings)
+            apply_global_overlay_to_video(output_path, graded_output_path, global_overlay_settings, preview_seconds=preview_seconds, job_id=job_id)
+            _raise_if_job_cancelled(job_id)
             os.replace(graded_output_path, output_path)
 
         overlay_ass_name = None
         overlay_settings = settings.get("overlay")
 
         if _overlay_layer_enabled(overlay_settings):
-            JOBS[job_id]["status"] = "rendering"
-            JOBS[job_id]["message"] = "Burning text overlay..."
+            _set_job_progress(job_id, status="rendering", message="Burning text overlay...", phase="text_overlay")
 
             overlay_ass_path = os.path.join(OUTPUT_DIR, f"{job_id}_{process_kind}_overlay.ass")
             final_output_path = os.path.join(OUTPUT_DIR, f"{job_id}_{process_kind}_with_overlay.mp4")
@@ -2387,17 +2913,32 @@ def process_video_job(job_id, video_path, output_path, process_kind, settings, p
 
             create_text_overlay_ass(overlay_ass_path, overlay_settings, processed_video_info, processed_duration)
             render_preview(output_path, overlay_ass_path, final_output_path, preview_start=0, preview_seconds=None)
+            _raise_if_job_cancelled(job_id)
             os.replace(final_output_path, output_path)
             overlay_ass_name = os.path.basename(overlay_ass_path)
 
-        JOBS[job_id]["status"] = "done"
-        JOBS[job_id]["message"] = "Processed video ready."
+        audio_mix_settings = settings.get("audio_mix")
+        audio_paths = list(settings.get("audio_paths") or [])
+        if audio_mix_settings and audio_paths and audio_mix_settings.get("enabled"):
+            _set_job_progress(job_id, status="rendering", message="Mixing additional audio...", phase="audio_mix")
+            mixed_output_path = os.path.join(OUTPUT_DIR, f"{job_id}_{process_kind}_audio_mix.mp4")
+            mix_audio_into_video(output_path, audio_paths, mixed_output_path, audio_mix_settings, job_id=job_id)
+            _raise_if_job_cancelled(job_id)
+            os.replace(mixed_output_path, output_path)
+
+        _set_job_progress(job_id, status="done", message="Processed video ready.", phase="done", current=None, total=None, eta_seconds=None)
         JOBS[job_id]["preview_file"] = os.path.basename(output_path)
         JOBS[job_id]["ass_file"] = overlay_ass_name
+        _append_job_log(job_id, "Output ready: " + os.path.basename(output_path))
 
     except Exception as exc:
-        JOBS[job_id]["status"] = "error"
-        JOBS[job_id]["message"] = str(exc)
+        if str(exc) == "Job cancelled by user.":
+            _set_job_progress(job_id, status="cancelled", message="Job cancelled.", phase="cancelled", current=None, total=None, eta_seconds=None)
+            _append_job_log(job_id, "Cancelled by user.")
+        else:
+            _set_job_progress(job_id, status="error", message=str(exc), phase="error", current=None, total=None, eta_seconds=None)
+            _append_job_log(job_id, "Error: " + str(exc))
+
 
 
 
@@ -3225,21 +3766,42 @@ def process_preview(job_id, video_path, srt_path, ass_path, preview_path, settin
         aspect_settings = settings.get("aspect")
         video_info = _video_info_after_aspect(source_video_info, aspect_settings)
 
-        JOBS[job_id]["status"] = "preparing"
-        JOBS[job_id]["message"] = "Generating animated ASS..."
-        srt_to_animated_ass(srt_path, ass_path, settings, video_info)
+        burn_captions = bool(settings.get("burn_captions", True))
+        ass_render_path = None
 
-        if append_text_overlay_to_ass(ass_path, settings.get("overlay"), video_info, source_duration):
-            JOBS[job_id]["message"] = "Adding text overlay layer..."
+        if burn_captions:
+            if not srt_path:
+                raise RuntimeError("Subtitle file is required when caption burn-in is enabled.")
 
-        if preview_start or preview_seconds is not None:
-            shift_ass_for_preview(ass_path, preview_start=preview_start, preview_seconds=preview_seconds)
+            JOBS[job_id]["status"] = "preparing"
+            JOBS[job_id]["message"] = "Generating animated ASS..."
+            srt_to_animated_ass(srt_path, ass_path, settings, video_info)
+
+            if append_text_overlay_to_ass(ass_path, settings.get("overlay"), video_info, source_duration):
+                JOBS[job_id]["message"] = "Adding text overlay layer..."
+
+            if preview_start or preview_seconds is not None:
+                shift_ass_for_preview(ass_path, preview_start=preview_start, preview_seconds=preview_seconds)
+
+            ass_render_path = ass_path
+        elif _overlay_layer_enabled(settings.get("overlay")):
+            JOBS[job_id]["status"] = "preparing"
+            JOBS[job_id]["message"] = "Generating text overlay layer..."
+            create_text_overlay_ass(ass_path, settings.get("overlay"), video_info, source_duration)
+
+            if preview_start or preview_seconds is not None:
+                shift_ass_for_preview(ass_path, preview_start=preview_start, preview_seconds=preview_seconds)
+
+            ass_render_path = ass_path
+        else:
+            JOBS[job_id]["status"] = "preparing"
+            JOBS[job_id]["message"] = "Rendering without burned captions..."
 
         JOBS[job_id]["status"] = "rendering"
         JOBS[job_id]["message"] = "Rendering video..."
         render_preview(
             video_path,
-            ass_path,
+            ass_render_path,
             preview_path,
             preview_start=preview_start,
             preview_seconds=preview_seconds,
@@ -3247,10 +3809,18 @@ def process_preview(job_id, video_path, srt_path, ass_path, preview_path, settin
             global_overlay_settings=settings.get("global_overlay"),
         )
 
+        audio_mix_settings = settings.get("audio_mix")
+        audio_paths = list(settings.get("audio_paths") or [])
+        if audio_mix_settings and audio_paths and audio_mix_settings.get("enabled"):
+            JOBS[job_id]["message"] = "Mixing additional audio..."
+            mixed_preview_path = os.path.join(OUTPUT_DIR, f"{job_id}_caption_audio_mix.mp4")
+            mix_audio_into_video(preview_path, audio_paths, mixed_preview_path, audio_mix_settings, job_id=job_id)
+            os.replace(mixed_preview_path, preview_path)
+
         JOBS[job_id]["status"] = "done"
         JOBS[job_id]["message"] = "Render ready."
         JOBS[job_id]["preview_file"] = os.path.basename(preview_path)
-        JOBS[job_id]["ass_file"] = os.path.basename(ass_path)
+        JOBS[job_id]["ass_file"] = os.path.basename(ass_render_path) if ass_render_path else None
 
     except Exception as exc:
         JOBS[job_id]["status"] = "error"
@@ -3352,15 +3922,19 @@ def api_preview():
 
         video = request.files.get("video")
         srt = request.files.get("srt")
+        burn_captions = _safe_bool(request.form.get("render_burn_captions", "1"), True)
 
-        if not video or not srt:
-            return jsonify({"ok": False, "error": "Upload both video and subtitle file."}), 400
+        if not video:
+            return jsonify({"ok": False, "error": "Upload a video file."}), 400
+
+        if burn_captions and not srt:
+            return jsonify({"ok": False, "error": "Upload a subtitle file or disable caption burn-in."}), 400
 
         # Accept source videos including WebM for preview rendering.
         if not video.filename.lower().endswith((".mp4", ".mov", ".m4v", ".webm")):
             return jsonify({"ok": False, "error": "Video must be mp4, mov, m4v, or webm."}), 400
 
-        if not srt.filename.lower().endswith((".srt", ".vtt")):
+        if srt and not srt.filename.lower().endswith((".srt", ".vtt")):
             return jsonify({"ok": False, "error": "Subtitle file must be .srt or .vtt"}), 400
 
         mode = request.form.get("mode", "preview")
@@ -3377,23 +3951,23 @@ def api_preview():
         job_id = str(uuid.uuid4())[:8]
 
         video_bytes = video.read()
-        srt_bytes = srt.read()
+        srt_bytes = srt.read() if srt else b""
 
         video_hash = hashlib.sha1(video_bytes).hexdigest()[:16]
-        srt_hash = hashlib.sha1(srt_bytes).hexdigest()[:16]
+        srt_hash = hashlib.sha1(srt_bytes).hexdigest()[:16] if srt_bytes else None
 
         video_ext = os.path.splitext(secure_filename(video.filename))[1].lower() or ".mp4"
-        srt_ext = os.path.splitext(secure_filename(srt.filename))[1].lower() or ".srt"
+        srt_ext = os.path.splitext(secure_filename(srt.filename))[1].lower() if srt else ".srt"
 
         video_name = f"src_{video_hash}{video_ext}"
-        srt_name = f"src_{srt_hash}{srt_ext}"
+        srt_name = f"src_{srt_hash}{srt_ext}" if srt_hash else None
         ass_name = f"{job_id}.ass"
 
         # Build output filename for the queued render job.
         output_name = f"{job_id}_{'preview' if mode == 'preview' else 'full'}.mp4"        
 
         video_path = os.path.join(UPLOAD_DIR, video_name)
-        srt_path = os.path.join(UPLOAD_DIR, srt_name)
+        srt_path = os.path.join(UPLOAD_DIR, srt_name) if srt_name else None
         ass_path = os.path.join(OUTPUT_DIR, ass_name)
         output_path = os.path.join(OUTPUT_DIR, output_name)
 
@@ -3401,13 +3975,11 @@ def api_preview():
             with open(video_path, "wb") as f:
                 f.write(video_bytes)
 
-        if not os.path.exists(srt_path):
+        if srt_path and not os.path.exists(srt_path):
             with open(srt_path, "wb") as f:
                 f.write(srt_bytes)
 
-
-
-
+        audio_paths = _save_audio_track_uploads(request.files.getlist("audio_tracks"), job_id)
 
         settings = {
             "word_display_mode": request.form.get("word_display_mode", "phrase"),
@@ -3476,6 +4048,9 @@ def api_preview():
             "overlay": _build_overlay_settings_from_form(request.form),
             "aspect": _build_aspect_settings_from_form(request.form),
             "global_overlay": _build_global_overlay_settings_from_form(request.form),
+            "audio_mix": _build_audio_mix_settings_from_form(request.form),
+            "audio_paths": audio_paths,
+            "burn_captions": burn_captions,
         }
 
 
@@ -3490,6 +4065,9 @@ def api_preview():
             "progress_current": None,
             "progress_total": None,
             "eta_seconds": None,
+            "logs": [{"time": time.strftime("%H:%M:%S"), "message": "Job queued."}],
+            "cancel_requested": False,
+            "process": None,
         }
 
         threading.Thread(
@@ -3524,7 +4102,7 @@ def api_process_video():
             return jsonify({"ok": False, "error": "Video must be mp4, mov, m4v, or webm."}), 400
 
         process_kind = request.form.get("process_kind", "silence")
-        if process_kind not in ("silence", "speed", "upscale", "scale", "aspect", "crop"):
+        if process_kind not in ("silence", "speed", "upscale", "scale", "aspect", "crop", "trim", "grade"):
             return jsonify({"ok": False, "error": "Invalid processing mode."}), 400
 
         mode = request.form.get("mode", "preview")
@@ -3550,6 +4128,8 @@ def api_process_video():
             with open(video_path, "wb") as f:
                 f.write(video_bytes)
 
+        audio_paths = _save_audio_track_uploads(request.files.getlist("audio_tracks"), job_id)
+
         settings = {
             "silence_threshold": _safe_float(request.form.get("silence_threshold", -40), -40),
             "min_silence_duration": _safe_float(request.form.get("min_silence_duration", 0.4), 0.4),
@@ -3559,8 +4139,12 @@ def api_process_video():
             "upscale_mode": "ai" if request.form.get("video_scale_mode", request.form.get("upscale_mode", "traditional")) == "ai" else "traditional",
             "aspect": _build_aspect_settings_from_form(request.form),
             "crop": _build_crop_settings_from_form(request.form),
+            "trim": _build_trim_settings_from_form(request.form),
+            "grading": _build_grading_settings_from_form(request.form),
             "overlay": _build_overlay_settings_from_form(request.form),
             "global_overlay": _build_global_overlay_settings_from_form(request.form),
+            "audio_mix": _build_audio_mix_settings_from_form(request.form),
+            "audio_paths": audio_paths,
         }
 
         if process_kind == "aspect":
@@ -3695,7 +4279,30 @@ def api_status(job_id):
         "captions_url": f"/outputs/{job['captions_file']}" if job.get("captions_file") else None,
         "captions_filename": job.get("captions_file"),
         "captions_text": job.get("captions_text"),
+        "logs": job.get("logs", [])[-30:],
+        "cancel_requested": bool(job.get("cancel_requested")),
     })
+
+
+
+@app.route("/api/cancel/<job_id>", methods=["POST"])
+def api_cancel_job(job_id):
+    job = JOBS.get(job_id)
+    if not job:
+        return jsonify({"ok": False, "error": "Job not found"}), 404
+
+    job["cancel_requested"] = True
+    job["message"] = "Cancelling..."
+    _append_job_log(job_id, "Cancel requested.")
+
+    process = job.get("process")
+    if process and getattr(process, "poll", lambda: None)() is None:
+        try:
+            process.terminate()
+        except Exception:
+            pass
+
+    return jsonify({"ok": True})
 
 
 
@@ -3856,6 +4463,68 @@ def api_delete_server_asset_file():
 
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.route("/api/dev_flush", methods=["POST"])
+def api_dev_flush():
+    """Clear local development render trash, uploads, revealed assets, overlay cache, and live job state."""
+    try:
+        ensure_dirs()
+
+        for job in list(JOBS.values()):
+            job["cancel_requested"] = True
+            process = job.get("process")
+            if process and process.poll() is None:
+                try:
+                    process.terminate()
+                except Exception:
+                    pass
+
+        time.sleep(0.1)
+
+        deleted_files = 0
+        deleted_dirs = 0
+
+        def clear_directory_contents(directory):
+            nonlocal deleted_files, deleted_dirs
+            if not os.path.isdir(directory):
+                return
+
+            for name in os.listdir(directory):
+                path = os.path.join(directory, name)
+                try:
+                    if os.path.isdir(path) and not os.path.islink(path):
+                        shutil.rmtree(path, ignore_errors=True)
+                        deleted_dirs += 1
+                    else:
+                        os.remove(path)
+                        deleted_files += 1
+                except FileNotFoundError:
+                    pass
+
+        clear_directory_contents(UPLOAD_DIR)
+        clear_directory_contents(OUTPUT_DIR)
+        os.makedirs(REVEAL_DIR, exist_ok=True)
+        os.makedirs(GLOBAL_OVERLAY_CACHE_DIR, exist_ok=True)
+
+        if os.path.isfile(APP_STATE_PATH):
+            try:
+                os.remove(APP_STATE_PATH)
+                deleted_files += 1
+            except FileNotFoundError:
+                pass
+
+        JOBS.clear()
+
+        return jsonify({
+            "ok": True,
+            "message": "Development cache and processing trash cleared.",
+            "deleted_files": deleted_files,
+            "deleted_dirs": deleted_dirs,
+        })
+
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc)}), 500
 
