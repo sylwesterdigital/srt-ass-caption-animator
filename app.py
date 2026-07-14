@@ -14,6 +14,7 @@ import shutil
 import stat
 import urllib.error
 import urllib.request
+import urllib.parse
 import zipfile
 import time
 import hashlib
@@ -29,6 +30,7 @@ UPLOAD_DIR = os.path.join(APP_ROOT, "uploads")
 OUTPUT_DIR = os.path.join(APP_ROOT, "outputs")
 REVEAL_DIR = os.path.join(OUTPUT_DIR, "revealed_assets")
 GLOBAL_OVERLAY_CACHE_DIR = os.path.join(OUTPUT_DIR, "global_overlay_cache")
+SOCIAL_IMPORT_DIR = os.path.join(OUTPUT_DIR, "social_imports")
 TOOLS_DIR = os.path.join(APP_ROOT, "tools")
 REALESRGAN_DIR = os.path.join(TOOLS_DIR, "realesrgan")
 REALESRGAN_RELEASE = "v0.2.5.0"
@@ -76,6 +78,7 @@ def ensure_dirs():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(REVEAL_DIR, exist_ok=True)
     os.makedirs(GLOBAL_OVERLAY_CACHE_DIR, exist_ok=True)
+    os.makedirs(SOCIAL_IMPORT_DIR, exist_ok=True)
     os.makedirs(FONTS_DIR, exist_ok=True)
     os.makedirs(TOOLS_DIR, exist_ok=True)
     os.makedirs(REALESRGAN_DIR, exist_ok=True)
@@ -83,10 +86,41 @@ def ensure_dirs():
     default_icons = {
         "volume.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16 8.5a5 5 0 0 1 0 7"/><path d="M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>',
         "headphone.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><path d="M6 14h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2Z"/><path d="M16 14h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2Z"/></svg>',
+        "handle.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>',
+        "fit.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H3v5"/><path d="M16 3h5v5"/><path d="M21 16v5h-5"/><path d="M3 16v5h5"/><path d="M9 9H5V5"/><path d="M15 9h4V5"/><path d="M19 15v4h-4"/><path d="M9 15H5v4"/></svg>',
+        "favicon.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#0c0f14"/><path d="M18 20h28v24H18z" fill="none" stroke="#7dd3fc" stroke-width="4"/><path d="M26 28h12M26 36h8" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/></svg>',
+
+        # Default UI command icons used by the browser controls and project action buttons.
+        "play.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg>',
+        "pause.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6V5Zm8 0h4v14h-4V5Z"/></svg>',
+        "mute.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="m19 9-6 6"/><path d="m13 9 6 6"/></svg>',
+        "unmute.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16 8.5a5 5 0 0 1 0 7"/><path d="M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>',
+        "full.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H3v5"/><path d="M16 3h5v5"/><path d="M21 16v5h-5"/><path d="M3 16v5h5"/></svg>',
+        "captions.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 10h5"/><path d="M7 14h3"/><path d="M14 14h3"/></svg>',
+        "trim.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 17h16"/><path d="M8 4v16"/><path d="M16 4v16"/></svg>',
+        "clear-trim.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 17h16"/><path d="M8 4v16"/><path d="m15 9 4 4"/><path d="m19 9-4 4"/></svg>',
+        "trim-preview.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 17h16"/><path d="M8 4v16"/><path d="M14 10v4l4-2-4-2Z"/></svg>',
+        "trim-full.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 17h16"/><path d="M8 4v16"/><path d="M14 10h5v4h-5z"/></svg>',
+        "videos.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="m17 9 4-2v10l-4-2V9Z"/></svg>',
+        "edit.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z"/></svg>',
+        "add-video.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="m17 9 4-2v10l-4-2V9Z"/><path d="M8 9v6"/><path d="M5 12h6"/></svg>',
+        "add-vide.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="m17 9 4-2v10l-4-2V9Z"/><path d="M8 9v6"/><path d="M5 12h6"/></svg>',
+        "new.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>',
+        "bew.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>',
+        "audio.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+        "labels.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h10"/><path d="M4 18h7"/></svg>',
+        "compact.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4H4v4"/><path d="M16 4h4v4"/><path d="M4 16v4h4"/><path d="M20 16v4h-4"/><path d="M9 12h6"/></svg>',
+        "expand-controls.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V4h4"/><path d="M20 8V4h-4"/><path d="M4 16v4h4"/><path d="M20 16v4h-4"/><path d="M8 12h8"/></svg>',
+        "publish.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M20 16v4H4v-4"/></svg>',
+        "reveal.svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
     }
     for filename, svg in default_icons.items():
         icon_path = os.path.join(icons_dir, filename)
-        if not os.path.exists(icon_path):
+        try:
+            icon_is_missing = not os.path.exists(icon_path) or os.path.getsize(icon_path) == 0
+        except OSError:
+            icon_is_missing = True
+        if icon_is_missing:
             with open(icon_path, "w", encoding="utf-8") as handle:
                 handle.write(svg)
 
@@ -261,12 +295,44 @@ def _list_custom_fonts():
 
 
 # Render a preview or full output while exposing uploaded fonts to libass.
-def render_preview(video_path, ass_path, output_path, preview_start=0, preview_seconds=8, aspect_settings=None, global_overlay_settings=None):
+def render_preview(video_path, ass_path, output_path, preview_start=0, preview_seconds=8, aspect_settings=None, global_overlay_settings=None, export_settings=None):
     # Render a preview or full output while exposing uploaded fonts to libass.
     # Force AV1 inputs through an explicit software decoder and render with a clean libass font directory.
     import shutil
 
     source_duration = get_video_duration(video_path)
+
+    # Normalize export format/profile before building the FFmpeg graph.
+    export_settings = export_settings or {}
+    output_format = str(export_settings.get("format") or "mp4").lower()
+    export_quality = str(export_settings.get("quality") or ("fast" if preview_seconds is not None else "best")).lower()
+    if output_format not in ("mp4", "gif", "hls", "dash", "prores"):
+        output_format = "mp4"
+    if export_quality not in ("best", "fast", "small", "prores"):
+        export_quality = "best"
+    if output_format == "prores":
+        export_quality = "prores"
+
+    # Normalize GIF encoder controls before rendering the editor proxy and palette-sampled GIF output.
+    gif_fps = max(5, min(30, _safe_int(export_settings.get("gif_fps", 24 if export_quality == "best" else 15), 24)))
+    gif_max_width = max(240, min(1920, _safe_int(export_settings.get("gif_max_width", 1280 if export_quality == "best" else 960), 1280)))
+    gif_dither = str(export_settings.get("gif_dither") or "sierra2_4a").strip().lower()
+    if gif_dither not in ("sierra2_4a", "sierra2", "floyd_steinberg", "bayer", "none"):
+        gif_dither = "sierra2_4a"
+
+    if output_format == "gif" and export_quality == "small":
+        gif_fps = min(gif_fps, 12)
+        gif_max_width = min(gif_max_width, 640)
+        if gif_dither == "sierra2_4a":
+            gif_dither = "bayer"
+    elif output_format == "gif" and export_quality == "fast":
+        gif_fps = min(gif_fps, 15)
+        gif_max_width = min(gif_max_width, 960)
+
+    output_path = os.path.abspath(output_path)
+    output_parent = os.path.dirname(output_path)
+    if output_parent:
+        os.makedirs(output_parent, exist_ok=True)
 
     requested_start = max(0.0, float(preview_start or 0.0))
     if requested_start >= source_duration:
@@ -347,6 +413,7 @@ def render_preview(video_path, ass_path, output_path, preview_start=0, preview_s
 
         source_info = get_video_info(video_path)
         overlay_png_path = None
+        gif_palette_path = None
         extra_input_args = []
         use_global_overlay = _global_overlay_layer_enabled(global_overlay_settings)
         output_video_info = _video_info_after_aspect(source_info, aspect_settings) if _aspect_layer_enabled(aspect_settings) else source_info
@@ -387,13 +454,26 @@ def render_preview(video_path, ass_path, output_path, preview_start=0, preview_s
         else:
             filter_parts.append(f"[{caption_input_label}]null[v]")
 
-        if has_audio:
+        if has_audio and output_format != "gif":
             if preview_seconds is not None:
                 filter_parts.append(
                     f"[0:a]atrim=start={requested_start:.6f}:end={requested_end:.6f},asetpts=PTS-STARTPTS[a]"
                 )
             else:
                 filter_parts.append("[0:a]asetpts=PTS-STARTPTS[a]")
+
+        render_output_path = output_path
+        editor_preview_path = output_path
+        packaged_output_path = output_path
+        package_source_path = None
+
+        # Special exports keep an MP4 editor proxy so the timeline can continue editing a playable source.
+        if output_format in ("gif", "hls", "dash"):
+            package_source_path = os.path.join(OUTPUT_DIR, f"{uuid.uuid4().hex[:12]}_editor_proxy.mp4")
+            render_output_path = package_source_path
+            editor_preview_path = package_source_path
+        elif output_format == "prores":
+            editor_preview_path = os.path.join(OUTPUT_DIR, f"{uuid.uuid4().hex[:12]}_prores_proxy.mp4")
 
         filter_complex = ";".join(filter_parts)
 
@@ -409,35 +489,165 @@ def render_preview(video_path, ass_path, output_path, preview_start=0, preview_s
             "-map", "[v]",
         ]
 
-        if has_audio:
+        if has_audio and output_format != "gif":
             cmd += ["-map", "[a]"]
 
-        cmd += [
-            "-c:v", "libx264",
-            "-crf", "18",
-            "-preset", "veryfast" if preview_seconds is not None else "medium",
-            "-pix_fmt", "yuv420p",
-        ]
-
-        if has_audio:
+        if output_format == "prores":
             cmd += [
-                "-c:a", "aac",
-                "-b:a", "192k",
+                "-c:v", "prores_ks",
+                "-profile:v", "3",
+                "-pix_fmt", "yuv422p10le",
             ]
 
-        cmd += [
-            "-movflags", "+faststart",
-            output_path,
-        ]
+            if has_audio:
+                cmd += ["-c:a", "pcm_s16le"]
+        else:
+            crf = "14"
+            preset = "slow"
+            audio_bitrate = "192k"
+
+            if preview_seconds is not None or export_quality == "fast":
+                crf = "20"
+                preset = "veryfast"
+            elif export_quality == "small":
+                crf = "28"
+                preset = "medium"
+                audio_bitrate = "128k"
+
+            cmd += [
+                "-c:v", "libx264",
+                "-crf", crf,
+                "-preset", preset,
+                "-pix_fmt", "yuv420p",
+            ]
+
+            if has_audio and output_format != "gif":
+                cmd += [
+                    "-c:a", "aac",
+                    "-b:a", audio_bitrate,
+                ]
+
+            if output_format != "gif":
+                cmd += ["-movflags", "+faststart"]
+
+        cmd.append(render_output_path)
 
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             raise RuntimeError(result.stderr.strip() or "FFmpeg render failed")
 
+        if output_format == "gif":
+            # GIF export uses a dedicated sampled palette instead of FFmpeg's default one-pass GIF encoder.
+            # This is the quality-critical path for caption edges, gradients, and high-motion social clips.
+            gif_palette_path = os.path.join(OUTPUT_DIR, f"{uuid.uuid4().hex[:12]}_gif_palette.png")
+            gif_scale_filter = f"fps={gif_fps},scale=w='min({gif_max_width},iw)':h=-2:flags=lanczos"
+            gif_palette_filter = f"{gif_scale_filter},palettegen=max_colors=256:reserve_transparent=0:stats_mode=full"
+            gif_paletteuse_filter = f"[0:v]{gif_scale_filter}[gifv];[gifv][1:v]paletteuse=dither={gif_dither}:diff_mode=rectangle"
+
+            if gif_dither == "bayer":
+                gif_paletteuse_filter = f"[0:v]{gif_scale_filter}[gifv];[gifv][1:v]paletteuse=dither=bayer:bayer_scale=3:diff_mode=rectangle"
+            elif gif_dither == "none":
+                gif_paletteuse_filter = f"[0:v]{gif_scale_filter}[gifv];[gifv][1:v]paletteuse=dither=none:diff_mode=rectangle"
+
+            palette_cmd = [
+                FFMPEG_BIN,
+                "-y",
+                "-nostdin",
+                "-i", package_source_path,
+                "-vf", gif_palette_filter,
+                "-frames:v", "1",
+                gif_palette_path,
+            ]
+            result = subprocess.run(palette_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip() or "GIF palette generation failed")
+
+            # Vulnerable block: generated proxy and palette paths are tokenized FFmpeg arguments, not shell text.
+            gif_cmd = [
+                FFMPEG_BIN,
+                "-y",
+                "-nostdin",
+                "-i", package_source_path,
+                "-i", gif_palette_path,
+                "-lavfi", gif_paletteuse_filter,
+                "-an",
+                "-sn",
+                "-loop", "0",
+                output_path,
+            ]
+            result = subprocess.run(gif_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip() or "GIF export failed")
+
+        elif output_format == "hls":
+            segment_pattern = os.path.join(os.path.dirname(output_path), "segment_%05d.ts")
+            hls_cmd = [
+                FFMPEG_BIN,
+                "-y",
+                "-nostdin",
+                "-i", package_source_path,
+                "-c", "copy",
+                "-f", "hls",
+                "-hls_time", "4",
+                "-hls_playlist_type", "vod",
+                "-hls_segment_filename", segment_pattern,
+                output_path,
+            ]
+            result = subprocess.run(hls_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip() or "HLS export failed")
+
+        elif output_format == "dash":
+            dash_cmd = [
+                FFMPEG_BIN,
+                "-y",
+                "-nostdin",
+                "-i", package_source_path,
+                "-c", "copy",
+                "-f", "dash",
+                "-seg_duration", "4",
+                "-use_template", "1",
+                "-use_timeline", "1",
+                output_path,
+            ]
+            result = subprocess.run(dash_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip() or "DASH export failed")
+
+        elif output_format == "prores":
+            proxy_cmd = [
+                FFMPEG_BIN,
+                "-y",
+                "-nostdin",
+                "-i", output_path,
+                "-c:v", "libx264",
+                "-crf", "20",
+                "-preset", "veryfast",
+                "-pix_fmt", "yuv420p",
+            ]
+            if has_audio:
+                proxy_cmd += ["-c:a", "aac", "-b:a", "192k"]
+            proxy_cmd += ["-movflags", "+faststart", editor_preview_path]
+            result = subprocess.run(proxy_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip() or "ProRes editor proxy failed")
+
+        return {
+            "output_path": packaged_output_path,
+            "editor_preview_path": editor_preview_path,
+            "format": output_format,
+            "quality": export_quality,
+        }
+
     finally:
         try:
             if 'overlay_png_path' in locals() and overlay_png_path:
                 os.remove(overlay_png_path)
+        except Exception:
+            pass
+        try:
+            if 'gif_palette_path' in locals() and gif_palette_path:
+                os.remove(gif_palette_path)
         except Exception:
             pass
         try:
@@ -531,6 +741,69 @@ def _safe_bool(value, default_value=False):
     if value is None:
         return default_value
     return str(value).lower() in ("1", "true", "yes", "on")
+
+
+# Normalize render output profile and container settings sent from the editor UI.
+def _build_export_settings_from_form(form, mode="preview"):
+    export_quality = str(form.get("export_quality", "fast" if mode == "preview" else "best") or "best").strip().lower()
+    export_format = str(form.get("export_output_format", "mp4") or "mp4").strip().lower()
+
+    if export_quality not in ("best", "fast", "small", "prores"):
+        export_quality = "best"
+
+    if export_format not in ("mp4", "gif", "hls", "dash", "prores"):
+        export_format = "mp4"
+
+    if export_quality == "prores":
+        export_format = "prores"
+
+    # GIF controls are explicit so quality profiles do not silently force poor one-size-fits-all settings.
+    default_gif_fps = 24 if export_quality == "best" else 15
+    default_gif_width = 1280 if export_quality == "best" else 960
+    if export_quality == "small":
+        default_gif_fps = 12
+        default_gif_width = 640
+
+    gif_fps = max(5, min(30, _safe_int(form.get("export_gif_fps", default_gif_fps), default_gif_fps)))
+    gif_max_width = max(240, min(1920, _safe_int(form.get("export_gif_max_width", default_gif_width), default_gif_width)))
+    gif_dither = str(form.get("export_gif_dither", "sierra2_4a") or "sierra2_4a").strip().lower()
+    if gif_dither not in ("sierra2_4a", "sierra2", "floyd_steinberg", "bayer", "none"):
+        gif_dither = "sierra2_4a"
+
+    return {
+        "quality": export_quality,
+        "format": export_format,
+        "gif_fps": gif_fps,
+        "gif_max_width": gif_max_width,
+        "gif_dither": gif_dither,
+    }
+
+
+# Resolve the render target path for single-file and packaged outputs under OUTPUT_DIR.
+def _build_render_output_path(job_id, mode, export_settings):
+    safe_job_id = secure_filename(str(job_id or uuid.uuid4().hex[:8]))[:32] or uuid.uuid4().hex[:8]
+    safe_mode = "preview" if mode == "preview" else "full"
+    output_format = str((export_settings or {}).get("format") or "mp4").lower()
+
+    if output_format == "gif":
+        return os.path.join(OUTPUT_DIR, f"{safe_job_id}_{safe_mode}.gif")
+
+    if output_format == "hls":
+        return os.path.join(OUTPUT_DIR, f"{safe_job_id}_{safe_mode}_hls", "master.m3u8")
+
+    if output_format == "dash":
+        return os.path.join(OUTPUT_DIR, f"{safe_job_id}_{safe_mode}_dash", "manifest.mpd")
+
+    if output_format == "prores":
+        return os.path.join(OUTPUT_DIR, f"{safe_job_id}_{safe_mode}_prores.mov")
+
+    return os.path.join(OUTPUT_DIR, f"{safe_job_id}_{safe_mode}.mp4")
+
+
+# Return an OUTPUT_DIR-relative path for job-status URLs.
+def _relative_output_name(path_value):
+    return os.path.relpath(os.path.abspath(path_value), OUTPUT_DIR).replace(os.sep, "/")
+
 
 
 def _escape_ass_text(text):
@@ -1585,62 +1858,105 @@ def _raise_if_job_cancelled(job_id):
         raise RuntimeError("Job cancelled by user.")
 
 
-def _run_job_subprocess(cmd, job_id=None, failure_message="FFmpeg command failed"):
-    """Run a subprocess while streaming stderr into job logs and allowing cancellation."""
+def _run_job_subprocess(cmd, job_id=None, failure_message="FFmpeg command failed", env=None):
+    """Run a subprocess while streaming stdout/stderr into job logs and allowing cancellation."""
+    import queue
+
     started_at = time.monotonic()
-    process = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        bufsize=1,
-    )
-
-    if job_id and job_id in JOBS:
-        JOBS[job_id]["process"] = process
-        _append_job_log(job_id, "Started: " + " ".join(str(part) for part in cmd[:6]) + (" ..." if len(cmd) > 6 else ""))
-
+    process = None
+    output_queue = queue.Queue()
     stderr_lines = []
+    output_lines = []
+
+    # Stream a subprocess pipe into a queue so yt-dlp stdout progress and FFmpeg stderr progress cannot block each other.
+    def _reader_thread(stream_name, stream):
+        try:
+            for line in iter(stream.readline, ""):
+                output_queue.put((stream_name, line))
+        except Exception as exc:
+            output_queue.put((stream_name, f"Reader error: {exc}"))
+        finally:
+            try:
+                stream.close()
+            except Exception:
+                pass
 
     try:
+        # Vulnerable block: command parts are passed as tokenized arguments, never through a shell.
+        # The optional environment is supplied by the caller for controlled tool paths such as yt-dlp/Deno.
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+            env=env,
+        )
+
+        reader_threads = []
+        for stream_name, stream in (("stdout", process.stdout), ("stderr", process.stderr)):
+            if not stream:
+                continue
+
+            thread = threading.Thread(target=_reader_thread, args=(stream_name, stream), daemon=True)
+            thread.start()
+            reader_threads.append(thread)
+
+        if job_id and job_id in JOBS:
+            JOBS[job_id]["process"] = process
+            _append_job_log(job_id, "Started: " + " ".join(str(part) for part in cmd[:6]) + (" ..." if len(cmd) > 6 else ""))
+
+        last_eta_update = 0
+
         while True:
             _raise_if_job_cancelled(job_id)
 
-            line = process.stderr.readline() if process.stderr else ""
+            try:
+                stream_name, line = output_queue.get(timeout=0.05)
+            except queue.Empty:
+                stream_name, line = None, ""
+
             if line:
                 clean_line = line.strip()
                 if clean_line:
-                    stderr_lines.append(clean_line)
-                    if len(stderr_lines) > 30:
-                        stderr_lines = stderr_lines[-30:]
+                    output_lines.append(clean_line)
+                    if len(output_lines) > 40:
+                        output_lines = output_lines[-40:]
+
+                    if stream_name == "stderr":
+                        stderr_lines.append(clean_line)
+                        if len(stderr_lines) > 30:
+                            stderr_lines = stderr_lines[-30:]
+
                     if job_id and (
                         "frame=" in clean_line
                         or "time=" in clean_line
                         or "speed=" in clean_line
+                        or "[download]" in clean_line
+                        or "[info]" in clean_line
                         or "error" in clean_line.lower()
                         or "warning" in clean_line.lower()
                     ):
                         _append_job_log(job_id, clean_line)
 
-            if process.poll() is not None:
+            if job_id:
+                elapsed_seconds = int(time.monotonic() - started_at)
+                if elapsed_seconds and elapsed_seconds % 5 == 0 and elapsed_seconds != last_eta_update:
+                    last_eta_update = elapsed_seconds
+                    JOBS[job_id]["eta_seconds"] = None
+
+            if process.poll() is not None and output_queue.empty() and all(not thread.is_alive() for thread in reader_threads):
                 break
 
-            if job_id and int(time.monotonic() - started_at) % 5 == 0:
-                JOBS[job_id]["eta_seconds"] = None
-
-            time.sleep(0.02)
-
-        if process.stdout:
-            process.stdout.read()
-
-        if process.returncode != 0:
-            raise RuntimeError("\n".join(stderr_lines[-12:]) or failure_message)
+        return_code = process.wait()
+        if return_code != 0:
+            raise RuntimeError("\n".join((stderr_lines or output_lines)[-12:]) or failure_message)
 
         if job_id:
             _append_job_log(job_id, "Finished subprocess successfully.")
 
     except Exception:
-        if process.poll() is None:
+        if process and process.poll() is None:
             process.terminate()
             try:
                 process.wait(timeout=4)
@@ -1648,9 +1964,8 @@ def _run_job_subprocess(cmd, job_id=None, failure_message="FFmpeg command failed
                 process.kill()
         raise
     finally:
-        if job_id and job_id in JOBS and JOBS[job_id].get("process") is process:
+        if process and job_id and job_id in JOBS and JOBS[job_id].get("process") is process:
             JOBS[job_id]["process"] = None
-
 
 def _video_has_audio(video_path):
     """Return True when the source has at least one audio stream."""
@@ -2902,8 +3217,32 @@ def process_video_job(job_id, video_path, output_path, process_kind, settings, p
 
         overlay_ass_name = None
         overlay_settings = settings.get("overlay")
+        burn_captions = bool(settings.get("burn_captions")) and bool(settings.get("srt_path"))
 
-        if _overlay_layer_enabled(overlay_settings):
+        if burn_captions:
+            _set_job_progress(job_id, status="rendering", message="Burning captions...", phase="captions")
+
+            caption_ass_path = os.path.join(OUTPUT_DIR, f"{job_id}_{process_kind}_captions.ass")
+            final_output_path = os.path.join(OUTPUT_DIR, f"{job_id}_{process_kind}_with_captions.mp4")
+            processed_video_info = get_video_info(output_path)
+            processed_duration = get_video_duration(output_path)
+
+            srt_to_animated_ass(settings["srt_path"], caption_ass_path, settings, processed_video_info)
+
+            if process_kind == "trim":
+                trim_ass_for_processed_segments(caption_ass_path, settings.get("trim"))
+            elif preview_start or preview_seconds is not None:
+                shift_ass_for_preview(caption_ass_path, preview_start=preview_start, preview_seconds=preview_seconds)
+
+            if append_text_overlay_to_ass(caption_ass_path, overlay_settings, processed_video_info, processed_duration):
+                _append_job_log(job_id, "Text overlay appended to caption burn-in layer.")
+
+            render_preview(output_path, caption_ass_path, final_output_path, preview_start=0, preview_seconds=None)
+            _raise_if_job_cancelled(job_id)
+            os.replace(final_output_path, output_path)
+            overlay_ass_name = os.path.basename(caption_ass_path)
+
+        elif _overlay_layer_enabled(overlay_settings):
             _set_job_progress(job_id, status="rendering", message="Burning text overlay...", phase="text_overlay")
 
             overlay_ass_path = os.path.join(OUTPUT_DIR, f"{job_id}_{process_kind}_overlay.ass")
@@ -3754,6 +4093,58 @@ def shift_ass_for_preview(ass_path, preview_start=0, preview_seconds=None):
 
 
 
+# Trim and shift ASS events onto the concatenated trim-output timeline.
+# Keeps caption burn-in aligned after Trim preview/full creates a new video asset.
+def trim_ass_for_processed_segments(ass_path, trim_settings):
+    segments = list((trim_settings or {}).get("segments") or [])
+    if not segments:
+        return False
+
+    source_segments = []
+    for item in segments:
+        try:
+            start_ms = max(0, int(round(float(item.get("start", 0)) * 1000)))
+            end_ms = max(start_ms + 1, int(round(float(item.get("end", 0)) * 1000)))
+        except Exception:
+            continue
+
+        if end_ms > start_ms:
+            source_segments.append((start_ms, end_ms))
+
+    if not source_segments:
+        return False
+
+    subs = pysubs2.load(ass_path, encoding="utf-8")
+    shifted_events = []
+    output_offset_ms = 0
+
+    for segment_start_ms, segment_end_ms in source_segments:
+        segment_duration_ms = max(1, segment_end_ms - segment_start_ms)
+
+        for event in subs.events:
+            if event.end <= segment_start_ms or event.start >= segment_end_ms:
+                continue
+
+            # Vulnerable block: caption event times are derived from validated trim ranges and clamped before rendering.
+            clipped_start = max(event.start, segment_start_ms)
+            clipped_end = min(event.end, segment_end_ms)
+            if clipped_end <= clipped_start:
+                continue
+
+            shifted_event = event.copy()
+            shifted_event.start = output_offset_ms + (clipped_start - segment_start_ms)
+            shifted_event.end = output_offset_ms + (clipped_end - segment_start_ms)
+            if shifted_event.end > shifted_event.start:
+                shifted_events.append(shifted_event)
+
+        output_offset_ms += segment_duration_ms
+
+    shifted_events.sort(key=lambda event: (event.start, event.end))
+    subs.events = shifted_events
+    subs.save(ass_path)
+    return True
+
+
 
 
 # Build ASS subtitles and render either a bounded preview or a full-length output segment.
@@ -3797,9 +4188,11 @@ def process_preview(job_id, video_path, srt_path, ass_path, preview_path, settin
             JOBS[job_id]["status"] = "preparing"
             JOBS[job_id]["message"] = "Rendering without burned captions..."
 
+        export_settings = settings.get("export") or {"format": "mp4", "quality": "best"}
+
         JOBS[job_id]["status"] = "rendering"
         JOBS[job_id]["message"] = "Rendering video..."
-        render_preview(
+        render_result = render_preview(
             video_path,
             ass_render_path,
             preview_path,
@@ -3807,19 +4200,29 @@ def process_preview(job_id, video_path, srt_path, ass_path, preview_path, settin
             preview_seconds=preview_seconds,
             aspect_settings=aspect_settings,
             global_overlay_settings=settings.get("global_overlay"),
+            export_settings=export_settings,
         )
+
+        editor_preview_path = render_result.get("editor_preview_path") or preview_path
+        output_render_path = render_result.get("output_path") or preview_path
 
         audio_mix_settings = settings.get("audio_mix")
         audio_paths = list(settings.get("audio_paths") or [])
         if audio_mix_settings and audio_paths and audio_mix_settings.get("enabled"):
-            JOBS[job_id]["message"] = "Mixing additional audio..."
-            mixed_preview_path = os.path.join(OUTPUT_DIR, f"{job_id}_caption_audio_mix.mp4")
-            mix_audio_into_video(preview_path, audio_paths, mixed_preview_path, audio_mix_settings, job_id=job_id)
-            os.replace(mixed_preview_path, preview_path)
+            if export_settings.get("format") == "mp4" and os.path.abspath(editor_preview_path) == os.path.abspath(output_render_path):
+                JOBS[job_id]["message"] = "Mixing additional audio..."
+                mixed_preview_path = os.path.join(OUTPUT_DIR, f"{job_id}_caption_audio_mix.mp4")
+                mix_audio_into_video(editor_preview_path, audio_paths, mixed_preview_path, audio_mix_settings, job_id=job_id)
+                os.replace(mixed_preview_path, editor_preview_path)
+            else:
+                _append_job_log(job_id, "Additional audio mix skipped for packaged/proxy export output.")
 
         JOBS[job_id]["status"] = "done"
         JOBS[job_id]["message"] = "Render ready."
-        JOBS[job_id]["preview_file"] = os.path.basename(preview_path)
+        JOBS[job_id]["preview_file"] = _relative_output_name(editor_preview_path)
+        JOBS[job_id]["output_file"] = _relative_output_name(output_render_path)
+        JOBS[job_id]["output_format"] = render_result.get("format") or export_settings.get("format") or "mp4"
+        JOBS[job_id]["output_quality"] = render_result.get("quality") or export_settings.get("quality") or "best"
         JOBS[job_id]["ass_file"] = os.path.basename(ass_render_path) if ass_render_path else None
 
     except Exception as exc:
@@ -3928,7 +4331,8 @@ def api_preview():
             return jsonify({"ok": False, "error": "Upload a video file."}), 400
 
         if burn_captions and not srt:
-            return jsonify({"ok": False, "error": "Upload a subtitle file or disable caption burn-in."}), 400
+            # Guard caption burn-in explicitly so checked UI state cannot silently render without subtitles.
+            return jsonify({"ok": False, "error": "Burn captions is enabled, but no subtitle file was sent."}), 400
 
         # Accept source videos including WebM for preview rendering.
         if not video.filename.lower().endswith((".mp4", ".mov", ".m4v", ".webm")):
@@ -3964,12 +4368,13 @@ def api_preview():
         ass_name = f"{job_id}.ass"
 
         # Build output filename for the queued render job.
-        output_name = f"{job_id}_{'preview' if mode == 'preview' else 'full'}.mp4"        
+        # Build output filename for the queued render job from the selected export format.
+        export_settings = _build_export_settings_from_form(request.form, mode)
+        output_path = _build_render_output_path(job_id, mode, export_settings)
 
         video_path = os.path.join(UPLOAD_DIR, video_name)
         srt_path = os.path.join(UPLOAD_DIR, srt_name) if srt_name else None
         ass_path = os.path.join(OUTPUT_DIR, ass_name)
-        output_path = os.path.join(OUTPUT_DIR, output_name)
 
         if not os.path.exists(video_path):
             with open(video_path, "wb") as f:
@@ -4051,6 +4456,7 @@ def api_preview():
             "audio_mix": _build_audio_mix_settings_from_form(request.form),
             "audio_paths": audio_paths,
             "burn_captions": burn_captions,
+            "export": export_settings,
         }
 
 
@@ -4060,6 +4466,9 @@ def api_preview():
             "status": "queued",
             "message": "Queued...",
             "preview_file": None,
+            "output_file": None,
+            "output_format": None,
+            "output_quality": None,
             "ass_file": None,
             "phase": None,
             "progress_current": None,
@@ -4094,12 +4503,22 @@ def api_process_video():
         import hashlib
 
         video = request.files.get("video")
+        srt = request.files.get("srt")
+        burn_captions = _safe_bool(request.form.get("render_burn_captions", "1"), True)
+
         if not video:
             return jsonify({"ok": False, "error": "Upload a video first."}), 400
+
+        if burn_captions and (not srt or not srt.filename):
+            # Keep process jobs working without captions unless the frontend posts a caption file for burn-in.
+            burn_captions = False
 
         # Accept source videos including WebM for silence-chop and speed-processing jobs.
         if not video.filename.lower().endswith((".mp4", ".mov", ".m4v", ".webm")):
             return jsonify({"ok": False, "error": "Video must be mp4, mov, m4v, or webm."}), 400
+
+        if srt and not srt.filename.lower().endswith((".srt", ".vtt")):
+            return jsonify({"ok": False, "error": "Subtitle file must be .srt or .vtt"}), 400
 
         process_kind = request.form.get("process_kind", "silence")
         if process_kind not in ("silence", "speed", "upscale", "scale", "aspect", "crop", "trim", "grade"):
@@ -4110,23 +4529,36 @@ def api_process_video():
         preview_start = 0
         preview_seconds = None
         if mode == "preview":
+            # Vulnerable block: clamp user-provided preview window before passing it to ffmpeg.
             preview_start = max(0, min(24 * 60 * 60, _safe_float(request.form.get("preview_start", 0), 0)))
             preview_seconds = max(1, min(60, _safe_float(request.form.get("preview_duration", 8), 8)))
 
         job_id = str(uuid.uuid4())[:8]
 
         video_bytes = video.read()
+        srt_bytes = srt.read() if srt else b""
+
         video_hash = hashlib.sha1(video_bytes).hexdigest()[:16]
+        srt_hash = hashlib.sha1(srt_bytes).hexdigest()[:16] if srt_bytes else None
+
         video_ext = os.path.splitext(secure_filename(video.filename))[1].lower() or ".mp4"
+        srt_ext = os.path.splitext(secure_filename(srt.filename))[1].lower() if srt else ".srt"
+
         video_name = f"src_{video_hash}{video_ext}"
+        srt_name = f"src_{srt_hash}{srt_ext}" if srt_hash else None
 
         output_name = f"{job_id}_{process_kind}_{'preview' if mode == 'preview' else 'full'}.mp4"
         video_path = os.path.join(UPLOAD_DIR, video_name)
+        srt_path = os.path.join(UPLOAD_DIR, srt_name) if srt_name else None
         output_path = os.path.join(OUTPUT_DIR, output_name)
 
         if not os.path.exists(video_path):
             with open(video_path, "wb") as f:
                 f.write(video_bytes)
+
+        if srt_path and not os.path.exists(srt_path):
+            with open(srt_path, "wb") as f:
+                f.write(srt_bytes)
 
         audio_paths = _save_audio_track_uploads(request.files.getlist("audio_tracks"), job_id)
 
@@ -4145,6 +4577,66 @@ def api_process_video():
             "global_overlay": _build_global_overlay_settings_from_form(request.form),
             "audio_mix": _build_audio_mix_settings_from_form(request.form),
             "audio_paths": audio_paths,
+
+            # Caption render settings are included for process jobs so Trim full can burn captions like Render full.
+            "srt_path": srt_path,
+            "burn_captions": burn_captions,
+            "word_display_mode": request.form.get("word_display_mode", "phrase"),
+            "font_name": request.form.get("font_name", "Arial"),
+            "font_size": _safe_int(request.form.get("font_size", 24), 24),
+            "outline": _safe_float(request.form.get("outline", 2), 2),
+            "shadow": _safe_float(request.form.get("shadow", 0), 0),
+            "blur": _safe_float(request.form.get("blur", 0.8), 0.8),
+            "margin_v": _safe_int(request.form.get("margin_v", 60), 60),
+            "margin_h": _safe_int(request.form.get("margin_h", 40), 40),
+            "alignment": _safe_int(request.form.get("alignment", 2), 2),
+            "bold": _safe_bool(request.form.get("bold", "0")),
+            "italic": _safe_bool(request.form.get("italic", "0")),
+            "all_caps": _safe_bool(request.form.get("all_caps", "0")),
+            "primary_colour": _hex_to_ass_bgr(request.form.get("primary_colour", "#FFFFFF"), "00"),
+            "primary_colour_mode": request.form.get("primary_colour_mode", "fixed"),
+            "primary_palette": request.form.get("primary_palette", ""),
+            "active_word_colour": _hex_to_ass_bgr(request.form.get("active_word_colour", "#ff0000"), "00"),
+            "active_word_colour_mode": request.form.get("active_word_colour_mode", "fixed"),
+            "active_palette": request.form.get("active_palette", ""),
+            "active_word_lead_ms": _safe_int(request.form.get("active_word_lead_ms", 80), 80),
+            "outline_colour": _hex_to_ass_bgr(request.form.get("outline_colour", "#000000"), "00"),
+            "shadow_colour": _hex_to_ass_bgr(request.form.get("shadow_colour", "#000000"), "00"),
+            "background_colour": _hex_to_ass_bgr(request.form.get("background_colour", "#000000"), "00"),
+            "background_colour_mode": request.form.get("background_colour_mode", "fixed"),
+            "background_palette": request.form.get("background_palette", ""),
+            "use_background": _safe_bool(request.form.get("use_background", "0")),
+            "background_alpha": _safe_float(request.form.get("background_alpha", 0.45), 0.45),
+            "background_pad_x": _safe_int(request.form.get("background_pad_x", 10), 10),
+            "random_position_jitter": _safe_bool(request.form.get("random_position_jitter", "0")),
+            "position_jitter_x": _safe_int(request.form.get("position_jitter_x", 0), 0),
+            "position_jitter_y": _safe_int(request.form.get("position_jitter_y", 0), 0),
+            "random_timing_jitter": _safe_bool(request.form.get("random_timing_jitter", "0")),
+            "timing_jitter_ms": _safe_int(request.form.get("timing_jitter_ms", 0), 0),
+            "variation_seed": _safe_int(request.form.get("variation_seed", 7), 7),
+            "animation_type": request.form.get("animation_type", "fade"),
+            "intro_ms": _safe_int(request.form.get("intro_ms", 180), 180),
+            "outro_ms": _safe_int(request.form.get("outro_ms", 120), 120),
+            "start_scale": _safe_int(request.form.get("start_scale", 100), 100),
+            "end_scale": _safe_int(request.form.get("end_scale", 100), 100),
+            "start_alpha": f"&H{request.form.get('start_alpha', '99')}&",
+            "mid_alpha": f"&H{request.form.get('mid_alpha', '44')}&",
+            "end_alpha": f"&H{request.form.get('end_alpha', '66')}&",
+            "anchor_x": _safe_float(request.form.get("anchor_x", 0.5), 0.5),
+            "anchor_y": _safe_float(request.form.get("anchor_y", 0.9), 0.9),
+            "offset_x": _safe_int(request.form.get("offset_x", 0), 0),
+            "offset_y": _safe_int(request.form.get("offset_y", 0), 0),
+            "in_offset_x": _safe_int(request.form.get("in_offset_x", 0), 0),
+            "in_offset_y": _safe_int(request.form.get("in_offset_y", 18), 18),
+            "out_offset_x": _safe_int(request.form.get("out_offset_x", 0), 0),
+            "out_offset_y": _safe_int(request.form.get("out_offset_y", 0), 0),
+            "overshoot_amount": _safe_int(request.form.get("overshoot_amount", 8), 8),
+            "overshoot_ms": _safe_int(request.form.get("overshoot_ms", 90), 90),
+            "settle_ms": _safe_int(request.form.get("settle_ms", 90), 90),
+            "rotation_z": _safe_float(request.form.get("rotation_z", 0), 0),
+            "letter_spacing": _safe_float(request.form.get("letter_spacing", 0), 0),
+            "reveal_offset_ms": _safe_int(request.form.get("reveal_offset_ms", 0), 0),
+            "out_mode": request.form.get("out_mode", "fade"),
         }
 
         if process_kind == "aspect":
@@ -4159,6 +4651,9 @@ def api_process_video():
             "progress_current": None,
             "progress_total": None,
             "eta_seconds": None,
+            "logs": [{"time": time.strftime("%H:%M:%S"), "message": "Job queued."}],
+            "cancel_requested": False,
+            "process": None,
         }
 
         threading.Thread(
@@ -4252,6 +4747,346 @@ def api_get_captions():
 
 
 
+def _validate_social_import_url(url_value):
+    """Validate a user-provided media URL before handing it to yt-dlp."""
+    url = str(url_value or "").strip()
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise ValueError("Enter a valid http or https social media URL.")
+    return url
+
+
+def _find_social_download_media_file(work_dir):
+    """Return the largest media file produced by yt-dlp in the job folder."""
+    media_extensions = {".mp4", ".mov", ".m4v", ".webm", ".mkv"}
+    candidates = []
+    for root, _, files in os.walk(work_dir):
+        for filename in files:
+            ext = os.path.splitext(filename)[1].lower()
+            if ext not in media_extensions:
+                continue
+            path = os.path.join(root, filename)
+            try:
+                size = os.path.getsize(path)
+            except OSError:
+                size = 0
+            if size > 0:
+                candidates.append((size, path))
+    if not candidates:
+        raise RuntimeError("yt-dlp finished, but no video file was produced.")
+    candidates.sort(reverse=True)
+    return candidates[0][1]
+
+
+def _read_social_download_caption_text(work_dir):
+    """Read the best downloaded VTT subtitle file created by yt-dlp, when available."""
+    candidates = []
+    for root, _, files in os.walk(work_dir):
+        for filename in files:
+            if not filename.lower().endswith(".vtt"):
+                continue
+            path = os.path.join(root, filename)
+            try:
+                size = os.path.getsize(path)
+            except OSError:
+                size = 0
+            if size <= 0:
+                continue
+
+            try:
+                with open(path, "r", encoding="utf-8-sig", errors="replace") as handle:
+                    text = handle.read()
+            except OSError:
+                continue
+
+            # Prefer auto-caption VTT files with inline word timestamps over manual phrase-level captions.
+            has_word_timestamps = bool(re.search(r"<\d{2}:\d{2}:\d{2}\.\d{3}>", text))
+            candidates.append((1 if has_word_timestamps else 0, size, path, text))
+
+    if not candidates:
+        return None, None
+
+    candidates.sort(reverse=True)
+    _, _, caption_path, caption_text = candidates[0]
+    return os.path.basename(caption_path), caption_text
+
+
+def download_social_video_job(job_id, url, settings):
+    """Download a social/video URL with yt-dlp and expose the resulting file to the project importer."""
+    try:
+        ensure_dirs()
+        _set_job_progress(job_id, status="preparing", message="Preparing social video download...", phase="social_import")
+
+        ytdlp_bin = shutil.which("yt-dlp") or shutil.which("yt_dlp")
+        if not ytdlp_bin:
+            raise RuntimeError("yt-dlp was not found. Install it with: python -m pip install -U yt-dlp")
+
+        caption_mode = str(settings.get("caption_mode") or "none").strip().lower()
+        caption_language = str(settings.get("caption_language") or "en").strip() or "en"
+        work_dir = os.path.abspath(os.path.join(SOCIAL_IMPORT_DIR, secure_filename(job_id)))
+        os.makedirs(work_dir, exist_ok=True)
+
+        # Build the subprocess environment explicitly so Flask-launched yt-dlp can find Homebrew tools.
+        # This keeps deno/node/ffmpeg discovery aligned with the same shell command that works in Terminal.
+        ytdlp_env = os.environ.copy()
+        path_parts = []
+        for candidate in [
+            os.path.dirname(ytdlp_bin),
+            os.path.dirname(FFMPEG_BIN) if FFMPEG_BIN else "",
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin",
+        ]:
+            if candidate and os.path.isdir(candidate) and candidate not in path_parts:
+                path_parts.append(candidate)
+        for candidate in str(ytdlp_env.get("PATH") or "").split(os.pathsep):
+            if candidate and candidate not in path_parts:
+                path_parts.append(candidate)
+        ytdlp_env["PATH"] = os.pathsep.join(path_parts)
+        ytdlp_env.setdefault("PYTHONIOENCODING", "utf-8")
+
+        # Detect supported yt-dlp flags once and only add options accepted by the installed version.
+        # Remote EJS components are enabled when supported because YouTube n-challenges can require them.
+        help_text = ""
+        try:
+            help_result = subprocess.run(
+                [ytdlp_bin, "--help"],
+                capture_output=True,
+                text=True,
+                env=ytdlp_env,
+                timeout=10,
+            )
+            help_text = "\n".join([help_result.stdout or "", help_result.stderr or ""])
+        except Exception:
+            help_text = ""
+
+        ytdlp_shared_args = [
+            "--no-playlist",
+            "--newline",
+            "--restrict-filenames",
+            "--no-mtime",
+        ]
+
+        if "--remote-components" in help_text:
+            ytdlp_shared_args += ["--remote-components", "ejs:github"]
+
+        if "--js-runtimes" in help_text and shutil.which("deno", path=ytdlp_env["PATH"]):
+            ytdlp_shared_args += ["--js-runtimes", "deno"]
+
+        if "--ffmpeg-location" in help_text and FFMPEG_BIN and os.path.exists(FFMPEG_BIN):
+            ytdlp_shared_args += ["--ffmpeg-location", os.path.dirname(FFMPEG_BIN)]
+
+        output_template = os.path.join(work_dir, "%(title).180B_%(id)s.%(ext)s")
+
+        # Download media first without subtitle flags so subtitle rate limits can never fail the video import.
+        # Vulnerable block: URL is validated before this point and is passed as a single subprocess argument.
+        video_cmd = [
+            ytdlp_bin,
+            *ytdlp_shared_args,
+            "-o", output_template,
+            url,
+        ]
+
+        _set_job_progress(job_id, status="rendering", message="Downloading video with yt-dlp...", phase="social_import")
+        _run_job_subprocess(video_cmd, job_id=job_id, failure_message="yt-dlp download failed", env=ytdlp_env)
+        _raise_if_job_cancelled(job_id)
+
+        # Captions are downloaded in a second isolated pass so 429/403 subtitle errors do not break video import.
+        if caption_mode == "download":
+            selected_caption_language = None
+            selected_caption_source = None
+
+            try:
+                metadata_cmd = [
+                    ytdlp_bin,
+                    *ytdlp_shared_args,
+                    "--skip-download",
+                    "-J",
+                    url,
+                ]
+                metadata_result = subprocess.run(
+                    metadata_cmd,
+                    capture_output=True,
+                    text=True,
+                    env=ytdlp_env,
+                    timeout=45,
+                )
+
+                if metadata_result.returncode == 0 and (metadata_result.stdout or "").strip():
+                    metadata = json.loads(metadata_result.stdout)
+                    requested_language = caption_language.lower()
+                    caption_matches = []
+
+                    # Prefer automatic captions because YouTube VTT auto captions usually include word timestamps.
+                    for source_name, subtitle_map in [
+                        ("automatic", metadata.get("automatic_captions") or {}),
+                        ("manual", metadata.get("subtitles") or {}),
+                    ]:
+                        if not isinstance(subtitle_map, dict):
+                            continue
+
+                        for language_key, formats in subtitle_map.items():
+                            language_key_text = str(language_key or "").strip()
+                            language_key_lower = language_key_text.lower()
+                            if not language_key_text:
+                                continue
+
+                            has_vtt_format = False
+                            if isinstance(formats, list):
+                                for item in formats:
+                                    if isinstance(item, dict) and str(item.get("ext") or "").lower() == "vtt":
+                                        has_vtt_format = True
+                                        break
+
+                            score = 0
+                            if language_key_lower == requested_language:
+                                score = 120
+                            elif language_key_lower.startswith(requested_language + "-"):
+                                score = 110
+                            elif language_key_lower.startswith(requested_language):
+                                score = 100
+                            elif requested_language == "en" and language_key_lower.startswith("en-"):
+                                score = 90
+                            elif requested_language != "en" and language_key_lower == "en":
+                                score = 50
+                            elif requested_language != "en" and language_key_lower.startswith("en-"):
+                                score = 40
+
+                            if score:
+                                if source_name == "automatic":
+                                    score += 10
+                                if has_vtt_format:
+                                    score += 5
+                                caption_matches.append((score, source_name, language_key_text))
+
+                    if caption_matches:
+                        caption_matches.sort(reverse=True)
+                        _, selected_caption_source, selected_caption_language = caption_matches[0]
+
+            except Exception as exc:
+                _append_job_log(job_id, f"Caption metadata lookup skipped: {exc}")
+
+            if selected_caption_language:
+                _set_job_progress(job_id, status="rendering", message="Downloading available captions...", phase="social_import")
+                caption_cmd = [
+                    ytdlp_bin,
+                    *ytdlp_shared_args,
+                    "--skip-download",
+                    "--sub-langs", selected_caption_language,
+                    "--sub-format", "vtt",
+                    "--convert-subs", "vtt",
+                    "-o", output_template,
+                ]
+
+                if selected_caption_source == "automatic":
+                    caption_cmd.append("--write-auto-subs")
+                else:
+                    caption_cmd.append("--write-subs")
+
+                caption_cmd.append(url)
+
+                try:
+                    _run_job_subprocess(caption_cmd, job_id=job_id, failure_message="yt-dlp caption download failed", env=ytdlp_env)
+                except Exception as exc:
+                    # Caption failures are non-fatal because the downloaded video remains valid project media.
+                    _append_job_log(job_id, "Caption download failed without blocking video import: " + str(exc).splitlines()[-1])
+            else:
+                _append_job_log(job_id, f"No downloadable caption track matched language: {caption_language}")
+
+            _raise_if_job_cancelled(job_id)
+
+        _set_job_progress(job_id, status="rendering", message="Finalizing downloaded media...", phase="social_import")
+        media_path = _find_social_download_media_file(work_dir)
+        media_filename = os.path.basename(media_path)
+        media_rel = os.path.relpath(media_path, OUTPUT_DIR).replace(os.sep, "/")
+
+        try:
+            info = get_video_info(media_path)
+        except Exception:
+            info = {"width": 0, "height": 0, "duration": 0}
+
+        captions_filename = None
+        captions_text = None
+        if caption_mode == "download":
+            captions_filename, captions_text = _read_social_download_caption_text(work_dir)
+            if captions_text:
+                _append_job_log(job_id, f"Downloaded captions: {captions_filename}")
+            else:
+                _append_job_log(job_id, "No downloadable captions were available for this URL.")
+
+        JOBS[job_id].update({
+            "status": "done",
+            "message": "Social video ready.",
+            "preview_file": None,
+            "ass_file": None,
+            "download_file": media_rel,
+            "download_filename": media_filename,
+            "download_title": os.path.splitext(media_filename)[0],
+            "download_info": info,
+            "captions_file": captions_filename,
+            "captions_text": captions_text,
+            "kind": "social_import",
+            "process": None,
+        })
+
+    except Exception as exc:
+        if str(exc) == "Job cancelled by user.":
+            JOBS[job_id]["status"] = "cancelled"
+            JOBS[job_id]["message"] = "Download cancelled."
+        else:
+            JOBS[job_id]["status"] = "error"
+            JOBS[job_id]["message"] = str(exc)
+        JOBS[job_id]["process"] = None
+
+@app.route("/api/social_import", methods=["POST"])
+def api_social_import():
+    """Queue a yt-dlp social/video URL download for later project import."""
+    try:
+        ensure_dirs()
+        payload = request.get_json(silent=True) or request.form
+        url = _validate_social_import_url(payload.get("url"))
+        caption_mode = str(payload.get("caption_mode", "none") or "none").strip().lower()
+        if caption_mode not in ("none", "download", "transcribe"):
+            caption_mode = "none"
+
+        caption_language = str(payload.get("caption_language", "en") or "en").strip() or "en"
+        job_id = str(uuid.uuid4())[:8]
+        JOBS[job_id] = {
+            "status": "queued",
+            "message": "Queued social video download...",
+            "preview_file": None,
+            "ass_file": None,
+            "captions_file": None,
+            "captions_text": None,
+            "download_file": None,
+            "kind": "social_import",
+            "logs": [],
+            "cancel_requested": False,
+            "process": None,
+            "phase": "social_import",
+            "progress_current": None,
+            "progress_total": None,
+            "eta_seconds": None,
+        }
+        _append_job_log(job_id, f"Queued URL: {url}")
+        threading.Thread(
+            target=download_social_video_job,
+            args=(job_id, url, {
+                "caption_mode": caption_mode,
+                "caption_language": caption_language,
+            }),
+            daemon=True,
+        ).start()
+        return jsonify({"ok": True, "job_id": job_id})
+
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+
 @app.route("/api/status/<job_id>")
 def api_status(job_id):
     job = JOBS.get(job_id)
@@ -4275,10 +5110,20 @@ def api_status(job_id):
         "progress_percent": progress_percent,
         "eta_seconds": job.get("eta_seconds"),
         "preview_url": f"/outputs/{job['preview_file']}" if job.get("preview_file") else None,
+        "output_url": f"/outputs/{job['output_file']}" if job.get("output_file") else None,
+        "output_file": job.get("output_file"),
+        "output_format": job.get("output_format"),
+        "output_quality": job.get("output_quality"),
         "ass_url": f"/outputs/{job['ass_file']}" if job.get("ass_file") else None,
         "captions_url": f"/outputs/{job['captions_file']}" if job.get("captions_file") else None,
         "captions_filename": job.get("captions_file"),
         "captions_text": job.get("captions_text"),
+        "kind": job.get("kind"),
+        "download_file": job.get("download_file"),
+        "download_url": f"/outputs/{job['download_file']}" if job.get("download_file") else None,
+        "download_filename": job.get("download_filename"),
+        "download_title": job.get("download_title"),
+        "download_info": job.get("download_info"),
         "logs": job.get("logs", [])[-30:],
         "cancel_requested": bool(job.get("cancel_requested")),
     })
