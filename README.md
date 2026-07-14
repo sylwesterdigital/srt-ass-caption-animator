@@ -1,383 +1,253 @@
-REPLACE: `README.md`
+# Caption Animator
 
-# caption-animator
+Caption Animator is a local macOS video editor for captioning, trimming, reframing, transforming, and exporting social video.
 
-Produced for this small feature animation yesterday - a tool built in minutes, just an idea:
-https://youtu.be/WMzr-QDAxkE?si=oamCYI09iHzF8elE
+The interface runs in a native macOS WebKit window. Video processing is performed locally through Flask, FFmpeg, Faster-Whisper, and optional Real-ESRGAN AI upscaling.
 
-Captions Animator — a browser UI plus Flask backend for creating **animated burned-in captions** on video.
+**Publisher:** WORKWORK.FUN  
+**Author:** Sylwester Mielniczuk  
+**Copyright:** © 2026
 
-The app lets you load a video and an `.srt` or `.vtt`, adjust caption styling and motion in a live helper overlay, then render either a short preview or the full exported video.
+## Download
 
-<img width="1611" height="1373" alt="Screenshot 2026-03-11 at 03 10 20" src="https://github.com/user-attachments/assets/cdb7d32e-6a12-4dce-ae18-ef184775a415" />
+Signed and notarized macOS builds are published on the GitHub Releases page:
 
-https://github.com/user-attachments/assets/995d45bb-cffb-4ddf-85dd-98b0f98e0722
+https://github.com/sylwesterdigital/srt-ass-caption-animator/releases
 
----
+For most users, download the `.dmg`, open it, and drag **Caption Animator** into **Applications**.
 
-## What it does
+## Current platform support
 
-### Front end
-- loads a source video and subtitle file
-- shows a draggable / resizable helper caption on top of the displayed video
-- exposes caption controls through `lil-gui`
-- allows live adjustment of:
-  - typography
-  - placement
-  - animation
-  - colors
-  - background
-  - outline
-  - shadow
-  - spacing
-  - rotation
-  - presets
-- saves / imports / exports presets
-- sends current control values with files to the backend for rendering
+- macOS 12 or later
+- Current public build: Apple Silicon (`arm64`)
+- Supported Macs: M1, M2, M3, M4, and later Apple Silicon models
+- Intel and universal builds are not currently published
 
-### Backend
-- accepts uploaded video and subtitle file
-- reads video resolution
-- converts SRT / VTT into animated ASS subtitles
-- applies style and per-line / per-word animation settings
-- uses FFmpeg to burn ASS subtitles into:
-  - a preview render
-  - a full final MP4 render
-- exposes job polling and returns rendered files when ready
-
-This is not just a generic subtitle editor. It is a **caption animation and render tool** for styling subtitles visually, previewing placement on the actual video frame, and exporting a final hard-subbed video.
-
----
+The application bundle is Developer ID signed and notarized by Apple.
 
 ## Main features
 
-- SRT and VTT subtitle input
-- Animated ASS subtitle generation
-- Hard-subbed preview and full export
-- Live caption positioning overlay in the browser
-- Typography and motion controls via `lil-gui`
-- Preset save / load / export / import
-- Per-word highlight support
-- Flask backend with render job polling
-- FFmpeg-based final render pipeline
+### Projects and media
 
----
+- Create and reopen local projects
+- Import multiple project videos
+- Keep project media and rendered versions between sessions
+- Import local MP4, MOV, M4V, and WebM files
+- Import supported online media through yt-dlp
+- Download available caption tracks when provided by the source
+- Convert incompatible WebM, VP9, AV1, or Opus downloads to WebKit-compatible MP4
 
-## Tech stack
+### Captions
 
-- Python
-- Flask
-- FFmpeg
-- HTML / CSS / JavaScript
-- `lil-gui`
-- ASS subtitle generation pipeline
+- Generate captions locally with Faster-Whisper
+- Edit caption text and timing
+- Display caption clips on the timeline
+- Import or export SRT and VTT captions
+- Render ASS-styled captions into the final video
+- Control font, size, position, outline, shadow, background, spacing, and alignment
+- Apply animated caption entrances and exits
+- Use custom uploaded fonts
+- Split captions by word count, duration, punctuation, pauses, characters, and line count
 
----
+### Video editing and transformation
 
-## Project structure
+- Trim and split video using a visual timeline
+- Generate previews before full rendering
+- Change playback speed while preserving audio pitch
+- Keep speech sections or silence sections
+- Crop and reframe video
+- Change output aspect ratio and canvas size
+- Scale or downscale using FFmpeg
+- Upscale using Real-ESRGAN
+- Apply colour grading
+- Add solid, linear-gradient, or radial-gradient colour overlays
+- Add independent text overlays
+- Mix additional audio tracks with volume and pan controls
 
-A typical layout looks like this:
+### Export and diagnostics
+
+- Export processed video as MP4
+- View processing progress and job logs
+- Cancel active processing jobs
+- Open the persistent application log from the UI
+- Reveal generated files in Finder
+
+## Included in the macOS release
+
+The packaged application includes the tools needed for normal operation:
+
+- FFmpeg and ffprobe
+- Faster-Whisper runtime
+- The configured Faster-Whisper model, currently `small`
+- yt-dlp
+- Deno for current yt-dlp JavaScript support
+- Real-ESRGAN assets when present in the source project
+- Python runtime and required packages
+- Local WebKit desktop shell
+
+Users do not need to install Python, Homebrew, FFmpeg, or the bundled Whisper model separately.
+
+## Local data
+
+The installed app keeps writable data outside the signed application bundle.
+
+Application data:
+
+```text
+~/Library/Application Support/Caption Animator
+```
+
+Application log:
+
+```text
+~/Library/Logs/Caption Animator/app.log
+```
+
+The data folder may contain:
+
+- Projects and application state
+- Imported media
+- Rendered outputs
+- Uploaded fonts
+- Downloaded models and helper tools
+- Temporary processing assets
+
+Removing the app from `/Applications` does not automatically remove this data.
+
+## Viewing logs
+
+Use the **Logs** control inside the application, or open the log directly:
+
+```bash
+open "$HOME/Library/Logs/Caption Animator/app.log"
+```
+
+Follow the log live in Terminal:
+
+```bash
+tail -f "$HOME/Library/Logs/Caption Animator/app.log"
+```
+
+Run the packaged executable with more verbose logging:
+
+```bash
+CAPTION_ANIMATOR_LOG_LEVEL=DEBUG \
+  "/Applications/Caption Animator.app/Contents/MacOS/Caption Animator"
+```
+
+## Development
+
+### Requirements
+
+- macOS
+- Python 3.12 recommended
+- FFmpeg and ffprobe
+- Python packages used by the backend, including Flask, Werkzeug, pysubs2, fonttools, Pillow, NumPy, and Faster-Whisper
+
+The development backend currently expects FFmpeg at:
+
+```text
+~/ffmpeg-full/bin/ffmpeg
+~/ffmpeg-full/bin/ffprobe
+```
+
+These paths are replaced automatically in packaged releases.
+
+### Run locally
+
+Create and activate a virtual environment:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install \
+  Flask Werkzeug pysubs2 fonttools Pillow numpy faster-whisper
+```
+
+Start the development server:
+
+```bash
+python app.py
+```
+
+Open:
+
+```text
+http://127.0.0.1:5151
+```
+
+The source development server uses Flask debug mode and automatic reload. The packaged application disables both.
+
+## Project layout
 
 ```text
 .
 ├── app.py
-├── requirements.txt
-├── static/
 ├── templates/
-├── storage/
+│   └── index.html
+├── assets/
+│   ├── fonts/
+│   └── images/icons/
+├── fonts/
+├── tools/
+│   └── realesrgan/
+├── srt_to_animated_ass.py
+├── build_macos_release_v2.sh
+├── release_signed.sh
+├── publish_github_release.sh
+├── VERSION.txt
+├── BUILD_NUMBER.txt
 ├── README.md
-└── ...
-````
+└── RELEASE.md
+```
 
-If your repository layout differs, keep `app.py` as the main Flask entry point and ensure `storage/` is writable.
+Some generated or machine-local items may intentionally remain untracked.
 
----
+## Building a release
 
-## Requirements
+The full signed, notarized, and GitHub publishing workflow is documented in [RELEASE.md](RELEASE.md).
 
-Before running the app, install:
-
-* Python 3.10+ recommended
-* `ffmpeg` available in PATH
-* `venv` support
-* pip
-
-Check FFmpeg:
+The normal signed build command is:
 
 ```bash
-ffmpeg -version
+./release_signed.sh
 ```
 
-If that fails, install FFmpeg first.
-
-### macOS
-
-```bash
-brew install ffmpeg
-```
-
-### Ubuntu / Debian
-
-```bash
-sudo apt update
-sudo apt install ffmpeg python3-venv
-```
-
----
-
-## Setup
-
-### 1. Clone the repo
-
-```bash
-git clone <your-repo-url>
-cd srt-ass-caption-animator
-```
-
-### 2. Create a virtual environment
-
-```bash
-python3 -m venv venv
-```
-
-### 3. Activate the virtual environment
-
-#### macOS / Linux
-
-```bash
-source venv/bin/activate
-```
-
-#### Windows (PowerShell)
-
-```powershell
-venv\Scripts\Activate.ps1
-```
-
-### 4. Install Python dependencies
-
-```bash
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-If you do not have a `requirements.txt` yet, generate one from your working environment or install the Flask / subtitle / rendering dependencies used by `app.py`.
-
----
-
-## Running the app
-
-With the virtual environment active:
-
-```bash
-python app.py
-```
-
-If the app uses Flask environment variables instead, you can also run it with:
-
-```bash
-export FLASK_APP=app.py
-export FLASK_ENV=development
-flask run
-```
-
-Typical local URL:
+Generated installers are placed in:
 
 ```text
-http://127.0.0.1:5000
+release/
 ```
 
-Open that in the browser.
+## Privacy and network use
 
----
+Video editing, FFmpeg processing, and local transcription are performed on the Mac.
 
-## Typical workflow
+Network access is used when required for:
 
-1. Open the app in the browser
-2. Load a source video
-3. Load an `.srt` or `.vtt`
-4. Drag and resize the helper caption overlay on the video
-5. Adjust styles and animation in `lil-gui`
-6. Save or export a preset if needed
-7. Render a short preview
-8. Render the full burned-in MP4 when satisfied
+- Downloading media through yt-dlp
+- Downloading optional models or helper assets
+- Fetching dependencies during a release build
+- Apple notarization
+- Publishing GitHub Releases
 
----
+Do not include private media in bug reports. Attach only the relevant log excerpt and reproduction steps.
 
-## Subtitle animation workflow
+## Known limitations
 
-The render pipeline works like this:
-
-1. subtitle file is uploaded
-2. backend parses SRT / VTT
-3. subtitle cues are converted into ASS
-4. current style / animation controls are applied
-5. FFmpeg burns ASS into the source video
-6. app returns preview or final output
-
-This gives you high-quality hard subtitles while keeping the browser UI fast and interactive.
-
----
-
-## Presets
-
-The UI supports presets for caption design and motion.
-
-Typical preset actions:
-
-* save current preset
-* load a saved preset
-* export preset to file
-* import preset from file
-
-This is useful when you want:
-
-* repeatable branding
-* reusable caption motion styles
-* quick switching between visual treatments
-
----
-
-## Active word highlight
-
-The app supports an **active word highlight** mode through:
-
-* `active_word_colour`
-* `active_word_lead_ms`
-
-These settings are part of the control model and are used to emphasize the current spoken word during subtitle playback / render.
-
-A previous crash happened because:
-
-* the values existed in `defaultControls`
-* but were missing from `controls`
-* `lil-gui` then crashed while trying to create the color picker for a missing property
-
-That issue means both defaults and active UI control state must stay in sync whenever a new control is added.
-
----
-
-## Output
-
-The app produces:
-
-* preview renders
-* final rendered MP4 files with burned-in animated captions
-
-Depending on your implementation, outputs may be stored under `storage/` and exposed through Flask routes for download or preview.
-
----
-
-## Development notes
-
-### Virtual environment
-
-Always activate the repo-local virtual environment before running or updating dependencies.
-
-### FFmpeg
-
-FFmpeg must be installed system-wide and accessible from the shell used to start Flask.
-
-### Storage
-
-Make sure the app has permission to write to the `storage/` directory.
-
-### Large files
-
-Preview rendering is much faster than full rendering and should be used during styling iteration.
-
----
-
-## Troubleshooting
-
-### `ffmpeg: command not found`
-
-Install FFmpeg and verify it is in PATH:
-
-```bash
-ffmpeg -version
-```
-
-### Flask app starts but render fails
-
-Check:
-
-* input file paths
-* subtitle parsing
-* FFmpeg availability
-* write permissions for `storage/`
-
-### Virtual environment command not found
-
-Use:
-
-```bash
-python3 -m venv venv
-```
-
-and make sure Python has venv support installed.
-
-### GUI crashes when opening a control
-
-Check whether the property exists in both:
-
-* `defaultControls`
-* active `controls`
-
-If a control exists only in defaults but not in the runtime control object, `lil-gui` can fail when binding it.
-
----
-
-## Recommended development commands
-
-Activate venv:
-
-```bash
-source venv/bin/activate
-```
-
-Install / refresh deps:
-
-```bash
-pip install -r requirements.txt
-```
-
-Run app:
-
-```bash
-python app.py
-```
-
-Deactivate venv:
-
-```bash
-deactivate
-```
-
----
-
-## Example use cases
-
-* TikTok / Reels / Shorts caption styling
-* hard-subbed explainer videos
-* animated quote videos
-* podcast subtitles
-* social media exports with stronger typography and motion
-
----
+- The current distributed build is Apple Silicon only.
+- Large files, transcription, and AI upscaling can require substantial disk space and processing time.
+- Online media providers can change formats or block downloads without notice.
+- Real-ESRGAN compatibility depends on the architecture of the bundled native helper.
+- Browser/WebKit media support varies by codec; social downloads are remuxed or transcoded to MP4 when needed.
+- This is an early release. Keep original source files and test important exports before deleting project media.
 
 ## License
 
-Add your license here, for example:
+See [LICENSE](LICENSE).
 
-```text
-MIT
-```
+## Credits
 
-or replace this section with your project’s actual license.
-
----
-
-## Repository summary
-
-`srt-ass-caption-animator` is a Flask-based caption animation tool that turns ordinary subtitle files into visually styled, animated, hard-burned captions using ASS + FFmpeg, with a browser-based live positioning and styling workflow.
+**WORKWORK.FUN**  
+Created by **Sylwester Mielniczuk**  
+© 2026
