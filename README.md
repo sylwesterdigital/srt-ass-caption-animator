@@ -1,3 +1,6 @@
+<img width="1641" height="1356" alt="Screenshot 2026-07-14 at 13 11 24" src="https://github.com/user-attachments/assets/fbcd8371-c668-456c-aefc-50cb13aa2c38" />
+
+
 # Caption Animator
 
 Caption Animator is a local macOS video editor for captioning, trimming, reframing, transforming, and exporting social video.
