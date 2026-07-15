@@ -455,7 +455,10 @@ if [[ "$WORKFLOW_STAGE" == published ]]; then
 
   HOMEPAGE_CHANNEL=stable
   [[ "$RELEASE_MODE" == prerelease ]] && HOMEPAGE_CHANNEL=prerelease
-  HOMEPAGE_ARGS=(--release-channel "$HOMEPAGE_CHANNEL")
+  HOMEPAGE_ARGS=(
+    --release-channel "$HOMEPAGE_CHANNEL"
+    --release-tag "$RELEASE_TAG"
+  )
   [[ "$DELETE_REMOTE" == 1 ]] && HOMEPAGE_ARGS+=(--delete-remote)
   [[ "$HOMEPAGE_DRY_RUN" == 1 ]] && HOMEPAGE_ARGS+=(--dry-run --keep-build)
 

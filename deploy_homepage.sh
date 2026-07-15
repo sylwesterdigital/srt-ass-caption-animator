@@ -21,6 +21,7 @@ GITHUB_API="${GITHUB_API:-https://api.github.com}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL:-any}"   # any, stable, prerelease
 RELEASE_ARCH="${RELEASE_ARCH:-arm64}"
+EXPECTED_RELEASE_TAG="${EXPECTED_RELEASE_TAG:-}"
 
 DO_MIN=1
 DO_PRECOMPRESS=1
@@ -80,6 +81,7 @@ Options:
   --remote-dir DIR
   --remote-url URL
   --release-channel any|stable|prerelease
+  --release-tag TAG
   --release-arch ARCH
   --no-min
   --drop-console
@@ -104,6 +106,7 @@ while [[ $# -gt 0 ]]; do
     --remote-dir) [[ $# -ge 2 ]] || die "--remote-dir requires a value"; REMOTE_DIR="$2"; shift 2 ;;
     --remote-url) [[ $# -ge 2 ]] || die "--remote-url requires a value"; REMOTE_URL="$2"; shift 2 ;;
     --release-channel) [[ $# -ge 2 ]] || die "--release-channel requires a value"; RELEASE_CHANNEL="$2"; shift 2 ;;
+    --release-tag) [[ $# -ge 2 ]] || die "--release-tag requires a value"; EXPECTED_RELEASE_TAG="$2"; shift 2 ;;
     --release-arch) [[ $# -ge 2 ]] || die "--release-arch requires a value"; RELEASE_ARCH="$2"; shift 2 ;;
     --no-min) DO_MIN=0; shift ;;
     --drop-console) DROP_CONSOLE=1; shift ;;
@@ -201,20 +204,49 @@ CURL_ARGS=(--fail --silent --show-error --location --retry 3 \
   --header 'Accept: application/vnd.github+json' \
   --header 'X-GitHub-Api-Version: 2022-11-28')
 [[ -z "$GITHUB_TOKEN" ]] || CURL_ARGS+=(--header "Authorization: Bearer $GITHUB_TOKEN")
-curl "${CURL_ARGS[@]}" "$GITHUB_API/repos/$GITHUB_REPO/releases?per_page=100" -o "$API_JSON"
+if [[ -n "$EXPECTED_RELEASE_TAG" ]]; then
+  info "Pinned release tag: $EXPECTED_RELEASE_TAG"
+  curl "${CURL_ARGS[@]}"     "$GITHUB_API/repos/$GITHUB_REPO/releases/tags/$EXPECTED_RELEASE_TAG"     -o "$API_JSON"
+else
+  curl "${CURL_ARGS[@]}"     "$GITHUB_API/repos/$GITHUB_REPO/releases?per_page=100"     -o "$API_JSON"
+fi
 
-python3 - "$API_JSON" "$RELEASE_ENV" "$RELEASE_CHANNEL" "$RELEASE_ARCH" "$GITHUB_REPO" <<'PY'
+python3 - "$API_JSON" "$RELEASE_ENV" "$RELEASE_CHANNEL" "$RELEASE_ARCH" "$GITHUB_REPO" "$EXPECTED_RELEASE_TAG" <<'PY'
 from pathlib import Path
 import json, shlex, sys
-src, dst, channel, arch, repo = sys.argv[1:]
+src, dst, channel, arch, repo, expected_tag = sys.argv[1:]
 data = json.loads(Path(src).read_text())
-if not isinstance(data, list):
-    raise SystemExit(data.get("message", "Unexpected GitHub response") if isinstance(data, dict) else "Unexpected GitHub response")
-items = [r for r in data if not r.get("draft")]
-if channel == "stable": items = [r for r in items if not r.get("prerelease")]
-if channel == "prerelease": items = [r for r in items if r.get("prerelease")]
-if not items: raise SystemExit(f"No {channel} release found for {repo}")
-r = items[0]
+
+if expected_tag:
+    if not isinstance(data, dict):
+        raise SystemExit(f"Unexpected GitHub response for pinned release {expected_tag}")
+    if data.get("draft"):
+        raise SystemExit(f"Pinned release {expected_tag} is still a draft")
+    if str(data.get("tag_name") or "") != expected_tag:
+        raise SystemExit(
+            f"GitHub returned tag {data.get('tag_name')!r}, expected {expected_tag!r}"
+        )
+    r = data
+else:
+    if not isinstance(data, list):
+        raise SystemExit(
+            data.get("message", "Unexpected GitHub response")
+            if isinstance(data, dict)
+            else "Unexpected GitHub response"
+        )
+    items = [release for release in data if not release.get("draft")]
+    if channel == "stable":
+        items = [release for release in items if not release.get("prerelease")]
+    if channel == "prerelease":
+        items = [release for release in items if release.get("prerelease")]
+    if not items:
+        raise SystemExit(f"No {channel} release found for {repo}")
+    r = items[0]
+
+if channel == "stable" and r.get("prerelease"):
+    raise SystemExit(f"Release {r.get('tag_name')} is a prerelease, not stable")
+if channel == "prerelease" and not r.get("prerelease"):
+    raise SystemExit(f"Release {r.get('tag_name')} is stable, not a prerelease")
 
 def score(a):
     n = str(a.get("name", "")).lower()
@@ -241,6 +273,9 @@ Path(dst).write_text("\n".join(f"{k}={shlex.quote(v)}" for k,v in values.items()
 PY
 # shellcheck disable=SC1090
 source "$RELEASE_ENV"
+if [[ -n "$EXPECTED_RELEASE_TAG" && "$RELEASE_TAG" != "$EXPECTED_RELEASE_TAG" ]]; then
+  die "Resolved release $RELEASE_TAG, expected $EXPECTED_RELEASE_TAG."
+fi
 info "Release: $RELEASE_TAG — $RELEASE_NAME"
 info "Release page: $RELEASE_URL"
 info "Download: $DOWNLOAD_URL"
