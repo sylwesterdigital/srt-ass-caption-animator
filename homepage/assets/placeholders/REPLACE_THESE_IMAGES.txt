@@ -1,0 +1,13 @@
+Replace these PNG files while keeping the filenames:
+
+hero-workspace.png
+workflow-import.png
+workflow-transcribe.png
+workflow-design.png
+workflow-export.png
+showcase-workspace.png
+showcase-typography.png
+showcase-editor.png
+showcase-delivery.png
+
+Recommended dimensions: 1600 × 1000.

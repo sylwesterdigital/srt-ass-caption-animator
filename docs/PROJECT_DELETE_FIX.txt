@@ -1,0 +1,15 @@
+Project deletion compatibility fix
+
+The generic error occurred when index.html called /api/delete_project_files
+but the installed frozen backend did not expose that newer route.
+
+This update:
+- retains the red Delete button and two OK / Cancel confirmations;
+- uses full project cleanup when the current backend supports it;
+- falls back to the older per-file deletion endpoint when necessary;
+- does not block IndexedDB project deletion because of a backend mismatch;
+- removes project records, blobs, thumbnails, captions, settings, and
+  recorded generated files;
+- includes the backend route for full tagged temp-folder and job cleanup.
+
+Original Finder-selected source files remain untouched.

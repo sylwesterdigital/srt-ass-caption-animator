@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#65d7ff"/>
+      <stop offset=".55" stop-color="#4f7cff"/>
+      <stop offset="1" stop-color="#996bff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#05080d"/>
+  <circle cx="920" cy="180" r="290" fill="#4f7cff" opacity=".16"/>
+  <circle cx="250" cy="570" r="360" fill="#65d7ff" opacity=".11"/>
+  <rect x="74" y="78" width="92" height="92" rx="24" fill="#0e1723" stroke="#ffffff" stroke-opacity=".15"/>
+  <rect x="96" y="101" width="48" height="42" rx="8" fill="none" stroke="#fff" stroke-width="6"/>
+  <path d="M113 111v22l21-11-21-11Z" fill="#65d7ff"/>
+  <text x="74" y="275" fill="#fff" font-family="Arial, sans-serif" font-size="88" font-weight="800">Caption Animator</text>
+  <text x="77" y="352" fill="url(#g)" font-family="Arial, sans-serif" font-size="48" font-weight="700">Captions that move with the story.</text>
+  <text x="79" y="430" fill="#aeb9c8" font-family="Arial, sans-serif" font-size="29">Local transcription · Animated captions · macOS</text>
+</svg>

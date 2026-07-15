@@ -265,3 +265,18 @@ Desktop.ini
 /*_FIX.txt
 /*_NOTES.txt
 /*_README.txt
+
+# Real-ESRGAN runtime downloaded during build/runtime
+/tools/realesrgan/**/realesrgan-ncnn-vulkan
+/tools/realesrgan/**/models/*.bin
+/tools/realesrgan/**/input*.jpg
+
+# Unneeded Inter source package files
+/fonts/Inter-4.1/Inter.ttc
+/fonts/Inter-4.1/extras/
+/fonts/Inter-4.1/help.txt
+/fonts/Inter-4.1/web/
+
+# Local housekeeping
+/cleanup_ignored_files.sh
+/homepage/README.md

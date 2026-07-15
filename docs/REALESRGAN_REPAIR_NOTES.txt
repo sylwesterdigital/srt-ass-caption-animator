@@ -1,0 +1,8 @@
+Real-ESRGAN integrity repair
+
+- New releases bundle and verify the complete official Real-ESRGAN package.
+- Existing installations show an Install / repair button in Application Logs.
+- Repair installs into ~/Library/Application Support/Caption Animator/tools/realesrgan/.
+- Apple-silicon Macs get clear Rosetta guidance when the runtime is Intel-only.
+- Standard FFmpeg scaling remains available if the optional AI runtime is unavailable.
+- The yt-dlp Team-ID loader failure is now shown as a concise release packaging issue.
