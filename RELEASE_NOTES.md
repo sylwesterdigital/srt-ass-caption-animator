@@ -4,6 +4,15 @@ This release introduces the **Cut** product identity and consolidates the latest
 
 ## Highlights
 
+## Startup reliability
+
+- Cut now tries the configured local port first.
+- When that port is occupied, macOS assigns a free loopback port automatically.
+- The desktop window waits for the local Flask server before opening.
+- The selected port is recorded in the application log.
+- Closing the window shuts down and closes the local server socket.
+
+
 ### New Cut identity
 
 - Renamed the application and macOS bundle to **Cut**

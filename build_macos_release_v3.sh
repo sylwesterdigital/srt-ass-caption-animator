@@ -645,6 +645,7 @@ template = r'''from __future__ import annotations
 import logging
 import os
 import shutil
+import socket
 import sys
 import threading
 import time
@@ -652,7 +653,26 @@ import traceback
 from pathlib import Path
 
 APP_NAME = __APP_NAME__
-APP_PORT = int(os.environ.get("CAPTION_ANIMATOR_PORT", __APP_PORT__))
+DEFAULT_APP_PORT = __APP_PORT__
+
+
+def configured_app_port() -> int:
+    raw_value = (
+        os.environ.get("CUT_PORT")
+        or os.environ.get("CAPTION_ANIMATOR_PORT")
+        or str(DEFAULT_APP_PORT)
+    )
+    try:
+        port = int(raw_value)
+    except (TypeError, ValueError):
+        return int(DEFAULT_APP_PORT)
+
+    if 0 <= port <= 65535:
+        return port
+    return int(DEFAULT_APP_PORT)
+
+
+APP_PORT = configured_app_port()
 
 
 def resource_root() -> Path:
@@ -660,10 +680,91 @@ def resource_root() -> Path:
 
 
 def data_root() -> Path:
-    override = os.environ.get("CAPTION_ANIMATOR_DATA_DIR")
+    override = (
+        os.environ.get("CUT_DATA_DIR")
+        or os.environ.get("CAPTION_ANIMATOR_DATA_DIR")
+    )
     if override:
         return Path(override).expanduser().resolve()
     return Path.home() / "Library" / "Application Support" / APP_NAME
+
+
+def local_port_is_available(port: int) -> bool:
+    if port == 0:
+        return True
+
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        probe.settimeout(0.25)
+        probe.bind(("127.0.0.1", port))
+        return True
+    except OSError:
+        return False
+    finally:
+        probe.close()
+
+
+def create_local_server(make_server, flask_app, preferred_port: int, logger):
+    selected_port = preferred_port
+
+    if selected_port != 0 and not local_port_is_available(selected_port):
+        logger.warning(
+            "Requested port %s is already in use; selecting a free local port.",
+            selected_port,
+        )
+        selected_port = 0
+
+    try:
+        server = make_server(
+            "127.0.0.1",
+            selected_port,
+            flask_app,
+            threaded=True,
+        )
+    except SystemExit as exc:
+        # Werkzeug can raise SystemExit when a port becomes occupied between
+        # the availability probe and server creation. Retry atomically with
+        # port 0 so the operating system assigns an available loopback port.
+        if selected_port == 0:
+            raise RuntimeError(
+                "Could not allocate a local application port."
+            ) from exc
+
+        logger.warning(
+            "Requested port %s became unavailable; retrying with a free port.",
+            selected_port,
+        )
+        server = make_server(
+            "127.0.0.1",
+            0,
+            flask_app,
+            threaded=True,
+        )
+
+    actual_port = int(
+        getattr(server, "server_port", 0)
+        or getattr(server, "port", 0)
+        or selected_port
+    )
+    if actual_port <= 0:
+        server.server_close()
+        raise RuntimeError("Local server did not report its bound port.")
+
+    return server, actual_port
+
+
+def wait_for_local_server(port: int, timeout: float = 10.0) -> bool:
+    deadline = time.monotonic() + max(0.1, timeout)
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection(
+                ("127.0.0.1", port),
+                timeout=0.25,
+            ):
+                return True
+        except OSError:
+            time.sleep(0.05)
+    return False
 
 
 class StreamToLogger:
@@ -829,15 +930,46 @@ def main() -> int:
         from werkzeug.serving import make_server
         import webview
 
-        server = make_server("127.0.0.1", APP_PORT, app, threaded=True)
-        server_thread = threading.Thread(target=server.serve_forever, name="flask-server", daemon=True)
+        server, server_port = create_local_server(
+            make_server,
+            app,
+            APP_PORT,
+            logger,
+        )
+        server_url = f"http://127.0.0.1:{server_port}/"
+        os.environ["CUT_PORT_ACTUAL"] = str(server_port)
+        os.environ["CAPTION_ANIMATOR_PORT_ACTUAL"] = str(server_port)
+
+        server_thread = threading.Thread(
+            target=server.serve_forever,
+            name="flask-server",
+            daemon=True,
+        )
         server_thread.start()
+
+        if not wait_for_local_server(server_port):
+            try:
+                server.shutdown()
+            finally:
+                server.server_close()
+            raise RuntimeError(
+                f"Local application server did not start on port {server_port}."
+            )
+
+        if server_port == APP_PORT:
+            logger.info("Local server listening at %s", server_url)
+        else:
+            logger.warning(
+                "Port %s was unavailable; local server is using port %s.",
+                APP_PORT,
+                server_port,
+            )
 
         webview.settings["ALLOW_DOWNLOADS"] = True
         webview.settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] = True
         window = webview.create_window(
             APP_NAME,
-            f"http://127.0.0.1:{APP_PORT}/",
+            server_url,
             width=1440,
             height=920,
             min_size=(980, 680),
@@ -858,6 +990,7 @@ def main() -> int:
             def stop_server() -> None:
                 try:
                     server.shutdown()
+                    server.server_close()
                 except Exception:
                     logger.exception("Local server shutdown failed")
 
