@@ -1,21 +1,131 @@
+# Cut — repository hygiene
+# Keep source code, templates, bundled fonts, icons, and required runtime tools.
+# Ignore generated media, application state, release products, build caches,
+# deployment copies, archives, and local development files.
+
+# ---------------------------------------------------------------------------
+# Application-generated data
+# ---------------------------------------------------------------------------
 archive/
 outputs/
 uploads/
-*.mp4
-*.mov
-.DS_Store
+updates/
 old/
 
+# Generated output subdirectories if they appear elsewhere
+**/global_overlay_cache/
+**/revealed_assets/
+**/social_imports/
 
-# Byte-compiled / optimized / DLL files
+# Runtime media and generated caption files
+*.mp4
+*.mov
+*.m4v
+*.webm
+*.avi
+*.mkv
+*.mpeg
+*.mpg
+*.wav
+*.mp3
+*.m4a
+*.aac
+*.flac
+*.ass
+*.srt
+*.vtt
+
+# Allow intentional public homepage media to be committed
+!homepage/assets/**/*.mp4
+!homepage/assets/**/*.mov
+!homepage/assets/**/*.m4v
+!homepage/assets/**/*.webm
+!homepage/assets/**/*.wav
+!homepage/assets/**/*.mp3
+!homepage/assets/**/*.m4a
+
+# ---------------------------------------------------------------------------
+# macOS release builds and local packaging
+# ---------------------------------------------------------------------------
+.macos-build/
+release/
+*.app/
+*.dmg
+*.pkg
+*.mpkg
+*.manifest
+*.spec
+
+# Local release state
+release/.last-release.env
+.last-release.env
+notarization-info.json
+notary-log.json
+stapler-log.txt
+
+# Legacy release output names that may appear outside release/
+CaptionAnimator-v*-macOS-*
+Cut-v*-macOS-*
+*-SHA256.txt
+
+# ---------------------------------------------------------------------------
+# Homepage deployment and working copies
+# ---------------------------------------------------------------------------
+homepage/.deploy_build/
+homepage/CaptionAnimator-commercial-page-with-png-placeholders/
+homepage/CaptionAnimator-commercial-page-with-png-placeholders.zip
+homepage/assets/placeholders/old/
+homepage/release.json
+homepage/release.json.gz
+homepage/release.json.br
+homepage/*.gz
+homepage/*.br
+
+# Generic deployment/build output
+.deploy_build/
+deploy_build/
+deploy-output/
+public-build/
+
+# ---------------------------------------------------------------------------
+# Archives and heavyweight source packages
+# ---------------------------------------------------------------------------
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+*.bz2
+*.xz
+
+# Design/video-editing source files
+*.psd
+*.psb
+*.ai
+*.eps
+*.indd
+*.idml
+*.sketch
+*.fig
+*.xd
+*.afdesign
+*.afphoto
+*.aep
+*.aepx
+*.prproj
+*.c4d
+*.blend
+*.blend1
+
+# ---------------------------------------------------------------------------
+# Python bytecode, environments, packaging, and test output
+# ---------------------------------------------------------------------------
 __pycache__/
 *.py[codz]
 *$py.class
-
-# C extensions
 *.so
 
-# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -35,23 +145,15 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
-
-# Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Unit test / coverage reports
 htmlcov/
 .tox/
 .nox/
 .coverage
 .coverage.*
-.cache
+.cache/
 nosetests.xml
 coverage.xml
 *.cover
@@ -60,157 +162,106 @@ coverage.xml
 .pytest_cache/
 cover/
 
-# Translations
-*.mo
-*.pot
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
 .pybuilder/
 target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
+.ipynb_checkpoints/
 profile_default/
 ipython_config.py
 
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# UV
-#   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#uv.lock
-
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
-#poetry.toml
-
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#   pdm recommends including project-wide configuration in pdm.toml, but excluding .pdm-python.
-#   https://pdm-project.org/en/latest/usage/project/#working-with-version-control
-#pdm.lock
-#pdm.toml
-.pdm-python
-.pdm-build/
-
-# pixi
-#   Similar to Pipfile.lock, it is generally recommended to include pixi.lock in version control.
-#pixi.lock
-#   Pixi creates a virtual environment in the .pixi directory, just like venv module creates one
-#   in the .venv directory. It is recommended not to include this directory in version control.
-.pixi
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
 .env
+.env.*
+!.env.example
 .envrc
-.venv
+.venv/
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+__pypackages__/
 
-# Spyder project settings
-.spyderproject
-.spyproject
+.pdm-python
+.pdm-build/
+.pixi/
+celerybeat-schedule
+celerybeat.pid
+*.sage.py
 
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
 .mypy_cache/
 .dmypy.json
 dmypy.json
-
-# Pyre type checker
 .pyre/
-
-# pytype static type analyzer
 .pytype/
-
-# Cython debug symbols
 cython_debug/
-
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
-
-# Abstra
-# Abstra is an AI-powered process automation framework.
-# Ignore directories containing user credentials, local state, and settings.
-# Learn more at https://abstra.io/docs
-.abstra/
-
-# Visual Studio Code
-#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
-#  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
-#  and can be added to the global gitignore or merged into this file. However, if you prefer, 
-#  you could uncomment the following to ignore the entire vscode folder
-# .vscode/
-
-# Ruff stuff:
 .ruff_cache/
-
-# PyPI configuration file
 .pypirc
 
-# Cursor
-#  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to
-#  exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
-#  refer to https://docs.cursor.com/context/ignore-files
+# ---------------------------------------------------------------------------
+# Node/front-end dependencies and caches
+# ---------------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.yarn/cache/
+.pnpm-store/
+.parcel-cache/
+.vite/
+.eslintcache
+
+# ---------------------------------------------------------------------------
+# Framework/editor/tool state
+# ---------------------------------------------------------------------------
+instance/
+.webassets-cache/
+.scrapy/
+docs/_build/
+/site/
+.spyderproject
+.spyproject
+.ropeproject
+.abstra/
 .cursorignore
 .cursorindexingignore
-
-# Marimo
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+.idea/
+.vscode/
+*.code-workspace
+
+# ---------------------------------------------------------------------------
+# Operating-system and temporary files
+# ---------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+
+Thumbs.db
+Desktop.ini
+
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+
+# ---------------------------------------------------------------------------
+# Superseded scripts and generated handoff notes
+# ---------------------------------------------------------------------------
+/build_macos_release.sh
+/build_macos_release_v2.sh
+/release_signed_v2.sh
+/*_FIX.txt
+/*_NOTES.txt
+/*_README.txt
