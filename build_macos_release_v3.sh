@@ -633,19 +633,23 @@ path.write_text(text, encoding="utf-8")
 PY
 
 log "Generating native desktop launcher"
-"$VENV_PYTHON" - "$PAYLOAD_DIR/desktop_launcher.py" "$APP_NAME" "$APP_PORT" <<'PYLAUNCH'
+"$VENV_PYTHON" - "$PAYLOAD_DIR/desktop_launcher.py" "$APP_NAME" "$APP_PORT" "$BUNDLE_ID" <<'PYLAUNCH'
 from pathlib import Path
 import sys
 
 output = Path(sys.argv[1])
 app_name = sys.argv[2]
 app_port = int(sys.argv[3])
+app_bundle_id = sys.argv[4]
 template = r'''from __future__ import annotations
 
+import fcntl
 import logging
+import multiprocessing
 import os
 import shutil
 import socket
+import subprocess
 import sys
 import threading
 import time
@@ -653,7 +657,9 @@ import traceback
 from pathlib import Path
 
 APP_NAME = __APP_NAME__
+APP_BUNDLE_ID = __APP_BUNDLE_ID__
 DEFAULT_APP_PORT = __APP_PORT__
+_INSTANCE_LOCK_HANDLE = None
 
 
 def configured_app_port() -> int:
@@ -765,6 +771,48 @@ def wait_for_local_server(port: int, timeout: float = 10.0) -> bool:
         except OSError:
             time.sleep(0.05)
     return False
+
+
+def activate_existing_instance(logger) -> None:
+    try:
+        subprocess.run(
+            [
+                "osascript",
+                "-e",
+                f'tell application id "{APP_BUNDLE_ID}" to activate',
+            ],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        )
+    except Exception:
+        logger.exception("Could not activate the existing Cut instance")
+
+
+def acquire_single_instance(data: Path, logger) -> bool:
+    global _INSTANCE_LOCK_HANDLE
+
+    lock_path = data / ".desktop-instance.lock"
+    handle = open(lock_path, "a+", encoding="utf-8")
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        logger.warning(
+            "Another %s desktop instance is already running; activating it instead of opening a second window.",
+            APP_NAME,
+        )
+        handle.close()
+        activate_existing_instance(logger)
+        return False
+
+    handle.seek(0)
+    handle.truncate()
+    handle.write(str(os.getpid()))
+    handle.flush()
+    _INSTANCE_LOCK_HANDLE = handle
+    logger.info("Single-instance lock acquired: %s", lock_path)
+    return True
 
 
 class StreamToLogger:
@@ -879,7 +927,10 @@ def prepare_runtime() -> tuple[Path, Path]:
     path_entries = [str(bundled_bin), "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
     existing = os.environ.get("PATH", "").split(os.pathsep)
     os.environ["PATH"] = os.pathsep.join(dict.fromkeys([p for p in path_entries + existing if p]))
+    os.environ["CUT_DATA_DIR"] = str(data)
     os.environ["CAPTION_ANIMATOR_DATA_DIR"] = str(data)
+    os.environ.setdefault("CUT_APP_NAME", APP_NAME)
+    os.environ.setdefault("CAPTION_ANIMATOR_APP_NAME", APP_NAME)
     os.environ.setdefault("HF_HOME", str(data / "models" / "huggingface"))
     os.environ.setdefault("XDG_CACHE_HOME", str(data / "cache"))
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
@@ -925,6 +976,9 @@ def main() -> int:
                     in {".ttf", ".otf", ".woff", ".woff2"}
                     for path in bundled_ui_fonts.rglob("*")
                 ), "fonts/ui exists but contains no supported font files"
+            return 0
+
+        if not acquire_single_instance(data, logger):
             return 0
 
         from werkzeug.serving import make_server
@@ -1020,9 +1074,14 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     raise SystemExit(main())
 '''
-template = template.replace("__APP_NAME__", repr(app_name)).replace("__APP_PORT__", repr(app_port))
+template = (
+    template.replace("__APP_NAME__", repr(app_name))
+    .replace("__APP_BUNDLE_ID__", repr(app_bundle_id))
+    .replace("__APP_PORT__", repr(app_port))
+)
 output.write_text(template, encoding="utf-8")
 PYLAUNCH
 log "Generating macOS icon"

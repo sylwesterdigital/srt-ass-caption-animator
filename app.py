@@ -3,6 +3,7 @@ from flask import Flask, request, send_from_directory, jsonify, render_template,
 
 from werkzeug.utils import secure_filename
 import os
+import socket
 import re
 import html
 import uuid
@@ -63,18 +64,76 @@ app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024 * 1024
 # Enable Flask template auto-reload during development so HTML changes are picked up without restarting.
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 
-APP_DISPLAY_NAME = os.environ.get("CAPTION_ANIMATOR_APP_NAME", "Caption Animator")
-APP_LOG_PATH = os.environ.get(
-    "CAPTION_ANIMATOR_LOG_FILE",
-    os.path.join(os.path.expanduser("~/Library/Logs"), APP_DISPLAY_NAME, "app.log"),
+APP_DISPLAY_NAME = os.environ.get(
+    "CUT_APP_NAME",
+    os.environ.get("CAPTION_ANIMATOR_APP_NAME", "Cut"),
 )
-APP_LOGGER = logging.getLogger("caption_animator")
+APP_LOG_PATH = os.environ.get(
+    "CUT_LOG_FILE",
+    os.environ.get(
+        "CAPTION_ANIMATOR_LOG_FILE",
+        os.path.join(os.path.expanduser("~/Library/Logs"), APP_DISPLAY_NAME, "app.log"),
+    ),
+)
+APP_LOGGER = logging.getLogger("cut")
+
+
+def _read_runtime_metadata(filename, fallback=""):
+    path = os.path.join(APP_ROOT, filename)
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            value = handle.read().strip()
+            if value:
+                return value
+    except OSError:
+        pass
+    return str(fallback or "").strip()
+
+
+def _runtime_version_metadata():
+    version = (
+        os.environ.get("CUT_APP_VERSION")
+        or os.environ.get("CAPTION_ANIMATOR_APP_VERSION")
+        or _read_runtime_metadata("VERSION.txt", "0.0.0")
+    ).strip()
+    build = (
+        os.environ.get("CUT_BUILD_NUMBER")
+        or os.environ.get("CAPTION_ANIMATOR_BUILD_NUMBER")
+        or _read_runtime_metadata("BUILD_NUMBER.txt", "0")
+    ).strip()
+
+    if not version:
+        version = "0.0.0"
+    if not build:
+        build = "0"
+
+    release_build = build.isdigit() and int(build) > 0
+    channel = "release" if release_build else "dev"
+    badge = f"v{version} · b{build}" if release_build else f"v{version} · dev"
+    title = (
+        f"{APP_DISPLAY_NAME} {version} (build {build})"
+        if release_build
+        else f"{APP_DISPLAY_NAME} development build {version}"
+    )
+    return {
+        "version": version,
+        "build": build,
+        "channel": channel,
+        "badge": badge,
+        "title": title,
+    }
+
+
+APP_VERSION_METADATA = _runtime_version_metadata()
 
 
 def _configure_app_logging():
     try:
         os.makedirs(os.path.dirname(APP_LOG_PATH), exist_ok=True)
-        level_name = os.environ.get("CAPTION_ANIMATOR_LOG_LEVEL", "INFO").upper()
+        level_name = os.environ.get(
+            "CUT_LOG_LEVEL",
+            os.environ.get("CAPTION_ANIMATOR_LOG_LEVEL", "INFO"),
+        ).upper()
         level = getattr(logging, level_name, logging.INFO)
         APP_LOGGER.setLevel(level)
         APP_LOGGER.propagate = False
@@ -2470,7 +2529,7 @@ def _download_file(url, destination_path):
     temp_path = f"{destination_path}.part"
     request_obj = urllib.request.Request(
         url,
-        headers={"User-Agent": "CaptionAnimator/1.0"},
+        headers={"User-Agent": "Cut/1.0"},
     )
 
     try:
@@ -4331,7 +4390,22 @@ def process_preview(job_id, video_path, srt_path, ass_path, preview_path, settin
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    metadata = _runtime_version_metadata()
+    return render_template(
+        "index.html",
+        app_name=APP_DISPLAY_NAME,
+        app_version=metadata["version"],
+        build_number=metadata["build"],
+        app_channel=metadata["channel"],
+        app_badge=metadata["badge"],
+        app_version_title=metadata["title"],
+    )
+
+
+@app.route("/api/app-version")
+def api_app_version():
+    metadata = _runtime_version_metadata()
+    return jsonify({"ok": True, **metadata})
 
 
 # Return uploaded custom fonts for the Typography UI.
@@ -5488,6 +5562,40 @@ def serve_output(filename):
     return send_from_directory(OUTPUT_DIR, filename)
 
 
+def _development_server_port():
+    raw_value = os.environ.get(
+        "CUT_PORT",
+        os.environ.get("CAPTION_ANIMATOR_PORT", "5151"),
+    )
+    try:
+        preferred = int(raw_value)
+    except (TypeError, ValueError):
+        preferred = 5151
+    preferred = preferred if 0 <= preferred <= 65535 else 5151
+
+    if preferred == 0:
+        return 0
+
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        probe.bind(("127.0.0.1", preferred))
+        return preferred
+    except OSError:
+        APP_LOGGER.warning(
+            "Development port %s is occupied; using an operating-system-assigned port.",
+            preferred,
+        )
+        return 0
+    finally:
+        probe.close()
+
+
 if __name__ == "__main__":
     ensure_dirs()
-    app.run(host="127.0.0.1", port=5151, debug=True, threaded=False, use_reloader=True)
+    app.run(
+        host="127.0.0.1",
+        port=_development_server_port(),
+        debug=os.environ.get("CUT_DEBUG") == "1",
+        threaded=True,
+        use_reloader=False,
+    )

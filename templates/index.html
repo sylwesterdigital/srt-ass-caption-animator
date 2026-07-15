@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Caption Animator</title>
+  <title>{{ app_name|default("Cut", true) }}</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
@@ -2971,7 +2971,9 @@
     .easy-toolbar-button,
     .easy-toolbar-input,
     .easy-toolbar-color,
-    .easy-toolbar-toggle {
+    .easy-toolbar-toggle,
+    .easy-toolbar-range-control,
+    .easy-toolbar-colour-control {
       appearance: none;
       border: 1px solid var(--line);
       border-radius: 11px;
@@ -2999,10 +3001,79 @@
       font-variant-numeric: tabular-nums;
     }
 
-    .easy-toolbar-color {
-      width: 40px;
-      padding: 2px;
+    .easy-toolbar-range-control,
+    .easy-toolbar-colour-control {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      min-height: 34px;
+      padding: 0 8px;
+      white-space: nowrap;
+    }
+
+    .easy-toolbar-control-label {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      line-height: 1;
+    }
+
+    .easy-toolbar-range {
+      width: clamp(108px, 14vw, 170px);
+      min-width: 108px;
       cursor: pointer;
+    }
+
+    .easy-toolbar-range-value {
+      min-width: 30px;
+      padding: 3px 5px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      color: var(--button-text);
+      background: color-mix(in srgb, var(--panel) 72%, transparent);
+      font-size: 10px;
+      font-weight: 850;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      text-align: center;
+    }
+
+    .easy-toolbar-color {
+      width: 34px;
+      min-width: 34px;
+      height: 28px;
+      min-height: 28px;
+      padding: 2px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .easy-toolbar-color::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    .easy-toolbar-color::-webkit-color-swatch {
+      border: 0;
+      border-radius: 5px;
+    }
+
+    .easy-toolbar-color::-moz-color-swatch {
+      border: 0;
+      border-radius: 5px;
+    }
+
+    @media (max-width: 760px) {
+      .easy-toolbar-range-control {
+        flex: 1 1 100%;
+        justify-content: flex-start;
+      }
+
+      .easy-toolbar-range {
+        flex: 1 1 auto;
+        width: auto;
+      }
     }
 
     .easy-toolbar-toggle,
@@ -4632,144 +4703,7 @@
       background-clip: padding-box;
     }
 
-  
-    /*
-     * Compact transport keeps the time/seek/volume reduction, but button labels
-     * still follow transportLabelModeBtn: text, icon + text, or icons.
-     */
-    @media (min-width: 641px) {
-      .custom-video-controls.controls-compact {
-        width: max-content;
-        min-width: 0;
-        max-width: calc(100vw - 16px);
-        grid-template-columns: repeat(4, max-content);
-        justify-content: center;
-        justify-items: start;
-        flex: 0 0 auto;
-      }
-
-      .custom-video-controls.controls-compact .transport-group,
-      .custom-video-controls.controls-compact .transport-playback-group,
-      .custom-video-controls.controls-compact .transport-audio-group,
-      .custom-video-controls.controls-compact .transport-view-group,
-      .custom-video-controls.controls-compact .transport-tools-group {
-        width: max-content;
-        min-width: max-content;
-        max-width: none;
-        flex: 0 0 auto;
-      }
-
-      .custom-video-controls.controls-compact .transport-tools-group {
-        overflow: visible;
-      }
-
-      body[data-button-label-mode="text"]
-      .custom-video-controls.controls-compact
-      .has-command-icon .button-icon {
-        display: none;
-      }
-
-      body[data-button-label-mode="text"]
-      .custom-video-controls.controls-compact
-      .has-command-icon .button-label,
-      body[data-button-label-mode="icon-text"]
-      .custom-video-controls.controls-compact
-      .has-command-icon .button-label {
-        display: inline-flex;
-      }
-
-      body[data-button-label-mode="icon-text"]
-      .custom-video-controls.controls-compact
-      .has-command-icon .button-icon,
-      body[data-button-label-mode="icon"]
-      .custom-video-controls.controls-compact
-      .has-command-icon .button-icon {
-        display: inline-block;
-      }
-
-      body[data-button-label-mode="icon"]
-      .custom-video-controls.controls-compact
-      .has-command-icon .button-label {
-        display: none;
-      }
-
-      body[data-button-label-mode="text"]
-      .custom-video-controls.controls-compact
-      .transport-button.has-command-icon,
-      body[data-button-label-mode="icon-text"]
-      .custom-video-controls.controls-compact
-      .transport-button.has-command-icon,
-      body[data-button-label-mode="text"]
-      .custom-video-controls.controls-compact
-      .transport-toggle.has-command-icon,
-      body[data-button-label-mode="icon-text"]
-      .custom-video-controls.controls-compact
-      .transport-toggle.has-command-icon {
-        width: auto;
-        min-width: max-content;
-        max-width: none;
-        padding-left: 10px;
-        padding-right: 10px;
-        overflow: visible;
-      }
-
-      body[data-button-label-mode="icon"]
-      .custom-video-controls.controls-compact
-      .transport-button.has-command-icon,
-      body[data-button-label-mode="icon"]
-      .custom-video-controls.controls-compact
-      .transport-toggle.has-command-icon {
-        width: 38px;
-        min-width: 38px;
-        max-width: 38px;
-        padding-left: 0;
-        padding-right: 0;
-        overflow: hidden;
-      }
-
-      body[data-button-label-mode="text"]
-      .custom-video-controls.controls-compact
-      .transport-toggle .button-label,
-      body[data-button-label-mode="icon-text"]
-      .custom-video-controls.controls-compact
-      .transport-toggle .button-label {
-        display: inline-flex;
-      }
-
-      body[data-button-label-mode="text"]
-      .custom-video-controls.controls-compact
-      .transport-toggle .button-icon {
-        display: none;
-      }
-
-      body[data-button-label-mode="icon-text"]
-      .custom-video-controls.controls-compact
-      .transport-toggle .button-icon,
-      body[data-button-label-mode="icon"]
-      .custom-video-controls.controls-compact
-      .transport-toggle .button-icon {
-        display: inline-block;
-      }
-
-      body[data-button-label-mode="icon"]
-      .custom-video-controls.controls-compact
-      .transport-toggle .button-label {
-        display: none;
-      }
-
-      .custom-video-controls.controls-compact #muteBtn {
-        width: auto;
-        min-width: max-content;
-      }
-
-      body[data-button-label-mode="icon"]
-      .custom-video-controls.controls-compact #muteBtn {
-        width: 38px;
-        min-width: 38px;
-      }
-    }
-
-</style>
+  </style>
 </head>
 <body data-theme="dark" data-ui-mode="pro">
   <div class="app" id="appRoot">
@@ -4791,16 +4725,17 @@
 
     <aside class="project-sidebar" id="projectSidebar">
       <div class="project-sidebar-header">
-        <div class="brand-lockup" title="Caption Animator">
+        <div class="brand-lockup" title="Cut">
           <img class="brand-logo" src="/assets/images/icons/logo.svg" alt="">
-          <div class="project-sidebar-title">Caption Animator</div>
+          <div class="project-sidebar-title">Cut</div>
           <span
             id="appBuildBadge"
             class="app-build-badge"
-            data-version="__APP_VERSION__"
-            data-build="__BUILD_NUMBER__"
-            title="Version __APP_VERSION__, build __BUILD_NUMBER__"
-          >dev</span>
+            data-version="{{ app_version|default('', true) }}"
+            data-build="{{ build_number|default('', true) }}"
+            data-channel="{{ app_channel|default('dev', true) }}"
+            title="{{ app_version_title|default('Cut version', true) }}"
+          >{{ app_badge|default('Cut', true) }}</span>
           <button
             id="newProjectBtn"
             type="button"
@@ -4924,8 +4859,43 @@
           </label>
           <button id="easyRenderFullBtn" type="button" class="easy-toolbar-button">Render full</button>
           <button id="easyFontGalleryBtn" type="button" class="easy-toolbar-button">Fonts</button>
-          <input id="easyFontSizeInput" class="easy-toolbar-input" type="number" min="8" max="512" step="1" value="24" aria-label="Caption font size">
-          <input id="easyTextColourInput" class="easy-toolbar-color" type="color" value="#ffffff" aria-label="Caption text colour">
+
+          <label class="easy-toolbar-range-control" title="Caption font size">
+            <span class="easy-toolbar-control-label">Size</span>
+            <input
+              id="easyFontSizeInput"
+              class="easy-toolbar-range"
+              type="range"
+              min="8"
+              max="256"
+              step="1"
+              value="24"
+              aria-label="Caption font size"
+            >
+            <output id="easyFontSizeValue" class="easy-toolbar-range-value" for="easyFontSizeInput">24</output>
+          </label>
+
+          <label class="easy-toolbar-colour-control" title="Normal caption text colour">
+            <span class="easy-toolbar-control-label">Text</span>
+            <input
+              id="easyTextColourInput"
+              class="easy-toolbar-color"
+              type="color"
+              value="#ffffff"
+              aria-label="Normal caption text colour"
+            >
+          </label>
+
+          <label class="easy-toolbar-colour-control" title="Current spoken word colour">
+            <span class="easy-toolbar-control-label">Current</span>
+            <input
+              id="easyActiveTextColourInput"
+              class="easy-toolbar-color"
+              type="color"
+              value="#ff0000"
+              aria-label="Current spoken word colour"
+            >
+          </label>
         </div>
 
 
@@ -5374,7 +5344,9 @@
     const easyBurnCaptionsToggle = document.getElementById('easyBurnCaptionsToggle');
     const easyFontGalleryBtn = document.getElementById('easyFontGalleryBtn');
     const easyFontSizeInput = document.getElementById('easyFontSizeInput');
+    const easyFontSizeValue = document.getElementById('easyFontSizeValue');
     const easyTextColourInput = document.getElementById('easyTextColourInput');
+    const easyActiveTextColourInput = document.getElementById('easyActiveTextColourInput');
     const newProjectBtn = document.getElementById('newProjectBtn');
     const projectSelect = document.getElementById('projectSelect');
     const editProjectBtn = document.getElementById('editProjectBtn');
@@ -6743,36 +6715,7 @@
           transportCompactBtn.setAttribute('aria-label', next.compactTransportControls ? 'Expand video controls' : 'Minimize video controls');
         }
         if (transportLabelModeBtn) {
-          const modeCopy = {
-            text: {
-              label: 'Text',
-              description: 'text only',
-              next: 'icon and text'
-            },
-            'icon-text': {
-              label: 'Icon + text',
-              description: 'icon and text',
-              next: 'icons only'
-            },
-            icon: {
-              label: 'Icons',
-              description: 'icons only',
-              next: 'text only'
-            }
-          };
-          const currentModeCopy =
-            modeCopy[next.buttonLabelMode] || modeCopy['icon-text'];
-
-          setCommandButtonVisual(
-            transportLabelModeBtn,
-            currentModeCopy.label,
-            'labels',
-            `Button labels: ${currentModeCopy.description}. Click for ${currentModeCopy.next}.`
-          );
-          transportLabelModeBtn.title =
-            `Button labels: ${currentModeCopy.description}. Click for ${currentModeCopy.next}.`;
-          transportLabelModeBtn.dataset.labelMode =
-            next.buttonLabelMode;
+          transportLabelModeBtn.setAttribute('aria-label', `Button labels: ${next.buttonLabelMode}`);
         }
         localStorage.setItem(APP_SETTINGS_LOCAL_KEY, JSON.stringify(next));
         syncEasyToolbarControls();
@@ -6853,19 +6796,8 @@
       function cycleButtonLabelMode() {
         const current = readAppSettings();
         const order = ['text', 'icon-text', 'icon'];
-        const currentIndex = order.indexOf(
-          current.buttonLabelMode
-        );
-        const nextMode = order[
-          currentIndex >= 0
-            ? (currentIndex + 1) % order.length
-            : 1
-        ];
-
-        applyAppSettings({
-          ...current,
-          buttonLabelMode: nextMode
-        });
+        const nextMode = order[(order.indexOf(current.buttonLabelMode) + 1) % order.length] || 'icon-text';
+        applyAppSettings({ ...current, buttonLabelMode: nextMode });
       }
 
     /* Toggle the transport bar between full controls and a compact icon-only control strip. */
@@ -6903,12 +6835,35 @@
 
     /* Keep easy-mode typography controls aligned with the active caption controls. */
       function syncEasyToolbarControls() {
-        if (easyFontSizeInput) easyFontSizeInput.value = String(Math.round(Number(controls.font_size || 24)));
-        if (easyTextColourInput) easyTextColourInput.value = /^#[0-9a-fA-F]{6}$/.test(String(controls.primary_colour || ''))
-          ? controls.primary_colour
-        : '#ffffff';
-        if (easyBurnCaptionsToggle) easyBurnCaptionsToggle.checked = Boolean(controls.render_burn_captions);
-        if (burnCaptionsToggle) burnCaptionsToggle.checked = Boolean(controls.render_burn_captions);
+        const fontSize = Math.max(
+          8,
+          Math.min(256, Math.round(Number(controls.font_size || 24)))
+        );
+
+        if (easyFontSizeInput) {
+          easyFontSizeInput.value = String(fontSize);
+          syncRangeFillStyle(easyFontSizeInput);
+        }
+        if (easyFontSizeValue) {
+          easyFontSizeValue.value = String(fontSize);
+          easyFontSizeValue.textContent = String(fontSize);
+        }
+
+        if (easyTextColourInput) {
+          easyTextColourInput.value = /^#[0-9a-fA-F]{6}$/.test(String(controls.primary_colour || ''))
+            ? controls.primary_colour
+            : '#ffffff';
+        }
+
+        if (easyActiveTextColourInput) {
+          easyActiveTextColourInput.value = /^#[0-9a-fA-F]{6}$/.test(String(controls.active_word_colour || ''))
+            ? controls.active_word_colour
+            : '#ff0000';
+        }
+
+        if (easyBurnCaptionsToggle) {
+          easyBurnCaptionsToggle.checked = Boolean(controls.render_burn_captions);
+        }
       }
 
 
@@ -15996,10 +15951,21 @@ if (easyFontGalleryBtn) {
 
 if (easyFontSizeInput) {
   easyFontSizeInput.addEventListener('input', () => {
-    controls.font_size = Math.max(8, Math.min(512, Math.round(Number(easyFontSizeInput.value || 24))));
+    controls.font_size = Math.max(
+      8,
+      Math.min(256, Math.round(Number(easyFontSizeInput.value || 24)))
+    );
+
+    if (easyFontSizeValue) {
+      easyFontSizeValue.value = String(controls.font_size);
+      easyFontSizeValue.textContent = String(controls.font_size);
+    }
+
+    syncRangeFillStyle(easyFontSizeInput);
     renderFontGallery();
     applyHelperPreview();
     refreshGui();
+    scheduleProjectVisualSettingsSave();
   });
 }
 
@@ -16009,6 +15975,17 @@ if (easyTextColourInput) {
     renderFontGallery();
     applyHelperPreview();
     refreshGui();
+    scheduleProjectVisualSettingsSave();
+  });
+}
+
+if (easyActiveTextColourInput) {
+  easyActiveTextColourInput.addEventListener('input', () => {
+    controls.active_word_colour = easyActiveTextColourInput.value;
+    renderFontGallery();
+    applyHelperPreview();
+    refreshGui();
+    scheduleProjectVisualSettingsSave();
   });
 }
 
@@ -17104,7 +17081,7 @@ applyHelperPreview();
     const summary = report.summary || {};
     const platformInfo = report.platform || {};
     const lines = [
-      `Caption Animator component integrity report`,
+      `Cut component integrity report`,
       `Generated: ${report.generated_at || ''}`,
       `Scope: ${report.scope || 'all'}`,
       `Overall: ${(summary.overall || 'unknown').toUpperCase()}`,
