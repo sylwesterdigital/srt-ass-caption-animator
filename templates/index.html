@@ -7310,6 +7310,114 @@
         return [...filenames];
       }
 
+
+      async function readJsonResponseSafely(response) {
+        const text = await response.text();
+        if (!text) return {};
+        try {
+          return JSON.parse(text);
+        } catch {
+          return {
+            error: response.ok
+              ? ''
+              : `Application storage returned HTTP ${response.status}.`
+          };
+        }
+      }
+
+      async function deleteExplicitProjectFilesFallback(filenames = []) {
+        const uniqueFilenames = [
+          ...new Set(
+            (Array.isArray(filenames) ? filenames : [])
+              .map(value => String(value || '').trim())
+              .filter(Boolean)
+          )
+        ];
+
+        let deletedFiles = 0;
+        const warnings = [];
+
+        for (const filename of uniqueFilenames) {
+          try {
+            const response = await fetch('/api/delete_server_asset_file', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ filename })
+            });
+            const payload = await readJsonResponseSafely(response);
+
+            if (!response.ok || payload.ok === false) {
+              warnings.push(
+                payload.error
+                || `Could not remove ${filename} (HTTP ${response.status}).`
+              );
+              continue;
+            }
+
+            if (payload.deleted) deletedFiles += 1;
+          } catch (error) {
+            warnings.push(
+              `Could not remove ${filename}: ${error.message || error}`
+            );
+          }
+        }
+
+        return {
+          ok: true,
+          fallback: true,
+          deleted_files: deletedFiles,
+          deleted_dirs: 0,
+          deleted_jobs: 0,
+          warnings
+        };
+      }
+
+      async function cleanupProjectApplicationFiles(projectId, filenames = []) {
+        let response = null;
+        let payload = {};
+
+        try {
+          response = await fetch('/api/delete_project_files', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              project_id: projectId,
+              filenames
+            })
+          });
+          payload = await readJsonResponseSafely(response);
+        } catch (error) {
+          payload = {
+            error: `Application storage could not be reached: ${error.message || error}`
+          };
+        }
+
+        if (response?.ok && payload.ok !== false) {
+          return {
+            ok: true,
+            fallback: false,
+            deleted_files: Number(payload.deleted_files || 0),
+            deleted_dirs: Number(payload.deleted_dirs || 0),
+            deleted_jobs: Number(payload.deleted_jobs || 0),
+            warnings: Array.isArray(payload.warnings)
+              ? payload.warnings
+              : []
+          };
+        }
+
+        const fallback = await deleteExplicitProjectFilesFallback(filenames);
+        const routeMessage = payload.error || (
+          response
+            ? `Project cleanup endpoint returned HTTP ${response.status}.`
+            : 'Project cleanup endpoint was unavailable.'
+        );
+
+        fallback.warnings.unshift(
+          `${routeMessage} Explicit generated files were cleaned with the compatibility fallback.`
+        );
+        return fallback;
+      }
+
       function removeProjectLocalMirrors(project) {
         const projectId = String(project?.id || '');
         if (!projectId) return;
@@ -7492,18 +7600,10 @@
         showStatus('info', `Deleting project <strong>${escapeHtml(projectName)}</strong> and related files…`);
 
         try {
-          const cleanupResponse = await fetch('/api/delete_project_files', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              project_id: projectToDelete.id,
-              filenames: diskFilenames
-            })
-          });
-          const cleanupData = await cleanupResponse.json().catch(() => ({}));
-          if (!cleanupResponse.ok || !cleanupData.ok) {
-            throw new Error(cleanupData.error || 'Could not remove project files from application storage.');
-          }
+          const cleanupData = await cleanupProjectApplicationFiles(
+            projectToDelete.id,
+            diskFilenames
+          );
 
           const localDeletion = await dbDeleteProjectData(projectToDelete.id, blobIds);
           removeProjectLocalMirrors(projectToDelete);
@@ -7525,12 +7625,19 @@
 
           const deletedFiles = Number(cleanupData.deleted_files || 0);
           const deletedBlobs = Number(localDeletion?.deletedBlobCount || 0);
+          const cleanupWarnings = Array.isArray(cleanupData.warnings)
+            ? cleanupData.warnings.filter(Boolean)
+            : [];
+          const warningNote = cleanupWarnings.length
+            ? ` ${escapeHtml(cleanupWarnings[0])}`
+            : '';
+
           showStatus(
-            'ok',
-            `Deleted project: <strong>${escapeHtml(projectName)}</strong>. Removed ${deletedBlobs} stored project ${deletedBlobs === 1 ? 'file' : 'files'} and ${deletedFiles} application ${deletedFiles === 1 ? 'file' : 'files'}.`
+            cleanupWarnings.length ? 'info' : 'ok',
+            `Deleted project: <strong>${escapeHtml(projectName)}</strong>. Removed ${deletedBlobs} stored project ${deletedBlobs === 1 ? 'file' : 'files'} and ${deletedFiles} application ${deletedFiles === 1 ? 'file' : 'files'}.${warningNote}`
           );
         } catch (error) {
-          showStatus('err', error.message || 'Could not delete the project.');
+          showStatus('err', `Project deletion failed: ${escapeHtml(error.message || error || 'Unknown error.')}`);
         }
       }
 

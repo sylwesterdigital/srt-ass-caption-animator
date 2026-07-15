@@ -143,6 +143,8 @@ required_app_markers = {
     "UI fonts API": '@app.route("/api/ui-fonts", methods=["GET"])',
     "UI font serving": '@app.route("/ui-fonts/<path:filename>")',
     "integrity API": '@app.route("/api/integrity-check", methods=["POST"])',
+    "project cleanup API": '@app.route("/api/delete_project_files", methods=["POST"])',
+    "resource-root discovery": "def _application_resource_roots()",
 }
 
 required_template_markers = {
@@ -150,6 +152,7 @@ required_template_markers = {
     "version badge": 'id="appBuildBadge"',
     "UI font request": "/api/ui-fonts",
     "integrity request": "/api/integrity-check",
+    "project cleanup fallback": "cleanupProjectApplicationFiles",
 }
 
 missing = [
@@ -314,11 +317,7 @@ if ! "$PAYLOAD_DIR/bin/ffmpeg" -hide_banner -encoders 2>/dev/null | grep 'libx26
   die "The selected FFmpeg does not include libx264, which the app uses for video export."
 fi
 
-log "Bundling standalone yt-dlp"
-YTDLP_URL="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
-curl --fail --location --retry 3 --silent --show-error "$YTDLP_URL" -o "$PAYLOAD_DIR/bin/yt-dlp"
-chmod 755 "$PAYLOAD_DIR/bin/yt-dlp"
-"$PAYLOAD_DIR/bin/yt-dlp" --version >/dev/null || die "Downloaded yt-dlp could not run on this Mac."
+log "Embedding yt-dlp Python package behind Cut's signed CLI wrapper"
 
 if [[ "$BUNDLE_DENO" == "1" ]]; then
   log "Bundling Deno JavaScript runtime for current yt-dlp YouTube support"
@@ -381,6 +380,7 @@ log "Installing packaging and runtime dependencies"
   "CairoSVG>=2.7" \
   "numpy>=1.26" \
   "faster-whisper>=1.2" \
+  "yt-dlp" \
   "pywebview>=6"
 
 # Pre-download the default Faster-Whisper model. Other model choices still download
@@ -643,14 +643,15 @@ text = text.replace(
 # Prefer bundled Real-ESRGAN, while keeping the existing per-user downloader fallback.
 needle = 'def _resolve_realesrgan_backend(job_id=None):\n'
 injection = '''def _resolve_realesrgan_backend(job_id=None):
-    bundled_root = os.path.join(RESOURCE_ROOT, "tools", "realesrgan")
-    bundled_binary = _find_realesrgan_binary(bundled_root)
-    bundled_models = _find_realesrgan_models(bundled_root)
-    if bundled_binary and bundled_models:
-        return {
-            "binary": bundled_binary,
-            "model_dir": bundled_models,
-        }
+    for resource_root in _application_resource_roots():
+        bundled_root = os.path.join(resource_root, "tools", "realesrgan")
+        bundled_binary = _find_realesrgan_binary(bundled_root)
+        bundled_models = _find_realesrgan_models(bundled_root)
+        if bundled_binary and bundled_models:
+            return {
+                "binary": bundled_binary,
+                "model_dir": bundled_models,
+            }
 '''
 if needle not in text:
     raise SystemExit("Could not patch Real-ESRGAN resolver.")
@@ -658,13 +659,15 @@ text = text.replace(needle, injection, 1)
 
 # Resolve any embedded Faster-Whisper model before allowing the library to fetch it.
 needle = '        model = WhisperModel(model_name, compute_type="auto")'
-injection = '''        bundled_model_path = os.path.join(
-            RESOURCE_ROOT,
-            "models",
-            f"faster-whisper-{model_name}",
-        )
-        if os.path.isdir(bundled_model_path):
-            model_name = bundled_model_path
+injection = '''        for resource_root in _application_resource_roots():
+            bundled_model_path = os.path.join(
+                resource_root,
+                "models",
+                f"faster-whisper-{model_name}",
+            )
+            if os.path.isdir(bundled_model_path):
+                model_name = bundled_model_path
+                break
 
         model = WhisperModel(model_name, compute_type="auto")'''
 if needle not in text:
@@ -1003,7 +1006,17 @@ def write_fatal(data: Path, message: str) -> None:
         pass
 
 
+def run_ytdlp_cli() -> int:
+    from yt_dlp import main as yt_dlp_main
+
+    result = yt_dlp_main(sys.argv[2:])
+    return int(result or 0)
+
+
 def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] == "--yt-dlp-cli":
+        return run_ytdlp_cli()
+
     resources, data = prepare_runtime()
     log_path = configure_logging(data)
     logger = logging.getLogger("caption_animator")
@@ -1014,6 +1027,9 @@ def main() -> int:
         from app import (
             FFMPEG_BIN,
             FFPROBE_BIN,
+            _application_resource_roots,
+            _find_realesrgan_binary,
+            _find_realesrgan_models,
             _list_ui_fonts,
             _runtime_version_metadata,
             app,
@@ -1049,11 +1065,40 @@ def main() -> int:
                 "/api/ui-fonts",
                 "/ui-fonts/<path:filename>",
                 "/api/integrity-check",
+                "/api/delete_project_files",
             ):
                 assert required_route in routes, f"Missing packaged route: {required_route}"
 
             ui_fonts = _list_ui_fonts()
             assert ui_fonts, "No UI font families were found after bundled-font synchronization"
+
+            ytdlp_path = resources / "bin" / "yt-dlp"
+            assert ytdlp_path.is_file(), "Signed yt-dlp wrapper is missing"
+            ytdlp_result = subprocess.run(
+                [str(ytdlp_path), "--version"],
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+            assert ytdlp_result.returncode == 0, (
+                "Signed yt-dlp wrapper failed: "
+                + (ytdlp_result.stderr or ytdlp_result.stdout or "").strip()
+            )
+
+            realesrgan_binary = None
+            realesrgan_models = None
+            for resource_root in _application_resource_roots():
+                candidate_root = os.path.join(resource_root, "tools", "realesrgan")
+                realesrgan_binary = (
+                    realesrgan_binary
+                    or _find_realesrgan_binary(candidate_root)
+                )
+                realesrgan_models = (
+                    realesrgan_models
+                    or _find_realesrgan_models(candidate_root)
+                )
+            assert realesrgan_binary, "Bundled Real-ESRGAN executable was not found"
+            assert realesrgan_models, "Bundled Real-ESRGAN models were not found"
 
             with app.test_client() as client:
                 version_response = client.get("/api/app-version")
@@ -1321,7 +1366,6 @@ datas = [
 binaries = [
     (str(PAYLOAD / "bin" / "ffmpeg"), "bin"),
     (str(PAYLOAD / "bin" / "ffprobe"), "bin"),
-    (str(PAYLOAD / "bin" / "yt-dlp"), "bin"),
 ]
 if (PAYLOAD / "bin" / "deno").exists():
     binaries.append((str(PAYLOAD / "bin" / "deno"), "bin"))
@@ -1348,6 +1392,7 @@ for package in (
     "PIL",
     "fontTools",
     "pysubs2",
+    "yt_dlp",
 ):
     try:
         pkg_datas, pkg_binaries, pkg_hiddenimports = collect_all(package)
@@ -1456,6 +1501,18 @@ log "Building ${APP_NAME}.app with PyInstaller"
 
 DIST_APP="$DIST_DIR/${APP_NAME}.app"
 [[ -d "$DIST_APP" ]] || die "PyInstaller did not produce $DIST_APP"
+
+# Use the signed Cut executable itself as the yt-dlp host. This avoids the
+# PyInstaller one-file Team-ID mismatch caused by the upstream yt-dlp_macos
+# executable extracting a differently signed Python framework.
+YTDLP_WRAPPER="$DIST_APP/Contents/Frameworks/bin/yt-dlp"
+mkdir -p "$(dirname "$YTDLP_WRAPPER")"
+cat > "$YTDLP_WRAPPER" <<SH
+#!/bin/sh
+HERE="\$(CDPATH= cd -- "\$(dirname -- "\$0")" && pwd)"
+exec "\$HERE/../../MacOS/${APP_NAME}" --yt-dlp-cli "\$@"
+SH
+chmod 755 "$YTDLP_WRAPPER"
 
 # Real-ESRGAN is copied as a resource so PyInstaller does not reject an Intel
 # helper in an Apple-silicon app. Restore its execute bit, sign nested Mach-O

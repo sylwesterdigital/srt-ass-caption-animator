@@ -288,6 +288,35 @@ def _integrity_first_line(value):
     return text_value.splitlines()[0] if text_value else ""
 
 
+
+def _application_resource_roots():
+    """Return all plausible PyInstaller resource roots without assuming one layout."""
+    roots = []
+
+    def add(path_value):
+        if not path_value:
+            return
+        absolute = os.path.abspath(os.path.expanduser(str(path_value)))
+        if absolute not in roots:
+            roots.append(absolute)
+
+    add(globals().get("RESOURCE_ROOT"))
+    add(APP_ROOT)
+
+    for existing in list(roots):
+        parent = os.path.dirname(existing)
+        name = os.path.basename(existing).lower()
+
+        if name == "frameworks":
+            add(os.path.join(parent, "Resources"))
+        elif name == "resources":
+            add(os.path.join(parent, "Frameworks"))
+        else:
+            add(os.path.join(existing, "Contents", "Frameworks"))
+            add(os.path.join(existing, "Contents", "Resources"))
+
+    return roots
+
 def _integrity_tool(name):
     candidates = []
     if name == "ffmpeg" and FFMPEG_BIN:
@@ -776,11 +805,11 @@ def _integrity_optional_media_checks():
             )
         )
 
-    resource_root = globals().get("RESOURCE_ROOT", APP_ROOT)
-    search_roots = (
-        os.path.join(resource_root, "tools", "realesrgan"),
-        REALESRGAN_DIR,
-    )
+    search_roots = [
+        os.path.join(resource_root, "tools", "realesrgan")
+        for resource_root in _application_resource_roots()
+    ]
+    search_roots.append(REALESRGAN_DIR)
     binary = None
     models = None
     for search_root in search_roots:
@@ -6502,6 +6531,145 @@ def api_delete_server_asset_file():
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+
+@app.route("/api/delete_project_files", methods=["POST"])
+def api_delete_project_files():
+    """Delete only Cut-managed files associated with a browser project."""
+    try:
+        ensure_dirs()
+        payload = request.get_json(silent=True) or {}
+        raw_project_id = str(payload.get("project_id") or "").strip()
+        safe_project_id = secure_filename(raw_project_id)[:96]
+        if not safe_project_id:
+            return jsonify({"ok": False, "error": "Missing project ID."}), 400
+
+        raw_filenames = payload.get("filenames") or []
+        if not isinstance(raw_filenames, list):
+            return jsonify({"ok": False, "error": "filenames must be a list."}), 400
+
+        deleted_paths = set()
+        deleted_files = 0
+        deleted_dirs = 0
+        deleted_bytes = 0
+        warnings = []
+
+        def delete_file(path_value):
+            nonlocal deleted_files, deleted_bytes
+            path_value = os.path.abspath(path_value)
+            if path_value in deleted_paths or not os.path.exists(path_value):
+                return
+            if not os.path.isfile(path_value) and not os.path.islink(path_value):
+                return
+            try:
+                try:
+                    deleted_bytes += int(os.path.getsize(path_value))
+                except OSError:
+                    pass
+                os.remove(path_value)
+                deleted_paths.add(path_value)
+                deleted_files += 1
+            except FileNotFoundError:
+                pass
+            except Exception as exc:
+                warnings.append(f"Could not delete {path_value}: {exc}")
+
+        # Explicit generated/revealed files recorded in the browser project.
+        for filename in raw_filenames[:2000]:
+            try:
+                delete_file(_safe_output_path_from_filename(filename))
+            except ValueError as exc:
+                warnings.append(str(exc))
+
+        # Project-tagged temporary files under Cut-managed storage only.
+        project_tokens = {
+            safe_project_id,
+            secure_filename(raw_project_id)[:48],
+        }
+        project_tokens.discard("")
+
+        managed_roots = {
+            os.path.abspath(UPLOAD_DIR),
+            os.path.abspath(OUTPUT_DIR),
+            os.path.abspath(REVEAL_DIR),
+            os.path.abspath(GLOBAL_OVERLAY_CACHE_DIR),
+            os.path.abspath(SOCIAL_IMPORT_DIR),
+        }
+
+        tagged_dirs = []
+        for managed_root in sorted(managed_roots):
+            if not os.path.isdir(managed_root):
+                continue
+            for directory, dirnames, filenames in os.walk(managed_root):
+                for filename in filenames:
+                    if any(token in filename for token in project_tokens):
+                        delete_file(os.path.join(directory, filename))
+                for dirname in dirnames:
+                    if any(token in dirname for token in project_tokens):
+                        tagged_dirs.append(os.path.join(directory, dirname))
+
+        for directory in sorted(set(tagged_dirs), key=len, reverse=True):
+            absolute_directory = os.path.abspath(directory)
+            if not any(
+                absolute_directory.startswith(root_path + os.sep)
+                for root_path in managed_roots
+            ):
+                continue
+            if not os.path.isdir(absolute_directory):
+                continue
+            try:
+                for nested_root, _, filenames in os.walk(absolute_directory):
+                    for filename in filenames:
+                        nested_path = os.path.join(nested_root, filename)
+                        if nested_path in deleted_paths:
+                            continue
+                        try:
+                            deleted_bytes += int(os.path.getsize(nested_path))
+                        except OSError:
+                            pass
+                        deleted_files += 1
+                shutil.rmtree(absolute_directory)
+                deleted_dirs += 1
+            except Exception as exc:
+                warnings.append(f"Could not delete {absolute_directory}: {exc}")
+
+        deleted_jobs = 0
+        for job_id, job in list(JOBS.items()):
+            if str(job.get("project_id") or "") != raw_project_id:
+                continue
+            job["cancel_requested"] = True
+            process = job.get("process")
+            if process and getattr(process, "poll", lambda: None)() is None:
+                try:
+                    process.terminate()
+                except Exception:
+                    pass
+            JOBS.pop(job_id, None)
+            deleted_jobs += 1
+
+        APP_LOGGER.info(
+            "Deleted project files: project=%s files=%s dirs=%s bytes=%s jobs=%s warnings=%s",
+            raw_project_id,
+            deleted_files,
+            deleted_dirs,
+            deleted_bytes,
+            deleted_jobs,
+            len(warnings),
+        )
+
+        return jsonify({
+            "ok": True,
+            "project_id": raw_project_id,
+            "deleted_files": deleted_files,
+            "deleted_dirs": deleted_dirs,
+            "deleted_bytes": deleted_bytes,
+            "deleted_jobs": deleted_jobs,
+            "warnings": warnings,
+        })
+    except Exception as exc:
+        APP_LOGGER.exception("Project file cleanup failed")
         return jsonify({"ok": False, "error": str(exc)}), 500
 
 
