@@ -1816,8 +1816,6 @@
       accent-color: var(--accent);
       writing-mode: vertical-lr;
       direction: rtl;
-      -webkit-appearance: slider-vertical;
-      appearance: slider-vertical;
       background: linear-gradient(0deg, var(--range-fill, var(--accent)) var(--range-progress, 0%), var(--range-empty, rgba(255,255,255,0.16)) var(--range-progress, 0%));
     }
 
@@ -2878,6 +2876,15 @@
       border-color: #f87171;
     }
 
+    .app-modal-action.tertiary {
+      margin-right: auto;
+    }
+
+    .app-modal-action.danger:hover {
+      background: #fb8b8b;
+      border-color: #fb8b8b;
+    }
+
     .app-modal-action:disabled {
       opacity: 0.55;
       cursor: not-allowed;
@@ -2899,6 +2906,11 @@
       .app-modal-actions {
         display: grid;
         grid-template-columns: 1fr;
+      }
+
+      .app-modal-action.tertiary {
+        margin-right: 0;
+        order: 3;
       }
     }
 
@@ -3099,26 +3111,1705 @@
 
 
 
-  </style>
+  
+    /* -----------------------------------------------------------------------
+       Refined video transport layout
+       Groups related controls, prevents text/button collisions, and wraps
+       cleanly at smaller window sizes without changing any control IDs.
+       ----------------------------------------------------------------------- */
+    .custom-video-controls {
+      width: min(1120px, 100%);
+      min-height: 56px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      align-content: center;
+      gap: 8px;
+      padding: 8px;
+      border-color: rgba(255, 255, 255, 0.10);
+      border-radius: 18px;
+      background:
+        linear-gradient(180deg, rgba(27, 33, 44, 0.94), rgba(14, 18, 25, 0.92));
+      box-shadow:
+        0 20px 55px rgba(0, 0, 0, 0.34),
+        inset 0 1px 0 rgba(255, 255, 255, 0.055);
+    }
+
+    body[data-theme="light"] .custom-video-controls {
+      border-color: rgba(15, 23, 42, 0.12);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(244, 247, 251, 0.95));
+      box-shadow:
+        0 20px 55px rgba(15, 23, 42, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.82);
+    }
+
+    .custom-video-controls.trim-mode-active,
+    .custom-video-controls.user-positioned {
+      width: min(1180px, calc(100vw - 40px));
+    }
+
+    .transport-group {
+      min-width: 0;
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.065);
+      border-radius: 13px;
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    body[data-theme="light"] .transport-group {
+      border-color: rgba(15, 23, 42, 0.08);
+      background: rgba(15, 23, 42, 0.035);
+    }
+
+    .transport-playback-group {
+      flex: 1 1 430px;
+      justify-content: flex-start;
+    }
+
+    .transport-audio-group,
+    .transport-view-group {
+      flex: 0 0 auto;
+    }
+
+    .transport-tools-group {
+      flex: 0 1 auto;
+      flex-wrap: wrap;
+    }
+
+    .custom-video-controls.trim-mode-active .transport-tools-group {
+      flex: 1 1 100%;
+    }
+
+    .transport-button,
+    .transport-toggle,
+    .custom-video-controls-handle {
+      flex: 0 0 auto;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition:
+        transform 120ms ease,
+        background-color 120ms ease,
+        border-color 120ms ease,
+        color 120ms ease,
+        box-shadow 120ms ease;
+    }
+
+    .transport-button,
+    .transport-toggle {
+      min-height: 34px;
+      border-radius: 10px;
+      padding-left: 11px;
+      padding-right: 11px;
+      font-size: 11px;
+      line-height: 1.1;
+      letter-spacing: 0.01em;
+    }
+
+    .transport-button:hover,
+    .transport-toggle:hover,
+    .custom-video-controls-handle:hover {
+      border-color: rgba(125, 211, 252, 0.40);
+      background: rgba(125, 211, 252, 0.12);
+    }
+
+    .transport-button:active,
+    .transport-toggle:active,
+    .custom-video-controls-handle:active {
+      transform: translateY(1px);
+    }
+
+    .transport-button:focus-visible,
+    .transport-toggle:focus-within,
+    .custom-video-controls-handle:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.22);
+      border-color: rgba(125, 211, 252, 0.72);
+    }
+
+    .transport-button.primary {
+      min-width: 64px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+    }
+
+    .transport-button.primary:hover {
+      filter: brightness(0.96);
+    }
+
+    .transport-button.icon-only {
+      width: 34px;
+      min-width: 34px;
+      height: 34px;
+      min-height: 34px;
+      padding: 0;
+    }
+
+    .transport-time {
+      width: 46px;
+      min-width: 46px;
+      flex: 0 0 46px;
+      padding: 0 2px;
+      font-size: 11px;
+      line-height: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: clip;
+    }
+
+    .transport-seek {
+      min-width: 140px;
+      flex: 1 1 240px;
+      margin: 0 4px;
+    }
+
+    .transport-volume {
+      width: 92px;
+      min-width: 64px;
+      flex: 0 1 92px;
+      margin: 0 3px;
+    }
+
+    .transport-toggle {
+      max-width: 150px;
+    }
+
+    .custom-video-controls-handle {
+      width: 34px;
+      min-width: 34px;
+      height: 40px;
+      min-height: 40px;
+      border-radius: 11px;
+      cursor: grab;
+    }
+
+    .custom-video-controls-handle:active {
+      cursor: grabbing;
+    }
+
+    .custom-video-controls.controls-compact {
+      width: auto;
+      max-width: calc(100vw - 40px);
+      gap: 6px;
+      padding: 6px;
+    }
+
+    .custom-video-controls.controls-compact .transport-group {
+      flex: 0 0 auto;
+      min-height: 38px;
+      padding: 2px;
+      gap: 4px;
+    }
+
+    .custom-video-controls.controls-compact .transport-playback-group {
+      flex-basis: auto;
+    }
+
+    .custom-video-controls.controls-compact .transport-button,
+    .custom-video-controls.controls-compact .transport-toggle {
+      min-height: 32px;
+    }
+
+    @media (max-width: 1180px) {
+      .custom-video-controls {
+        width: min(900px, 100%);
+      }
+
+      .transport-playback-group {
+        flex-basis: 100%;
+      }
+
+      .transport-tools-group {
+        flex: 1 1 100%;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .custom-video-controls,
+      .custom-video-controls.trim-mode-active,
+      .custom-video-controls.user-positioned {
+        width: calc(100vw - 20px);
+        max-width: calc(100vw - 20px);
+        gap: 6px;
+        padding: 6px;
+      }
+
+      .transport-group {
+        min-height: 38px;
+      }
+
+      .transport-playback-group {
+        display: grid;
+        grid-template-columns: auto auto minmax(90px, 1fr) auto;
+        width: 100%;
+      }
+
+      .transport-audio-group {
+        flex: 1 1 180px;
+      }
+
+      .transport-view-group {
+        flex: 0 0 auto;
+      }
+
+      .transport-tools-group {
+        width: 100%;
+      }
+
+      .transport-seek {
+        width: 100%;
+        min-width: 90px;
+        margin: 0;
+      }
+
+      .transport-volume {
+        width: auto;
+        flex: 1 1 90px;
+      }
+
+      .transport-button,
+      .transport-toggle {
+        padding-left: 9px;
+        padding-right: 9px;
+        font-size: 10.5px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .transport-playback-group {
+        grid-template-columns: auto 42px minmax(72px, 1fr) 42px;
+      }
+
+      .transport-time {
+        width: 42px;
+        min-width: 42px;
+        flex-basis: 42px;
+        font-size: 10px;
+      }
+
+      .transport-tools-group {
+        justify-content: flex-start;
+      }
+
+      #transportCompactBtn,
+      #transportLabelModeBtn {
+        max-width: 74px;
+      }
+    }
+
+  
+    /* Source-controlled UI polish: keep development and packaged UI identical. */
+    :root {
+      --trim-panel-reserved-height: 0px;
+    }
+
+    .project-sidebar {
+      height: calc(100vh - var(--trim-panel-reserved-height));
+      transition: height 160ms ease;
+    }
+
+    /* Top bar can use a second row for status messages instead of overlapping metadata. */
+    .topbar {
+      flex-wrap: wrap;
+      align-items: flex-start;
+      align-content: flex-start;
+    }
+
+    .topbar > .badge {
+      flex: 1 1 360px;
+      min-width: 0;
+      max-width: min(62vw, 920px);
+    }
+
+    .topbar > .easy-toolbar {
+      flex: 0 1 auto;
+      max-width: 100%;
+    }
+
+    .status-region {
+      flex: 0 0 100%;
+      width: 100%;
+      min-width: 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+      gap: 6px;
+      pointer-events: none;
+    }
+
+    .stage .status-region .status {
+      position: static;
+      left: auto;
+      top: auto;
+      width: fit-content;
+      max-width: min(720px, calc(100vw - 72px));
+      max-height: min(42vh, 420px);
+      margin: 0;
+      padding: 10px 13px;
+      overflow: auto;
+      border-radius: 12px;
+      box-shadow: 0 16px 38px rgba(0,0,0,0.28);
+      pointer-events: auto;
+      overflow-wrap: anywhere;
+    }
+
+    .stage .status-region .status-toggle-button {
+      position: static;
+      left: auto;
+      top: auto;
+      width: 30px;
+      min-width: 30px;
+      height: 30px;
+      min-height: 30px;
+      border-radius: 10px;
+      font-size: 20px;
+      font-weight: 400;
+      line-height: 1;
+      pointer-events: auto;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.20);
+    }
+
+    .stage .status-region .status-toggle-button[hidden] {
+      display: none !important;
+    }
+
+    .stage .status-region .status-toggle-button:not([hidden]) {
+      display: inline-grid;
+    }
+
+    @media (max-width: 900px) {
+      .topbar > .badge {
+        flex-basis: 100%;
+        max-width: none;
+      }
+
+      .topbar > .easy-toolbar {
+        width: 100%;
+      }
+
+      .stage .status-region .status {
+        max-width: calc(100vw - 72px);
+      }
+    }
+
+    /* Denser, more readable caption rows. */
+    .caption-editor-list {
+      gap: 6px;
+      padding-right: 0;
+    }
+
+    .caption-row {
+      padding: 6px;
+      gap: 5px;
+      border-radius: 12px;
+    }
+
+    .caption-row-top {
+      gap: 5px;
+    }
+
+    .caption-index {
+      min-width: 22px;
+      font-size: 11px;
+    }
+
+    .caption-time-grid {
+      gap: 4px;
+    }
+
+    .caption-time-input,
+    .caption-textarea {
+      font-size: 12px;
+      border-radius: 8px;
+    }
+
+    .caption-time-input {
+      min-height: 27px;
+      padding: 4px 6px;
+    }
+
+    .caption-textarea {
+      min-height: 40px;
+      max-height: 132px;
+      padding: 6px 8px;
+      resize: none;
+      line-height: 1.4;
+      overflow-y: hidden;
+      letter-spacing: 0.005em;
+    }
+
+    .caption-textarea:focus {
+      border-color: rgba(125, 211, 252, 0.62);
+      box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.12);
+      background: rgba(0,0,0,0.30);
+    }
+
+    .caption-row-actions {
+      gap: 4px;
+    }
+
+    /* Application logs are part of the source template, not injected during release. */
+    .app-log-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 220;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(2, 6, 12, 0.76);
+      backdrop-filter: blur(16px);
+    }
+
+    .app-log-overlay.open {
+      display: flex;
+    }
+
+    .app-log-panel {
+      width: min(1080px, calc(100vw - 30px));
+      height: min(760px, calc(100vh - 30px));
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 10px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--panel);
+      box-shadow: 0 35px 100px rgba(0,0,0,0.56);
+    }
+
+    .app-log-header,
+    .app-log-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .app-log-header {
+      justify-content: space-between;
+    }
+
+    .app-log-title {
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .app-log-path {
+      min-width: 0;
+      color: var(--muted);
+      font-size: 10px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .app-log-output {
+      margin: 0;
+      min-height: 0;
+      overflow: auto;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(0,0,0,0.30);
+      color: #dbeafe;
+      font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      user-select: text;
+    }
+
+    #appLogsButton {
+      padding-inline: 9px;
+    }
+
+  
+    /* Keep command buttons wide enough for both icon and label. */
+    .custom-video-controls .transport-button.has-command-icon {
+      width: auto;
+      min-width: max-content;
+      max-width: none;
+      height: 34px;
+      min-height: 34px;
+      padding: 0 10px;
+      flex: 0 0 auto;
+      gap: 7px;
+      white-space: nowrap;
+      overflow: visible;
+    }
+
+    .custom-video-controls .transport-button.has-command-icon .button-icon,
+    .custom-video-controls .transport-button.has-command-icon .button-label {
+      flex: 0 0 auto;
+    }
+
+    body[data-button-label-mode="icon"] .custom-video-controls .transport-button.has-command-icon,
+    .custom-video-controls.controls-compact .transport-button.has-command-icon {
+      width: 34px;
+      min-width: 34px;
+      max-width: 34px;
+      padding-left: 0;
+      padding-right: 0;
+      overflow: hidden;
+    }
+
+  
+    /* Use the first control as a full-width draggable top bar. */
+    .custom-video-controls {
+      position: relative;
+      padding-top: 38px;
+    }
+
+    .custom-video-controls .custom-video-controls-handle {
+      position: absolute;
+      top: 6px;
+      left: 8px;
+      right: 8px;
+      width: auto;
+      min-width: 0;
+      height: 24px;
+      min-height: 24px;
+      padding: 0 7px;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      background: rgba(255,255,255,0.045);
+      border-color: rgba(255,255,255,0.08);
+      cursor: grab;
+      z-index: 4;
+    }
+
+    .custom-video-controls .custom-video-controls-handle::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 46px;
+      height: 3px;
+      border-radius: 999px;
+      transform: translate(-50%, -50%);
+      background: rgba(255,255,255,0.22);
+      box-shadow:
+        0 -5px 0 rgba(255,255,255,0.08),
+        0 5px 0 rgba(255,255,255,0.08);
+      pointer-events: none;
+    }
+
+    .custom-video-controls .custom-video-controls-handle .icon-mask {
+      width: 15px;
+      height: 15px;
+      margin-left: auto;
+      opacity: 0.82;
+    }
+
+    .custom-video-controls .custom-video-controls-handle:hover {
+      background: rgba(255,255,255,0.075);
+      color: var(--text);
+    }
+
+    .custom-video-controls .custom-video-controls-handle:active,
+    .custom-video-controls.is-dragging-panel .custom-video-controls-handle {
+      cursor: grabbing;
+      background: rgba(125,211,252,0.10);
+      border-color: rgba(125,211,252,0.24);
+    }
+
+  
+    /* Compact desktop transport with a real draggable title bar. */
+    .custom-video-controls {
+      width: min(980px, calc(100% - 16px));
+      max-width: calc(100% - 16px);
+      min-height: 0;
+      padding: 0 8px 8px;
+      display: none;
+      grid-template-columns: minmax(320px, 1fr) auto auto auto;
+      grid-template-areas:
+        "drag drag drag drag"
+        "playback audio view tools";
+      align-items: center;
+      justify-content: stretch;
+      gap: 6px;
+      overflow: hidden;
+      border-radius: 16px;
+    }
+
+    .custom-video-controls.show {
+      display: grid;
+    }
+
+    .custom-video-controls.trim-mode-active,
+    .custom-video-controls.user-positioned {
+      width: min(1040px, calc(100vw - 32px));
+      max-width: calc(100vw - 32px);
+    }
+
+    .custom-video-controls .custom-video-controls-handle {
+      grid-area: drag;
+      position: relative;
+      inset: auto;
+      width: calc(100% + 16px);
+      min-width: 0;
+      height: 27px;
+      min-height: 27px;
+      margin: 0 -8px;
+      padding: 0 10px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      border: 0;
+      border-bottom: 1px solid rgba(255,255,255,0.075);
+      border-radius: 15px 15px 0 0;
+      background: rgba(255,255,255,0.035);
+      color: var(--muted);
+      cursor: grab;
+      overflow: hidden;
+      touch-action: none;
+      z-index: 4;
+    }
+
+    .custom-video-controls .custom-video-controls-handle::before {
+      content: "";
+      position: absolute;
+      left: 35px;
+      right: 10px;
+      top: 50%;
+      height: 1px;
+      transform: translateY(-50%);
+      background: linear-gradient(
+        90deg,
+        rgba(255,255,255,0.13),
+        rgba(255,255,255,0.025)
+      );
+      pointer-events: none;
+    }
+
+    .custom-video-controls .custom-video-controls-handle .icon-mask {
+      width: 15px;
+      height: 15px;
+      margin: 0;
+      opacity: 0.78;
+      flex: 0 0 auto;
+    }
+
+    .custom-video-controls .custom-video-controls-handle:hover {
+      background: rgba(255,255,255,0.055);
+      color: var(--text);
+    }
+
+    .custom-video-controls .custom-video-controls-handle:active,
+    .custom-video-controls.is-dragging-panel .custom-video-controls-handle {
+      cursor: grabbing;
+      background: rgba(125,211,252,0.085);
+      color: var(--accent);
+    }
+
+    .custom-video-controls .transport-playback-group {
+      grid-area: playback;
+      min-width: 0;
+      width: auto;
+      flex: none;
+    }
+
+    .custom-video-controls .transport-audio-group {
+      grid-area: audio;
+      width: 158px;
+      min-width: 158px;
+      max-width: 158px;
+      flex: none;
+      justify-content: flex-start;
+    }
+
+    .custom-video-controls .transport-view-group {
+      grid-area: view;
+      width: auto;
+      min-width: max-content;
+      flex: none;
+    }
+
+    .custom-video-controls .transport-tools-group {
+      grid-area: tools;
+      min-width: 0;
+      width: auto;
+      max-width: 100%;
+      flex: none;
+      flex-wrap: nowrap;
+      justify-content: flex-start;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
+    }
+
+    .custom-video-controls .transport-tools-group::-webkit-scrollbar {
+      display: none;
+    }
+
+    .custom-video-controls .transport-group {
+      min-height: 38px;
+      padding: 3px;
+      gap: 5px;
+      border-radius: 12px;
+    }
+
+    .custom-video-controls .transport-button,
+    .custom-video-controls .transport-toggle {
+      min-height: 32px;
+      height: 32px;
+      padding: 0 10px;
+      border-radius: 9px;
+      flex: 0 0 auto;
+      white-space: nowrap;
+      overflow: visible;
+      text-overflow: clip;
+    }
+
+    .custom-video-controls .transport-button.icon-only {
+      width: 32px;
+      min-width: 32px;
+      height: 32px;
+      min-height: 32px;
+      padding: 0;
+    }
+
+    .custom-video-controls .transport-button.has-command-icon {
+      width: auto;
+      min-width: max-content;
+      max-width: none;
+    }
+
+    .custom-video-controls .transport-time {
+      width: 42px;
+      min-width: 42px;
+      flex: 0 0 42px;
+      font-size: 11px;
+    }
+
+    .custom-video-controls .transport-seek {
+      min-width: 110px;
+      flex: 1 1 190px;
+      margin: 0 3px;
+    }
+
+    .custom-video-controls .transport-volume {
+      width: 68px;
+      min-width: 68px;
+      max-width: 68px;
+      flex: 0 0 68px;
+      margin: 0 2px;
+    }
+
+    .custom-video-controls #muteBtn {
+      min-width: 75px;
+    }
+
+    .custom-video-controls.trim-mode-active {
+      grid-template-columns: minmax(300px, 1fr) auto auto;
+      grid-template-areas:
+        "drag drag drag"
+        "playback audio view"
+        "tools tools tools";
+    }
+
+    .custom-video-controls.trim-mode-active .transport-tools-group {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .custom-video-controls.controls-compact {
+      width: min(720px, calc(100% - 16px));
+      padding: 0 6px 6px;
+      grid-template-columns: auto auto auto auto;
+      grid-template-areas:
+        "drag drag drag drag"
+        "playback audio view tools";
+    }
+
+    .custom-video-controls.controls-compact .custom-video-controls-handle {
+      width: calc(100% + 12px);
+      margin-inline: -6px;
+    }
+
+    @media (max-width: 920px) {
+      .custom-video-controls,
+      .custom-video-controls.controls-compact {
+        width: min(760px, calc(100% - 12px));
+        max-width: calc(100% - 12px);
+        grid-template-columns: minmax(280px, 1fr) auto auto;
+        grid-template-areas:
+          "drag drag drag"
+          "playback playback playback"
+          "audio view tools";
+      }
+
+      .custom-video-controls .transport-tools-group {
+        justify-self: end;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .custom-video-controls,
+      .custom-video-controls.trim-mode-active,
+      .custom-video-controls.user-positioned,
+      .custom-video-controls.controls-compact {
+        width: calc(100vw - 16px);
+        max-width: calc(100vw - 16px);
+        grid-template-columns: auto auto minmax(0, 1fr);
+        grid-template-areas:
+          "drag drag drag"
+          "playback playback playback"
+          "audio view view"
+          "tools tools tools";
+      }
+
+      .custom-video-controls .transport-audio-group {
+        width: 150px;
+        min-width: 150px;
+        max-width: 150px;
+      }
+
+      .custom-video-controls .transport-tools-group {
+        width: 100%;
+        justify-self: stretch;
+        justify-content: flex-start;
+      }
+    }
+
+  
+    .config-font-control {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .config-font-refresh {
+      min-height: 40px;
+      padding-inline: 12px;
+      white-space: nowrap;
+    }
+
+    .config-help {
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    #configUiFontSelect {
+      font-family: var(--app-font-family);
+    }
+
+  
+    /* Compact sidebar masthead: brand left, controls right, no overlap. */
+    .project-sidebar-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      min-height: 34px;
+    }
+
+    .project-sidebar-header .brand-lockup {
+      min-width: 0;
+      gap: 7px;
+      overflow: hidden;
+    }
+
+    .project-sidebar-header .brand-logo {
+      width: 24px;
+      height: 24px;
+      border-radius: 7px;
+    }
+
+    .project-sidebar-header .project-sidebar-title {
+      min-width: 0;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.01em;
+      text-transform: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .project-sidebar-header .project-header-actions {
+      display: inline-grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 30px;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .project-sidebar-header .sidebar-header-icon,
+    .project-sidebar-header .project-button.icon.sidebar-header-icon {
+      width: 30px;
+      min-width: 30px;
+      height: 30px;
+      min-height: 30px;
+      padding: 0;
+      border-radius: 9px;
+      display: inline-grid;
+      place-items: center;
+    }
+
+    .project-sidebar-header .sidebar-header-icon .icon-mask {
+      width: 15px;
+      height: 15px;
+    }
+
+    .project-sidebar-header .sidebar-dock-toggle.sidebar-header-icon {
+      position: static;
+      inset: auto;
+      margin: 0;
+    }
+
+    .sidebar-log-glyph {
+      position: relative;
+      width: 15px;
+      height: 13px;
+      display: block;
+    }
+
+    .sidebar-log-glyph::before {
+      content: "";
+      position: absolute;
+      left: 1px;
+      right: 1px;
+      top: 2px;
+      height: 1.5px;
+      border-radius: 999px;
+      background: currentColor;
+      box-shadow:
+        0 4px 0 currentColor,
+        0 8px 0 currentColor;
+      opacity: 0.92;
+    }
+
+    @media (max-width: 1120px) {
+      .project-sidebar-header .project-sidebar-title {
+        font-size: 11px;
+      }
+
+      .project-sidebar-header .project-header-actions {
+        grid-auto-columns: 28px;
+        gap: 3px;
+      }
+
+      .project-sidebar-header .sidebar-header-icon,
+      .project-sidebar-header .project-button.icon.sidebar-header-icon {
+        width: 28px;
+        min-width: 28px;
+        height: 28px;
+        min-height: 28px;
+      }
+    }
+
+  
+    /* App controls live in the top-right of the full window, outside the sidebar. */
+    .global-app-actions {
+      position: fixed;
+      top: 12px;
+      right: 14px;
+      z-index: 210;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: rgba(18, 22, 30, 0.88);
+      box-shadow: 0 14px 36px rgba(0,0,0,0.30);
+      backdrop-filter: blur(14px);
+      pointer-events: auto;
+    }
+
+    .global-app-actions .global-app-action,
+    .global-app-actions .project-button.icon.global-app-action {
+      position: static;
+      inset: auto;
+      width: 31px;
+      min-width: 31px;
+      height: 31px;
+      min-height: 31px;
+      margin: 0;
+      padding: 0;
+      border-radius: 9px;
+      display: inline-grid;
+      place-items: center;
+    }
+
+    .global-app-actions .global-app-action .icon-mask {
+      width: 15px;
+      height: 15px;
+    }
+
+    .global-app-actions .sidebar-log-glyph {
+      width: 15px;
+      height: 13px;
+    }
+
+    .project-sidebar-header {
+      display: block;
+      min-height: 34px;
+    }
+
+    .project-sidebar-header .brand-lockup {
+      width: 100%;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    /* Reserve the top-right area so metadata/toolbars cannot sit under app controls. */
+    .stage .topbar {
+      top: 56px;
+      right: 16px;
+    }
+
+    @media (max-width: 760px) {
+      .global-app-actions {
+        top: 8px;
+        right: 8px;
+        gap: 3px;
+        padding: 4px;
+      }
+
+      .global-app-actions .global-app-action,
+      .global-app-actions .project-button.icon.global-app-action {
+        width: 29px;
+        min-width: 29px;
+        height: 29px;
+        min-height: 29px;
+      }
+
+      .stage .topbar {
+        top: 52px;
+      }
+    }
+
+  
+    /* App identity: logo, name, build badge, and New button stay together. */
+    .project-sidebar-header .brand-lockup {
+      display: grid;
+      grid-template-columns: 24px minmax(0, auto) auto 28px;
+      align-items: center;
+      justify-content: start;
+      gap: 6px;
+      width: 100%;
+      min-width: 0;
+    }
+
+    .project-sidebar-header .project-sidebar-title {
+      min-width: 0;
+      max-width: 138px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .app-build-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+      height: 17px;
+      padding: 0 5px;
+      border: 1px solid rgba(125, 211, 252, 0.18);
+      border-radius: 999px;
+      background: rgba(125, 211, 252, 0.08);
+      color: var(--muted);
+      font-size: 8px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: 0.025em;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .project-sidebar-header .brand-new-project-button,
+    .project-sidebar-header .project-button.icon.brand-new-project-button {
+      width: 28px;
+      min-width: 28px;
+      height: 28px;
+      min-height: 28px;
+      padding: 0;
+      border-radius: 9px;
+      display: inline-grid;
+      place-items: center;
+    }
+
+    .project-sidebar-header .brand-new-project-button .icon-mask {
+      width: 14px;
+      height: 14px;
+    }
+
+    @media (max-width: 1120px) {
+      .project-sidebar-header .brand-lockup {
+        grid-template-columns: 22px minmax(0, auto) auto 27px;
+        gap: 5px;
+      }
+
+      .project-sidebar-header .project-sidebar-title {
+        max-width: 112px;
+      }
+
+      .app-build-badge {
+        padding-inline: 4px;
+        font-size: 7.5px;
+      }
+
+      .project-sidebar-header .brand-new-project-button,
+      .project-sidebar-header .project-button.icon.brand-new-project-button {
+        width: 27px;
+        min-width: 27px;
+        height: 27px;
+        min-height: 27px;
+      }
+    }
+
+  
+    /* The brand New button is always a compact icon-only action. */
+    .project-sidebar-header #newProjectBtn,
+    .project-sidebar-header #newProjectBtn.has-command-icon {
+      width: 28px !important;
+      min-width: 28px !important;
+      max-width: 28px !important;
+      height: 28px !important;
+      min-height: 28px !important;
+      max-height: 28px !important;
+      padding: 0 !important;
+      gap: 0 !important;
+      overflow: hidden !important;
+      border-radius: 9px;
+      flex: 0 0 28px;
+    }
+
+    .project-sidebar-header #newProjectBtn .button-label {
+      display: none !important;
+    }
+
+    .project-sidebar-header #newProjectBtn .button-icon,
+    .project-sidebar-header #newProjectBtn .icon-mask {
+      width: 14px !important;
+      height: 14px !important;
+      margin: 0 !important;
+      flex: 0 0 14px;
+    }
+
+  
+    .app-log-panel {
+      grid-template-rows: auto auto auto minmax(140px, 1fr);
+    }
+
+    .app-log-actions {
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .app-log-action-group {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .integrity-action-group {
+      justify-content: flex-end;
+    }
+
+    .app-integrity-panel {
+      display: grid;
+      gap: 8px;
+      max-height: min(38vh, 360px);
+      overflow: auto;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.025);
+    }
+
+    .app-integrity-empty,
+    .app-integrity-loading {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+      padding: 8px;
+    }
+
+    .app-integrity-summary {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 7px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: rgba(0,0,0,0.18);
+      font-size: 11px;
+      font-weight: 750;
+    }
+
+    .app-integrity-summary[data-status="ok"] {
+      border-color: rgba(34, 197, 94, 0.32);
+      background: rgba(22, 101, 52, 0.13);
+    }
+
+    .app-integrity-summary[data-status="warning"] {
+      border-color: rgba(245, 158, 11, 0.36);
+      background: rgba(146, 64, 14, 0.14);
+    }
+
+    .app-integrity-summary[data-status="error"] {
+      border-color: rgba(248, 113, 113, 0.38);
+      background: rgba(127, 29, 29, 0.16);
+    }
+
+    .app-integrity-platform {
+      color: var(--muted);
+      font-weight: 500;
+      margin-left: auto;
+    }
+
+    .app-integrity-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 7px;
+    }
+
+    .app-integrity-item {
+      display: grid;
+      grid-template-columns: 9px minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: rgba(0,0,0,0.16);
+    }
+
+    .app-integrity-dot {
+      width: 8px;
+      height: 8px;
+      margin-top: 4px;
+      border-radius: 999px;
+      background: var(--muted);
+      box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.10);
+    }
+
+    .app-integrity-item[data-status="ok"] .app-integrity-dot {
+      background: #22c55e;
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.13);
+    }
+
+    .app-integrity-item[data-status="warning"] .app-integrity-dot {
+      background: #f59e0b;
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.13);
+    }
+
+    .app-integrity-item[data-status="error"] .app-integrity-dot {
+      background: #f87171;
+      box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.13);
+    }
+
+    .app-integrity-name {
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1.25;
+    }
+
+    .app-integrity-detail,
+    .app-integrity-path,
+    .app-integrity-help {
+      margin-top: 3px;
+      font-size: 10px;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+
+    .app-integrity-detail {
+      color: var(--muted);
+    }
+
+    .app-integrity-path {
+      color: #93c5fd;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .app-integrity-help {
+      padding: 6px 7px;
+      border-radius: 8px;
+      color: #fde68a;
+      background: rgba(120, 53, 15, 0.20);
+      border: 1px solid rgba(245, 158, 11, 0.20);
+    }
+
+    .integrity-check-running {
+      opacity: 0.58;
+      pointer-events: none;
+    }
+
+    @media (max-width: 760px) {
+      .app-log-panel {
+        padding: 12px;
+      }
+
+      .app-log-actions,
+      .app-log-action-group,
+      .integrity-action-group {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .app-integrity-list {
+        grid-template-columns: 1fr;
+      }
+
+      .app-integrity-platform {
+        width: 100%;
+        margin-left: 0;
+      }
+    }
+
+  
+    /* Transport interaction polish. */
+    .custom-video-controls .transport-button.primary,
+    .custom-video-controls .transport-button.primary:hover,
+    .custom-video-controls .transport-button.primary:focus-visible {
+      background: var(--button-primary-bg);
+      color: var(--button-primary-text);
+      border-color: var(--button-primary-bg);
+      opacity: 1;
+      filter: none;
+    }
+
+    .custom-video-controls .transport-button.primary:hover {
+      box-shadow:
+        0 5px 14px rgba(0,0,0,0.24),
+        0 0 0 2px rgba(255,255,255,0.10);
+      transform: translateY(-1px);
+    }
+
+    .custom-video-controls .transport-button.primary:active {
+      background: color-mix(in srgb, var(--button-primary-bg) 88%, transparent);
+      color: var(--button-primary-text);
+      transform: translateY(0);
+      box-shadow: none;
+    }
+
+    .custom-video-controls .transport-button.primary .button-icon,
+    .custom-video-controls .transport-button.primary .button-label {
+      color: inherit;
+      opacity: 1;
+    }
+
+    /* Slim draggable control-bar header. */
+    .custom-video-controls .custom-video-controls-handle {
+      height: 14px;
+      min-height: 14px;
+      max-height: 14px;
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+
+    .custom-video-controls .custom-video-controls-handle .icon-mask {
+      width: 9px;
+      height: 9px;
+    }
+
+    .custom-video-controls .custom-video-controls-handle::before {
+      left: 25px;
+      height: 1px;
+      box-shadow: none;
+    }
+
+  
+    .app-build-badge {
+      max-width: 76px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+  
+    /* Theme-matched caption editor scrollbar. */
+    :root {
+      --caption-scrollbar-thumb: rgba(148, 163, 184, 0.34);
+      --caption-scrollbar-thumb-hover: rgba(125, 211, 252, 0.72);
+      --caption-scrollbar-track: rgba(255, 255, 255, 0.025);
+    }
+
+    body[data-theme="light"] {
+      --caption-scrollbar-thumb: rgba(71, 85, 105, 0.26);
+      --caption-scrollbar-thumb-hover: rgba(3, 105, 161, 0.62);
+      --caption-scrollbar-track: rgba(15, 23, 42, 0.025);
+    }
+
+    .caption-editor-list {
+      scrollbar-width: thin;
+      scrollbar-color: transparent transparent;
+      scrollbar-gutter: stable;
+      overscroll-behavior: contain;
+    }
+
+    .caption-editor-list:hover,
+    .caption-editor-list:focus-within {
+      scrollbar-color:
+        var(--caption-scrollbar-thumb)
+        var(--caption-scrollbar-track);
+    }
+
+    .caption-editor-list::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    .caption-editor-list::-webkit-scrollbar-track {
+      margin-block: 5px;
+      border-radius: 999px;
+      background: transparent;
+    }
+
+    .caption-editor-list:hover::-webkit-scrollbar-track,
+    .caption-editor-list:focus-within::-webkit-scrollbar-track {
+      background: var(--caption-scrollbar-track);
+    }
+
+    .caption-editor-list::-webkit-scrollbar-thumb {
+      min-height: 36px;
+      border: 2px solid transparent;
+      border-radius: 999px;
+      background: transparent;
+      background-clip: padding-box;
+      transition: background-color 140ms ease;
+    }
+
+    .caption-editor-list:hover::-webkit-scrollbar-thumb,
+    .caption-editor-list:focus-within::-webkit-scrollbar-thumb {
+      background: var(--caption-scrollbar-thumb);
+      background-clip: padding-box;
+    }
+
+    .caption-editor-list::-webkit-scrollbar-thumb:hover {
+      background: var(--caption-scrollbar-thumb-hover);
+      background-clip: padding-box;
+    }
+
+    .caption-editor-list::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+
+    /* Keep long caption textareas visually consistent with the list. */
+    .caption-textarea {
+      scrollbar-width: thin;
+      scrollbar-color:
+        var(--caption-scrollbar-thumb)
+        transparent;
+    }
+
+    .caption-textarea::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .caption-textarea::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .caption-textarea::-webkit-scrollbar-thumb {
+      border: 1px solid transparent;
+      border-radius: 999px;
+      background: var(--caption-scrollbar-thumb);
+      background-clip: padding-box;
+    }
+
+    .caption-textarea::-webkit-scrollbar-thumb:hover {
+      background: var(--caption-scrollbar-thumb-hover);
+      background-clip: padding-box;
+    }
+
+  
+    /*
+     * Compact transport keeps the time/seek/volume reduction, but button labels
+     * still follow transportLabelModeBtn: text, icon + text, or icons.
+     */
+    @media (min-width: 641px) {
+      .custom-video-controls.controls-compact {
+        width: max-content;
+        min-width: 0;
+        max-width: calc(100vw - 16px);
+        grid-template-columns: repeat(4, max-content);
+        justify-content: center;
+        justify-items: start;
+        flex: 0 0 auto;
+      }
+
+      .custom-video-controls.controls-compact .transport-group,
+      .custom-video-controls.controls-compact .transport-playback-group,
+      .custom-video-controls.controls-compact .transport-audio-group,
+      .custom-video-controls.controls-compact .transport-view-group,
+      .custom-video-controls.controls-compact .transport-tools-group {
+        width: max-content;
+        min-width: max-content;
+        max-width: none;
+        flex: 0 0 auto;
+      }
+
+      .custom-video-controls.controls-compact .transport-tools-group {
+        overflow: visible;
+      }
+
+      body[data-button-label-mode="text"]
+      .custom-video-controls.controls-compact
+      .has-command-icon .button-icon {
+        display: none;
+      }
+
+      body[data-button-label-mode="text"]
+      .custom-video-controls.controls-compact
+      .has-command-icon .button-label,
+      body[data-button-label-mode="icon-text"]
+      .custom-video-controls.controls-compact
+      .has-command-icon .button-label {
+        display: inline-flex;
+      }
+
+      body[data-button-label-mode="icon-text"]
+      .custom-video-controls.controls-compact
+      .has-command-icon .button-icon,
+      body[data-button-label-mode="icon"]
+      .custom-video-controls.controls-compact
+      .has-command-icon .button-icon {
+        display: inline-block;
+      }
+
+      body[data-button-label-mode="icon"]
+      .custom-video-controls.controls-compact
+      .has-command-icon .button-label {
+        display: none;
+      }
+
+      body[data-button-label-mode="text"]
+      .custom-video-controls.controls-compact
+      .transport-button.has-command-icon,
+      body[data-button-label-mode="icon-text"]
+      .custom-video-controls.controls-compact
+      .transport-button.has-command-icon,
+      body[data-button-label-mode="text"]
+      .custom-video-controls.controls-compact
+      .transport-toggle.has-command-icon,
+      body[data-button-label-mode="icon-text"]
+      .custom-video-controls.controls-compact
+      .transport-toggle.has-command-icon {
+        width: auto;
+        min-width: max-content;
+        max-width: none;
+        padding-left: 10px;
+        padding-right: 10px;
+        overflow: visible;
+      }
+
+      body[data-button-label-mode="icon"]
+      .custom-video-controls.controls-compact
+      .transport-button.has-command-icon,
+      body[data-button-label-mode="icon"]
+      .custom-video-controls.controls-compact
+      .transport-toggle.has-command-icon {
+        width: 38px;
+        min-width: 38px;
+        max-width: 38px;
+        padding-left: 0;
+        padding-right: 0;
+        overflow: hidden;
+      }
+
+      body[data-button-label-mode="text"]
+      .custom-video-controls.controls-compact
+      .transport-toggle .button-label,
+      body[data-button-label-mode="icon-text"]
+      .custom-video-controls.controls-compact
+      .transport-toggle .button-label {
+        display: inline-flex;
+      }
+
+      body[data-button-label-mode="text"]
+      .custom-video-controls.controls-compact
+      .transport-toggle .button-icon {
+        display: none;
+      }
+
+      body[data-button-label-mode="icon-text"]
+      .custom-video-controls.controls-compact
+      .transport-toggle .button-icon,
+      body[data-button-label-mode="icon"]
+      .custom-video-controls.controls-compact
+      .transport-toggle .button-icon {
+        display: inline-block;
+      }
+
+      body[data-button-label-mode="icon"]
+      .custom-video-controls.controls-compact
+      .transport-toggle .button-label {
+        display: none;
+      }
+
+      .custom-video-controls.controls-compact #muteBtn {
+        width: auto;
+        min-width: max-content;
+      }
+
+      body[data-button-label-mode="icon"]
+      .custom-video-controls.controls-compact #muteBtn {
+        width: 38px;
+        min-width: 38px;
+      }
+    }
+
+</style>
 </head>
 <body data-theme="dark" data-ui-mode="pro">
   <div class="app" id="appRoot">
+    <div class="global-app-actions" aria-label="Application controls">
+      <button id="appLogsButton" type="button" class="project-button icon global-app-action" aria-label="Open application logs" title="Application logs">
+        <span class="sidebar-log-glyph" aria-hidden="true"></span>
+      </button>
+      <button id="configButton" type="button" class="project-button icon global-app-action" aria-label="Open app settings" title="App settings">
+        <span class="icon-mask icon-config" aria-hidden="true"></span>
+      </button>
+      <button id="sidebarDockToggle" type="button" class="sidebar-dock-toggle global-app-action" aria-label="Hide project dock" aria-pressed="false" title="Hide project dock">
+        <span class="icon-mask icon-hide" aria-hidden="true"></span>
+      </button>
+    </div>
+
     <button id="sidebarDockShowToggle" type="button" class="sidebar-dock-show-toggle" aria-label="Show project dock" aria-pressed="true">
       <span class="icon-mask icon-show" aria-hidden="true"></span>
     </button>
 
     <aside class="project-sidebar" id="projectSidebar">
       <div class="project-sidebar-header">
-        <div class="brand-lockup">
-          <img class="brand-logo" src="/assets/images/icons/logo.svg" alt="Caption Animator">
-          <div class="project-sidebar-title">Projects</div>
-        </div>
-        <button id="sidebarDockToggle" type="button" class="sidebar-dock-toggle" aria-label="Hide project dock" aria-pressed="false">
-          <span class="icon-mask icon-hide" aria-hidden="true"></span>
-        </button>
-        <div class="project-header-actions">
-          <button id="configButton" type="button" class="project-button icon" aria-label="Open app settings"><span class="icon-mask icon-config" aria-hidden="true"></span></button>
-          <button id="newProjectBtn" type="button" class="project-button primary">New</button>
+        <div class="brand-lockup" title="Caption Animator">
+          <img class="brand-logo" src="/assets/images/icons/logo.svg" alt="">
+          <div class="project-sidebar-title">Caption Animator</div>
+          <span
+            id="appBuildBadge"
+            class="app-build-badge"
+            data-version="__APP_VERSION__"
+            data-build="__BUILD_NUMBER__"
+            title="Version __APP_VERSION__, build __BUILD_NUMBER__"
+          >dev</span>
+          <button
+            id="newProjectBtn"
+            type="button"
+            class="project-button icon primary brand-new-project-button"
+            aria-label="Create new project"
+            title="New project"
+          >
+            <span class="icon-mask icon-new" aria-hidden="true"></span>
+          </button>
         </div>
       </div>
 
@@ -3188,6 +4879,38 @@
 
 
 
+
+    <div id="appLogOverlay" class="app-log-overlay" aria-hidden="true">
+      <section class="app-log-panel" role="dialog" aria-modal="true" aria-labelledby="appLogTitle">
+        <div class="app-log-header">
+          <div>
+            <div id="appLogTitle" class="app-log-title">Application logs</div>
+            <div id="appLogPath" class="app-log-path">Loading…</div>
+          </div>
+          <button id="appLogClose" type="button" class="project-button">Close</button>
+        </div>
+        <div class="app-log-actions">
+          <div class="app-log-action-group" aria-label="Log actions">
+            <button id="appLogRefresh" type="button" class="project-button">Refresh logs</button>
+            <button id="appLogReveal" type="button" class="project-button">Reveal log</button>
+            <button id="appLogCopy" type="button" class="project-button">Copy logs</button>
+          </div>
+          <div class="app-log-action-group integrity-action-group" aria-label="Component checks">
+            <button id="appIntegrityAll" type="button" class="project-button primary">Check all</button>
+            <button id="appIntegrityMedia" type="button" class="project-button">Media tools</button>
+            <button id="appIntegrityCaptions" type="button" class="project-button">Captions &amp; AI</button>
+            <button id="appIntegrityCopy" type="button" class="project-button">Copy report</button>
+          </div>
+        </div>
+        <section id="appIntegrityPanel" class="app-integrity-panel" aria-live="polite">
+          <div class="app-integrity-empty">
+            Run an integrity check to verify the installed components.
+          </div>
+        </section>
+        <pre id="appLogOutput" class="app-log-output">Loading…</pre>
+      </section>
+    </div>
+
     <div class="stage">
       <div class="topbar">
         <div class="badge" id="selectionMeta">No files selected.</div>
@@ -3205,6 +4928,11 @@
           <input id="easyTextColourInput" class="easy-toolbar-color" type="color" value="#ffffff" aria-label="Caption text colour">
         </div>
 
+
+        <div id="statusRegion" class="status-region" aria-live="polite">
+          <div id="status" class="status"></div>
+          <button id="statusToggleBtn" type="button" class="status-toggle-button" aria-label="Dismiss status" title="Dismiss status" hidden>×</button>
+        </div>
 
         <!-- Keep only backend bridge elements required by the current JavaScript while moving visible controls to lil-gui. -->
         <div class="backend-bridge" hidden aria-hidden="true">
@@ -3381,34 +5109,41 @@
         </div>
 
         <div id="customVideoControls" class="custom-video-controls" aria-label="Video playback controls">
-          <button id="playPauseBtn" type="button" class="transport-button primary" aria-label="Play video">Play</button>
-          <span id="transportCurrent" class="transport-time">0:00</span>
-          <input id="transportSeek" class="transport-seek" type="range" min="0" max="1000" step="1" value="0" aria-label="Seek video">
-          <span id="transportDuration" class="transport-time">0:00</span>
-          <button id="muteBtn" type="button" class="transport-button" aria-label="Mute video">Mute</button>
-          <input id="volumeRange" class="transport-volume" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volume">
-          <button id="fullscreenBtn" type="button" class="transport-button" aria-label="Fullscreen preview">Full</button>
-          <button id="previewAnchorBtn" type="button" class="transport-button icon-only" aria-label="Change preview position" title="Change preview position"><span class="icon-mask icon-stage-position" aria-hidden="true"></span></button>
-          <label class="transport-toggle has-command-icon" title="Burn captions into Render full output">
-            <input id="burnCaptionsToggle" type="checkbox" checked aria-label="Burn captions on Render full">
-            <span class="icon-mask icon-captions button-icon" aria-hidden="true"></span>
-            <span class="button-label">Captions</span>
-          </label>
-          <button id="trimToggleBtn" type="button" class="transport-button" aria-label="Show trim timeline" aria-pressed="false">Trim</button>
-          <button id="transportCompactBtn" type="button" class="transport-button" aria-label="Minimize video controls" aria-pressed="false" title="Minimize video controls">Compact</button>
-          <button id="transportLabelModeBtn" type="button" class="transport-button" aria-label="Cycle button label display" title="Cycle button label display">Labels</button>
-          <button id="trimLoopBtn" type="button" class="transport-button trim-action-button icon-only" aria-label="Loop kept trim ranges" aria-pressed="false" title="Loop kept trim ranges"><span class="icon-mask icon-loop" aria-hidden="true"></span></button>
-          <button id="trimClearTransportBtn" type="button" class="transport-button trim-action-button" aria-label="Clear all trim points">Clear Trim</button>
-          <button id="trimPreviewTransportBtn" type="button" class="transport-button trim-action-button" aria-label="Render trim preview">Trim preview</button>
-          <button id="trimFullTransportBtn" type="button" class="transport-button trim-action-button" aria-label="Render full trimmed video">Trim full</button>
           <button id="customVideoControlsHandle" type="button" class="custom-video-controls-handle" aria-label="Move video controls" title="Drag video controls"><span class="icon-mask icon-handle" aria-hidden="true"></span></button>
+          <div class="transport-group transport-playback-group" role="group" aria-label="Playback">
+            <button id="playPauseBtn" type="button" class="transport-button primary" aria-label="Play video">Play</button>
+            <span id="transportCurrent" class="transport-time">0:00</span>
+            <input id="transportSeek" class="transport-seek" type="range" min="0" max="1000" step="1" value="0" aria-label="Seek video">
+            <span id="transportDuration" class="transport-time">0:00</span>
+          </div>
+
+          <div class="transport-group transport-audio-group" role="group" aria-label="Audio">
+            <button id="muteBtn" type="button" class="transport-button" aria-label="Mute video">Mute</button>
+            <input id="volumeRange" class="transport-volume" type="range" min="0" max="1" step="0.01" value="1" aria-label="Volume">
+          </div>
+
+          <div class="transport-group transport-view-group" role="group" aria-label="Preview view">
+            <button id="fullscreenBtn" type="button" class="transport-button" aria-label="Fullscreen preview">Full</button>
+            <button id="previewAnchorBtn" type="button" class="transport-button icon-only" aria-label="Change preview position" title="Change preview position"><span class="icon-mask icon-stage-position" aria-hidden="true"></span></button>
+          </div>
+
+          <div class="transport-group transport-tools-group" role="group" aria-label="Editing controls">
+            <label class="transport-toggle has-command-icon" title="Burn captions into Render full output">
+              <input id="burnCaptionsToggle" type="checkbox" checked aria-label="Burn captions on Render full">
+              <span class="icon-mask icon-captions button-icon" aria-hidden="true"></span>
+              <span class="button-label">Captions</span>
+            </label>
+            <button id="trimToggleBtn" type="button" class="transport-button" aria-label="Show trim timeline" aria-pressed="false">Trim</button>
+            <button id="transportCompactBtn" type="button" class="transport-button" aria-label="Minimize video controls" aria-pressed="false" title="Minimize video controls">Compact</button>
+            <button id="transportLabelModeBtn" type="button" class="transport-button" aria-label="Cycle button label display" title="Cycle button label display">Labels</button>
+            <button id="trimLoopBtn" type="button" class="transport-button trim-action-button" aria-label="Loop kept trim ranges" aria-pressed="false" title="Loop kept trim ranges"><span class="icon-mask icon-loop" aria-hidden="true"></span></button>
+            <button id="trimClearTransportBtn" type="button" class="transport-button trim-action-button" aria-label="Clear all trim points">Clear Trim</button>
+            <button id="trimPreviewTransportBtn" type="button" class="transport-button trim-action-button" aria-label="Render trim preview">Trim preview</button>
+            <button id="trimFullTransportBtn" type="button" class="transport-button trim-action-button" aria-label="Render full trimmed video">Trim full</button>
+          </div>
+
         </div>
       </div>
-
-      <button id="statusToggleBtn" type="button" class="status-toggle-button" aria-label="Hide status" aria-pressed="false">
-        <span class="icon-mask icon-hide" aria-hidden="true"></span>
-      </button>
-      <div id="status" class="status"></div>
 
       <div class="hint">
         H = toggle helpers.<br>
@@ -3440,6 +5175,17 @@
             <option value="light">Light</option>
           </select>
         </label>
+
+        <label class="config-field config-font-field">
+          <span class="config-label">UI font</span>
+          <div class="config-font-control">
+            <select id="configUiFontSelect" class="config-select">
+              <option value="default">Inter — default</option>
+            </select>
+            <button id="configUiFontRefreshBtn" type="button" class="project-button config-font-refresh" title="Rescan fonts/ui">Rescan</button>
+          </div>
+          <span id="configUiFontHelp" class="config-help">Scanning fonts/ui recursively…</span>
+        </label>
         <label class="config-field">
           <span class="config-label">Button labels</span>
           <select id="configButtonLabelsSelect" class="config-select">
@@ -3469,6 +5215,7 @@
         <div id="appModalBody" class="app-modal-body"></div>
         <div id="appModalError" class="app-modal-error" role="alert"></div>
         <div class="app-modal-actions">
+          <button id="appModalTertiary" type="button" class="app-modal-action danger tertiary" hidden>Delete</button>
           <button id="appModalCancel" type="button" class="app-modal-action">Cancel</button>
           <button id="appModalConfirm" type="submit" class="app-modal-action primary">Continue</button>
         </div>
@@ -3615,6 +5362,9 @@
     const configOverlay = document.getElementById('configOverlay');
     const configModeSelect = document.getElementById('configModeSelect');
     const configThemeSelect = document.getElementById('configThemeSelect');
+    const configUiFontSelect = document.getElementById('configUiFontSelect');
+    const configUiFontRefreshBtn = document.getElementById('configUiFontRefreshBtn');
+    const configUiFontHelp = document.getElementById('configUiFontHelp');
     const configButtonLabelsSelect = document.getElementById('configButtonLabelsSelect');
     const configCloseBtn = document.getElementById('configCloseBtn');
     const configDoneBtn = document.getElementById('configDoneBtn');
@@ -3657,6 +5407,7 @@
     const appModalForm = document.getElementById('appModalForm');
     const appModalBody = document.getElementById('appModalBody');
     const appModalError = document.getElementById('appModalError');
+    const appModalTertiary = document.getElementById('appModalTertiary');
     const appModalCancel = document.getElementById('appModalCancel');
     const appModalConfirm = document.getElementById('appModalConfirm');
 
@@ -4421,14 +6172,20 @@
 
     /* Show status panel with current state or error. */
     function showStatus(kind, message) {
-      statusEl.className = `status show ${kind}${statusEl.classList.contains('is-user-hidden') ? ' is-user-hidden' : ''}`;
+      statusEl.className = `status show ${kind}`;
       statusEl.innerHTML = message;
+      if (statusToggleBtn) {
+        statusToggleBtn.hidden = false;
+      }
     }
 
     /* Hide status panel. */
     function clearStatus() {
-      statusEl.className = statusEl.classList.contains('is-user-hidden') ? 'status is-user-hidden' : 'status';
+      statusEl.className = 'status';
       statusEl.innerHTML = '';
+      if (statusToggleBtn) {
+        statusToggleBtn.hidden = true;
+      }
     }
 
     /* Toggle animated processing chrome around the current video stage while a backend job is active. */
@@ -4605,6 +6362,9 @@
         fields = [],
         confirmText = 'Continue',
         cancelText = 'Cancel',
+        tertiaryText = '',
+        tertiaryValue = null,
+        tertiaryDanger = false,
         danger = false,
         closeOnBackdrop = true,
         closeOnEscape = true,
@@ -4626,6 +6386,12 @@
         appModalConfirm.textContent = confirmText || 'Continue';
         appModalCancel.textContent = cancelText || 'Cancel';
         appModalConfirm.className = `app-modal-action ${danger ? 'danger' : 'primary'}`;
+        if (appModalTertiary) {
+          const hasTertiaryAction = Boolean(tertiaryText);
+          appModalTertiary.hidden = !hasTertiaryAction;
+          appModalTertiary.textContent = tertiaryText || '';
+          appModalTertiary.className = `app-modal-action tertiary ${tertiaryDanger ? 'danger' : ''}`.trim();
+        }
         setAppModalError('');
         appModalBody.innerHTML = '';
 
@@ -4645,6 +6411,7 @@
             previousFocus,
             closeOnBackdrop,
             closeOnEscape,
+            tertiaryValue,
             previousBodyOverflow: document.body.style.overflow
           };
 
@@ -4703,6 +6470,13 @@
         appModalClose.addEventListener('click', () => closeAppModal(null));
       }
 
+      if (appModalTertiary) {
+        appModalTertiary.addEventListener('click', () => {
+          if (!activeAppModal || appModalTertiary.hidden) return;
+          closeAppModal(activeAppModal.tertiaryValue ?? { __modalAction: 'tertiary' });
+        });
+      }
+
       if (appModalCancel) {
         appModalCancel.addEventListener('click', () => closeAppModal(null));
       }
@@ -4724,6 +6498,9 @@
           : 'Create a workspace for source videos, rendered versions, thumbnails, and operation history.',
           icon: initial.edit ? '✎' : '+',
           confirmText: initial.edit ? 'Save project' : 'Create project',
+          tertiaryText: initial.edit ? 'Delete' : '',
+          tertiaryValue: initial.edit ? { __modalAction: 'delete-project' } : null,
+          tertiaryDanger: true,
           fields: [
             {
               name: 'name',
@@ -4766,16 +6543,162 @@
         });
       }
 
-      function openConfirmModal({ title, description, confirmText = 'Confirm', danger = false } = {}) {
+      function openConfirmModal({ title, description, confirmText = 'Confirm', cancelText = 'Cancel', danger = false } = {}) {
         return openAppModal({
           title,
           description,
           icon: danger ? '!' : '✓',
           fields: [],
           confirmText,
+          cancelText,
           danger
         }).then(result => Boolean(result));
       }
+
+
+    const DEFAULT_UI_FONT_ID = 'default';
+    const DEFAULT_UI_FONT_STACK = '"InterVariable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    const uiFontRegistry = new Map();
+    let uiFontLoadPromise = null;
+
+    function uiFontFormat(format) {
+      const normalized = String(format || '').toLowerCase();
+      if (normalized === 'ttf') return 'truetype';
+      if (normalized === 'otf') return 'opentype';
+      if (normalized === 'woff2') return 'woff2';
+      if (normalized === 'woff') return 'woff';
+      return normalized;
+    }
+
+    function installUiFontFaces(fonts) {
+      let style = document.getElementById('dynamicUiFontFaces');
+      if (!style) {
+        style = document.createElement('style');
+        style.id = 'dynamicUiFontFaces';
+        document.head.append(style);
+      }
+
+      const rules = [];
+      for (const font of fonts) {
+        for (const face of Array.isArray(font.faces) ? font.faces : []) {
+          const family = String(font.css_family || '').replace(/["\\]/g, '');
+          const url = String(face.url || '').replace(/["\\]/g, match => `\\${match}`);
+          if (!family || !url) continue;
+
+          rules.push(`@font-face {
+            font-family: "${family}";
+            src: url("${url}") format("${uiFontFormat(face.format)}");
+            font-style: ${face.style || 'normal'};
+            font-weight: ${face.weight || 400};
+            font-display: swap;
+          }`);
+        }
+      }
+      style.textContent = rules.join('\n');
+    }
+
+    function applyUiFontSelection(fontId = DEFAULT_UI_FONT_ID) {
+      const selected = uiFontRegistry.get(String(fontId));
+      const stack = selected
+        ? `"${selected.css_family}", ${DEFAULT_UI_FONT_STACK}`
+        : DEFAULT_UI_FONT_STACK;
+
+      document.documentElement.style.setProperty('--app-font-family', stack);
+      document.documentElement.style.setProperty('--app-display-font-family', stack);
+      document.body.dataset.uiFont = selected?.id || DEFAULT_UI_FONT_ID;
+
+      if (configUiFontSelect) {
+        const validValue = selected?.id || DEFAULT_UI_FONT_ID;
+        configUiFontSelect.value = validValue;
+        configUiFontSelect.style.fontFamily = stack;
+      }
+
+      if (selected && document.fonts?.load) {
+        void document.fonts.load(`500 14px "${selected.css_family}"`);
+      }
+    }
+
+    async function loadUiFontChoices({ force = false } = {}) {
+      if (uiFontLoadPromise && !force) return uiFontLoadPromise;
+
+      uiFontLoadPromise = (async () => {
+        if (configUiFontHelp) {
+          configUiFontHelp.textContent = 'Scanning fonts/ui recursively…';
+        }
+        if (configUiFontRefreshBtn) configUiFontRefreshBtn.disabled = true;
+
+        try {
+          const response = await fetch(`/api/ui-fonts?ts=${Date.now()}`, {
+            cache: 'no-store'
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !payload.ok) {
+            throw new Error(payload.error || `Font scan failed (${response.status}).`);
+          }
+
+          const fonts = Array.isArray(payload.fonts) ? payload.fonts : [];
+          uiFontRegistry.clear();
+          for (const font of fonts) {
+            if (font?.id && font?.css_family && Array.isArray(font.faces) && font.faces.length) {
+              uiFontRegistry.set(String(font.id), font);
+            }
+          }
+
+          installUiFontFaces([...uiFontRegistry.values()]);
+
+          if (configUiFontSelect) {
+            const selectedId = readAppSettings().uiFontId;
+            configUiFontSelect.replaceChildren();
+
+            const defaultOption = document.createElement('option');
+            defaultOption.value = DEFAULT_UI_FONT_ID;
+            defaultOption.textContent = 'Inter — default';
+            configUiFontSelect.append(defaultOption);
+
+            for (const font of uiFontRegistry.values()) {
+              const option = document.createElement('option');
+              option.value = font.id;
+              option.textContent = `${font.label} (${font.faces.length} face${font.faces.length === 1 ? '' : 's'})`;
+              configUiFontSelect.append(option);
+            }
+
+            configUiFontSelect.value = uiFontRegistry.has(selectedId)
+              ? selectedId
+              : DEFAULT_UI_FONT_ID;
+          }
+
+          const requestedId = readAppSettings().uiFontId;
+          applyUiFontSelection(
+            uiFontRegistry.has(requestedId)
+              ? requestedId
+              : DEFAULT_UI_FONT_ID
+          );
+
+          if (configUiFontHelp) {
+            const directory = String(payload.directory || 'fonts/ui');
+            configUiFontHelp.textContent = uiFontRegistry.size
+              ? `${uiFontRegistry.size} font ${uiFontRegistry.size === 1 ? 'family' : 'families'} found recursively in ${directory}.`
+              : `No supported fonts found in ${directory}. Add .woff2, .woff, .otf, or .ttf files anywhere below that folder.`;
+          }
+
+          return [...uiFontRegistry.values()];
+        } catch (error) {
+          if (configUiFontHelp) {
+            configUiFontHelp.textContent = `Could not load UI fonts: ${error.message || error}`;
+          }
+          applyUiFontSelection(DEFAULT_UI_FONT_ID);
+          return [];
+        } finally {
+          if (configUiFontRefreshBtn) configUiFontRefreshBtn.disabled = false;
+        }
+      })();
+
+      try {
+        return await uiFontLoadPromise;
+      } finally {
+        uiFontLoadPromise = null;
+      }
+    }
 
     /* Store app-wide UI mode, theme, button label display, and compact transport state without touching project assets or render settings. */
       function readAppSettings() {
@@ -4785,11 +6708,12 @@
           return {
             mode: ['pro', 'easy'].includes(parsed.mode) ? parsed.mode : 'pro',
             theme: ['dark', 'light'].includes(parsed.theme) ? parsed.theme : 'dark',
+            uiFontId: typeof parsed.uiFontId === 'string' && parsed.uiFontId ? parsed.uiFontId : DEFAULT_UI_FONT_ID,
             buttonLabelMode: ['text', 'icon-text', 'icon'].includes(parsed.buttonLabelMode) ? parsed.buttonLabelMode : 'icon-text',
             compactTransportControls: typeof parsed.compactTransportControls === 'boolean' ? parsed.compactTransportControls : false
           };
         } catch {
-          return { mode: 'pro', theme: 'dark', buttonLabelMode: 'icon-text', compactTransportControls: false };
+          return { mode: 'pro', theme: 'dark', uiFontId: DEFAULT_UI_FONT_ID, buttonLabelMode: 'icon-text', compactTransportControls: false };
         }
       }
 
@@ -4798,6 +6722,7 @@
         const next = {
           mode: ['pro', 'easy'].includes(settings.mode) ? settings.mode : 'pro',
           theme: ['dark', 'light'].includes(settings.theme) ? settings.theme : 'dark',
+          uiFontId: typeof settings.uiFontId === 'string' && settings.uiFontId ? settings.uiFontId : DEFAULT_UI_FONT_ID,
           buttonLabelMode: ['text', 'icon-text', 'icon'].includes(settings.buttonLabelMode) ? settings.buttonLabelMode : 'icon-text',
           compactTransportControls: typeof settings.compactTransportControls === 'boolean' ? settings.compactTransportControls : false
         };
@@ -4805,10 +6730,12 @@
         document.body.dataset.uiMode = next.mode;
         document.body.dataset.theme = next.theme;
         document.body.dataset.buttonLabelMode = next.buttonLabelMode;
+        applyUiFontSelection(next.uiFontId);
         customVideoControls?.classList.toggle('controls-compact', Boolean(next.compactTransportControls));
 
         if (configModeSelect) configModeSelect.value = next.mode;
         if (configThemeSelect) configThemeSelect.value = next.theme;
+        if (configUiFontSelect) configUiFontSelect.value = uiFontRegistry.has(next.uiFontId) ? next.uiFontId : DEFAULT_UI_FONT_ID;
         if (configButtonLabelsSelect) configButtonLabelsSelect.value = next.buttonLabelMode;
         if (transportCompactBtn) {
           transportCompactBtn.classList.toggle('is-active', Boolean(next.compactTransportControls));
@@ -4816,7 +6743,36 @@
           transportCompactBtn.setAttribute('aria-label', next.compactTransportControls ? 'Expand video controls' : 'Minimize video controls');
         }
         if (transportLabelModeBtn) {
-          transportLabelModeBtn.setAttribute('aria-label', `Button labels: ${next.buttonLabelMode}`);
+          const modeCopy = {
+            text: {
+              label: 'Text',
+              description: 'text only',
+              next: 'icon and text'
+            },
+            'icon-text': {
+              label: 'Icon + text',
+              description: 'icon and text',
+              next: 'icons only'
+            },
+            icon: {
+              label: 'Icons',
+              description: 'icons only',
+              next: 'text only'
+            }
+          };
+          const currentModeCopy =
+            modeCopy[next.buttonLabelMode] || modeCopy['icon-text'];
+
+          setCommandButtonVisual(
+            transportLabelModeBtn,
+            currentModeCopy.label,
+            'labels',
+            `Button labels: ${currentModeCopy.description}. Click for ${currentModeCopy.next}.`
+          );
+          transportLabelModeBtn.title =
+            `Button labels: ${currentModeCopy.description}. Click for ${currentModeCopy.next}.`;
+          transportLabelModeBtn.dataset.labelMode =
+            next.buttonLabelMode;
         }
         localStorage.setItem(APP_SETTINGS_LOCAL_KEY, JSON.stringify(next));
         syncEasyToolbarControls();
@@ -4873,7 +6829,6 @@
 
     /* Apply icon/text structure to static command buttons while preserving existing handlers and IDs. */
       function hydrateCommandButtons() {
-        setCommandButtonVisual(newProjectBtn, 'New', 'new', 'Create project');
         setCommandButtonVisual(editProjectBtn, 'Edit', 'edit', 'Edit project');
         setCommandButtonVisual(addProjectVideoBtn, 'Add video', 'add-video', 'Add video');
         setCommandButtonVisual(videosTabBtn, 'Videos', 'videos', 'Show videos panel');
@@ -4898,8 +6853,19 @@
       function cycleButtonLabelMode() {
         const current = readAppSettings();
         const order = ['text', 'icon-text', 'icon'];
-        const nextMode = order[(order.indexOf(current.buttonLabelMode) + 1) % order.length] || 'icon-text';
-        applyAppSettings({ ...current, buttonLabelMode: nextMode });
+        const currentIndex = order.indexOf(
+          current.buttonLabelMode
+        );
+        const nextMode = order[
+          currentIndex >= 0
+            ? (currentIndex + 1) % order.length
+            : 1
+        ];
+
+        applyAppSettings({
+          ...current,
+          buttonLabelMode: nextMode
+        });
       }
 
     /* Toggle the transport bar between full controls and a compact icon-only control strip. */
@@ -4921,6 +6887,7 @@
       function openConfigOverlay() {
         if (!configOverlay) return;
         applyAppSettings(readAppSettings());
+        void loadUiFontChoices();
         configOverlay.setAttribute('aria-hidden', 'false');
         configOverlay.classList.add('open');
         requestAnimationFrame(() => configModeSelect?.focus({ preventScroll: true }));
@@ -5316,6 +7283,97 @@
         });
       }
 
+      async function dbDeleteProjectData(projectId, blobIds = []) {
+        const db = await openProjectDb();
+        const uniqueBlobIds = [...new Set((blobIds || []).filter(Boolean))];
+
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(
+            [PROJECT_STORE_NAME, PROJECT_BLOB_STORE_NAME],
+            'readwrite'
+          );
+          const projectStore = tx.objectStore(PROJECT_STORE_NAME);
+          const blobStore = tx.objectStore(PROJECT_BLOB_STORE_NAME);
+
+          uniqueBlobIds.forEach(blobId => blobStore.delete(blobId));
+          projectStore.delete(projectId);
+
+          tx.oncomplete = () => resolve({ deletedBlobCount: uniqueBlobIds.length });
+          tx.onerror = () => reject(tx.error || new Error('Could not delete the project data.'));
+          tx.onabort = () => reject(tx.error || new Error('Could not delete the project data.'));
+        });
+      }
+
+      function collectProjectBlobIds(project) {
+        const blobIds = new Set();
+        const seen = new Set();
+
+        function visit(value, keyName = '') {
+          if (value == null) return;
+          if (typeof value === 'string') {
+            if (/blobid$/i.test(keyName) && value) blobIds.add(value);
+            return;
+          }
+          if (typeof value !== 'object' || seen.has(value)) return;
+          seen.add(value);
+
+          if (Array.isArray(value)) {
+            value.forEach(item => visit(item, keyName));
+            return;
+          }
+
+          Object.entries(value).forEach(([key, item]) => visit(item, key));
+        }
+
+        visit(project);
+        return [...blobIds];
+      }
+
+      function collectProjectDiskFilenames(project) {
+        const filenames = new Set();
+        const assets = Array.isArray(project?.assets) ? project.assets : [];
+
+        function addFilename(value) {
+          const filename = String(value || '').trim();
+          if (filename) filenames.add(filename);
+        }
+
+        assets.forEach(asset => {
+          addFilename(asset.serverOutputFilename);
+          addFilename(asset.revealedOutputFilename);
+          addFilename(getOutputFilenameFromUrl(asset.serverOutputUrl || ''));
+
+          const sourceFilename = String(asset.publishDraft?.sourceFilename || '').trim();
+          if (sourceFilename && (
+            sourceFilename === asset.serverOutputFilename
+            || sourceFilename === asset.revealedOutputFilename
+          )) {
+            addFilename(sourceFilename);
+          }
+        });
+
+        return [...filenames];
+      }
+
+      function removeProjectLocalMirrors(project) {
+        const projectId = String(project?.id || '');
+        if (!projectId) return;
+
+        localStorage.removeItem(projectVisualSettingsStorageKey(projectId));
+
+        const trimPrefix = `${PROJECT_ASSET_TRIM_LOCAL_PREFIX}${projectId}:`;
+        const keysToRemove = [];
+        for (let index = 0; index < localStorage.length; index += 1) {
+          const key = localStorage.key(index);
+          if (key?.startsWith(trimPrefix)) keysToRemove.push(key);
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+
+        if (localStorage.getItem(PROJECT_LAST_KEY) === projectId) {
+          localStorage.removeItem(PROJECT_LAST_KEY);
+        }
+      }
+
       async function saveCurrentProject() {
         if (!currentProject) return;
         persistCurrentAssetTrimSettings({ force: true });
@@ -5440,6 +7498,87 @@
         return currentProject;
       }
 
+      async function deleteCurrentProject() {
+        if (!currentProject) return;
+
+        const projectToDelete = currentProject;
+        const projectName = String(projectToDelete.name || 'Untitled project');
+        const assetCount = Array.isArray(projectToDelete.assets)
+          ? projectToDelete.assets.length
+          : 0;
+
+        const firstConfirmation = await openConfirmModal({
+          title: 'Delete project?',
+          description: `Delete “${projectName}” and all data related to it? This includes ${assetCount} project ${assetCount === 1 ? 'video' : 'videos'}, thumbnails, saved captions, generated outputs, revealed copies, and project-tagged temporary files.`,
+          confirmText: 'OK',
+          cancelText: 'Cancel',
+          danger: true
+        });
+        if (!firstConfirmation) return;
+
+        const finalConfirmation = await openConfirmModal({
+          title: 'Are you absolutely sure?',
+          description: `This is the final confirmation for “${projectName}”. The project and its related files cannot be restored after deletion.`,
+          confirmText: 'OK',
+          cancelText: 'Cancel',
+          danger: true
+        });
+        if (!finalConfirmation) return;
+
+        const blobIds = collectProjectBlobIds(projectToDelete);
+        const diskFilenames = collectProjectDiskFilenames(projectToDelete);
+
+        clearTimeout(projectAssetTrimSettingsSaveTimer);
+        projectAssetTrimSettingsSaveTimer = null;
+        clearTimeout(projectVisualSettingsSaveTimer);
+        projectVisualSettingsSaveTimer = null;
+        projectVisualSettingsPending = null;
+
+        showStatus('info', `Deleting project <strong>${escapeHtml(projectName)}</strong> and related files…`);
+
+        try {
+          const cleanupResponse = await fetch('/api/delete_project_files', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              project_id: projectToDelete.id,
+              filenames: diskFilenames
+            })
+          });
+          const cleanupData = await cleanupResponse.json().catch(() => ({}));
+          if (!cleanupResponse.ok || !cleanupData.ok) {
+            throw new Error(cleanupData.error || 'Could not remove project files from application storage.');
+          }
+
+          const localDeletion = await dbDeleteProjectData(projectToDelete.id, blobIds);
+          removeProjectLocalMirrors(projectToDelete);
+
+          currentProject = null;
+          lastProjectVisualSettingsJson = '';
+          lastProjectAssetTrimSettingsJson = '';
+          clearProjectWorkspaceState();
+          await refreshProjectList('');
+
+          const nextProject = projectListCache[0] || null;
+          if (nextProject) {
+            await loadProject(nextProject.id, { loadSelected: true });
+          } else {
+            renderProjectPanel();
+            updateMeta();
+            refreshGui();
+          }
+
+          const deletedFiles = Number(cleanupData.deleted_files || 0);
+          const deletedBlobs = Number(localDeletion?.deletedBlobCount || 0);
+          showStatus(
+            'ok',
+            `Deleted project: <strong>${escapeHtml(projectName)}</strong>. Removed ${deletedBlobs} stored project ${deletedBlobs === 1 ? 'file' : 'files'} and ${deletedFiles} application ${deletedFiles === 1 ? 'file' : 'files'}.`
+          );
+        } catch (error) {
+          showStatus('err', error.message || 'Could not delete the project.');
+        }
+      }
+
       async function editCurrentProject() {
         if (!currentProject) {
           await createProject();
@@ -5453,6 +7592,11 @@
         });
 
         if (!values) return;
+
+        if (values.__modalAction === 'delete-project') {
+          await deleteCurrentProject();
+          return;
+        }
 
         currentProject.name = String(values.name || 'Untitled project').trim() || 'Untitled project';
         currentProject.description = String(values.description || '').trim();
@@ -11066,8 +13210,21 @@ function markCaptionsDirty() {
   updateCaptionsEditorMeta();
 }
 
+function autosizeCaptionTextarea(textArea) {
+  if (!textArea) return;
+  textArea.style.height = 'auto';
+  const minimum = 40;
+  const maximum = 132;
+  const nextHeight = Math.max(minimum, Math.min(maximum, textArea.scrollHeight));
+  textArea.style.height = `${nextHeight}px`;
+  textArea.style.overflowY = textArea.scrollHeight > maximum ? 'auto' : 'hidden';
+}
+
 function renderCaptionsEditor(options = {}) {
   if (!captionEditorList) return;
+
+  const preservedScrollTop = captionEditorList.scrollTop;
+  const preserveScroll = options.preserveScroll !== false;
 
   updateCaptionsEditorMeta();
 
@@ -11179,7 +13336,10 @@ function renderCaptionsEditor(options = {}) {
       seekPreviewToCaptionEditorRow(Math.min(index, subtitleCues.length - 1), { scroll: true, instant: true });
     });
 
-    textArea.addEventListener('input', updateCueFromInputs);
+    textArea.addEventListener('input', () => {
+      updateCueFromInputs();
+      autosizeCaptionTextarea(textArea);
+    });
 
     seekButton.addEventListener('click', () => {
       seekPreviewToCaptionEditorRow(index, { scroll: true });
@@ -11198,11 +13358,21 @@ function renderCaptionsEditor(options = {}) {
 
     row.append(top, textArea, rowActions);
     captionEditorList.append(row);
+    autosizeCaptionTextarea(textArea);
   });
 
-if (options.followActive) {
-  requestAnimationFrame(() => scrollCaptionRowIntoView(activeIndex, { force: Boolean(options.force), instant: Boolean(options.instant) }));
-}
+  if (preserveScroll) {
+    captionEditorList.scrollTop = preservedScrollTop;
+  }
+
+  if (options.followActive) {
+    requestAnimationFrame(() => {
+      scrollCaptionRowIntoView(activeIndex, {
+        force: Boolean(options.force),
+        instant: Boolean(options.instant)
+      });
+    });
+  }
 }
 
 function clearCaptionsEditorState() {
@@ -11585,18 +13755,42 @@ function scrollCaptionRowIntoView(index, options = {}) {
 
   const containerRect = captionEditorList.getBoundingClientRect();
   const rowRect = row.getBoundingClientRect();
-  const comfortableTop = containerRect.top + 42;
-  const comfortableBottom = containerRect.bottom - 42;
-  const isComfortablyVisible = rowRect.top >= comfortableTop && rowRect.bottom <= comfortableBottom;
-
-  if (!force && isComfortablyVisible && index === lastActiveCaptionIndex) return;
+  const padding = 18;
+  const comfortableTop = containerRect.top + padding;
+  const comfortableBottom = containerRect.bottom - padding;
+  const isComfortablyVisible =
+    rowRect.top >= comfortableTop &&
+    rowRect.bottom <= comfortableBottom;
 
   lastActiveCaptionIndex = index;
-  const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
-  row.scrollIntoView({
-    block: 'center',
-    inline: 'nearest',
-    behavior: prefersReducedMotion || options.instant ? 'auto' : 'smooth'
+
+  // Do not recenter every successive cue. Keep the list still while the next
+  // cue is already visible, and move only enough to reveal a clipped row.
+  if (isComfortablyVisible) return;
+
+  let nextScrollTop = captionEditorList.scrollTop;
+
+  if (rowRect.top < comfortableTop) {
+    nextScrollTop += rowRect.top - comfortableTop;
+  } else if (rowRect.bottom > comfortableBottom) {
+    nextScrollTop += rowRect.bottom - comfortableBottom;
+  }
+
+  const maximumScrollTop = Math.max(
+    0,
+    captionEditorList.scrollHeight - captionEditorList.clientHeight
+  );
+  nextScrollTop = Math.max(0, Math.min(maximumScrollTop, nextScrollTop));
+
+  const prefersReducedMotion =
+    window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+
+  captionEditorList.scrollTo({
+    top: nextScrollTop,
+    behavior:
+      prefersReducedMotion || options.instant || !options.smooth
+        ? 'auto'
+        : 'smooth'
   });
 }
 
@@ -11641,7 +13835,11 @@ function showCurrentCaptionRow(options = {}) {
   const currentMs = Math.max(0, Math.floor((previewVideo.currentTime || 0) * 1000));
   const activeIndex = getActiveSubtitleCueIndex(currentMs);
   updateCaptionEditorFollowControls(activeIndex);
-  scrollCaptionRowIntoView(activeIndex, { force: true, ...options });
+  scrollCaptionRowIntoView(activeIndex, {
+    force: true,
+    smooth: !options.instant,
+    ...options
+  });
 }
 
 /* Escape text for safe helper HTML rendering. */
@@ -13734,6 +15932,22 @@ if (configThemeSelect) {
   configThemeSelect.addEventListener('change', () => applyAppSettings({ ...readAppSettings(), theme: configThemeSelect.value }));
 }
 
+if (configUiFontSelect) {
+  configUiFontSelect.addEventListener('change', () => {
+    applyAppSettings({
+      ...readAppSettings(),
+      uiFontId: configUiFontSelect.value || DEFAULT_UI_FONT_ID
+    });
+  });
+}
+
+if (configUiFontRefreshBtn) {
+  configUiFontRefreshBtn.addEventListener('click', async () => {
+    await loadUiFontChoices({ force: true });
+    showStatus('ok', `UI fonts rescanned: <strong>${uiFontRegistry.size}</strong> ${uiFontRegistry.size === 1 ? 'family' : 'families'} found.`);
+  });
+}
+
 if (configButtonLabelsSelect) {
   configButtonLabelsSelect.addEventListener('change', () => applyAppSettings({ ...readAppSettings(), buttonLabelMode: configButtonLabelsSelect.value }));
 }
@@ -14449,13 +16663,7 @@ if (trimClearDraftBtn) {
 }
 
 if (statusToggleBtn) {
-  statusToggleBtn.addEventListener('click', () => {
-    const hidden = !statusEl.classList.contains('is-user-hidden');
-    statusEl.classList.toggle('is-user-hidden', hidden);
-    statusToggleBtn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
-    statusToggleBtn.setAttribute('aria-label', hidden ? 'Show status' : 'Hide status');
-    statusToggleBtn.innerHTML = `<span class="icon-mask ${hidden ? 'icon-show' : 'icon-hide'}" aria-hidden="true"></span>`;
-  });
+  statusToggleBtn.addEventListener('click', clearStatus);
 }
 
 if (appRoot && sidebarDockToggle && sidebarDockShowToggle) {
@@ -14648,7 +16856,10 @@ previewVideo.addEventListener('timeupdate', () => {
     }
 
     window.clearTimeout(captionsRenderQueued);
-    captionsRenderQueued = window.setTimeout(() => renderCaptionsEditor({ followActive: true }), 120);
+    captionsRenderQueued = window.setTimeout(() => {
+      updateCaptionRowsActiveState(activeIndex);
+      scrollCaptionRowIntoView(activeIndex);
+    }, 80);
   }
 });
 
@@ -14666,7 +16877,11 @@ previewVideo.addEventListener('seeked', () => {
     return;
   }
 
-  renderCaptionsEditor({ followActive: true, force: true });
+  updateCaptionRowsActiveState(activeIndex);
+  scrollCaptionRowIntoView(activeIndex, {
+    force: true,
+    instant: true
+  });
 });
 
 /* Refresh native preview when playback is paused at a subtitle boundary. */
@@ -14788,6 +17003,7 @@ resetBtn.addEventListener('click', resetUI);
 /* Restore cached source-video metadata on startup so the UI shows that a reusable video already exists. */
 cachedVideoMeta = readCachedVideoMetaFromStorage();
 hydrateCommandButtons();
+await loadUiFontChoices();
 applyAppSettings(readAppSettings());
 syncRangeFillStyles();
 await loadPresets();
@@ -14796,5 +17012,315 @@ updateMeta();
 syncAudioMixState();
 applyHelperPreview();
 </script>
+
+<script>
+(() => {
+  const trimPanelNode = document.getElementById('trimPanel');
+  const syncTrimPanelReservation = () => {
+    if (!trimPanelNode) return;
+    const visible = trimPanelNode.classList.contains('show') &&
+      getComputedStyle(trimPanelNode).display !== 'none';
+    const reserved = visible
+      ? Math.ceil(trimPanelNode.getBoundingClientRect().height) + 8
+      : 0;
+    document.documentElement.style.setProperty(
+      '--trim-panel-reserved-height',
+      `${reserved}px`,
+    );
+  };
+
+  if (trimPanelNode) {
+    new MutationObserver(syncTrimPanelReservation).observe(trimPanelNode, {
+      attributes: true,
+      attributeFilter: ['class', 'style'],
+    });
+    if ('ResizeObserver' in window) {
+      new ResizeObserver(syncTrimPanelReservation).observe(trimPanelNode);
+    }
+    window.addEventListener('resize', syncTrimPanelReservation, { passive: true });
+    requestAnimationFrame(syncTrimPanelReservation);
+  }
+
+  const selectionMeta = document.getElementById('selectionMeta');
+  const syncSelectionMetaTitle = () => {
+    if (selectionMeta) selectionMeta.title = selectionMeta.textContent.trim();
+  };
+  if (selectionMeta) {
+    new MutationObserver(syncSelectionMetaTitle).observe(selectionMeta, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+    syncSelectionMetaTitle();
+  }
+
+  const logsButton = document.getElementById('appLogsButton');
+  const overlay = document.getElementById('appLogOverlay');
+  const output = document.getElementById('appLogOutput');
+  const pathNode = document.getElementById('appLogPath');
+  const closeButton = document.getElementById('appLogClose');
+  const refreshButton = document.getElementById('appLogRefresh');
+  const revealButton = document.getElementById('appLogReveal');
+  const copyButton = document.getElementById('appLogCopy');
+  const integrityPanel = document.getElementById('appIntegrityPanel');
+  const integrityAllButton = document.getElementById('appIntegrityAll');
+  const integrityMediaButton = document.getElementById('appIntegrityMedia');
+  const integrityCaptionsButton = document.getElementById('appIntegrityCaptions');
+  const integrityCopyButton = document.getElementById('appIntegrityCopy');
+  let latestIntegrityReport = null;
+  let integrityHasRun = false;
+
+  if (!logsButton || !overlay || !output || !pathNode) return;
+
+  async function refreshLogs() {
+    output.textContent = 'Loading…';
+    try {
+      const response = await fetch('/api/app_logs', { cache: 'no-store' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || `Unable to load logs (${response.status}).`);
+      }
+      pathNode.textContent = data.path || '';
+      output.textContent = (data.lines || []).join('\n') || 'No log entries yet.';
+      output.scrollTop = output.scrollHeight;
+    } catch (error) {
+      pathNode.textContent = 'Log endpoint unavailable';
+      output.textContent = `Log error: ${error.message || error}`;
+    }
+  }
+
+
+  function escapeIntegrityHtml(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function integrityReportText(report) {
+    if (!report) return 'No integrity report has been generated.';
+    const summary = report.summary || {};
+    const platformInfo = report.platform || {};
+    const lines = [
+      `Caption Animator component integrity report`,
+      `Generated: ${report.generated_at || ''}`,
+      `Scope: ${report.scope || 'all'}`,
+      `Overall: ${(summary.overall || 'unknown').toUpperCase()}`,
+      `Passed: ${summary.passed || 0}; Warnings: ${summary.warnings || 0}; Errors: ${summary.errors || 0}`,
+      `Platform: ${platformInfo.system || ''} ${platformInfo.release || ''} ${platformInfo.machine || ''}; Python ${platformInfo.python || ''}`,
+      '',
+    ];
+
+    for (const check of report.checks || []) {
+      lines.push(`[${String(check.status || 'unknown').toUpperCase()}] ${check.label || check.id}`);
+      if (check.detail) lines.push(`  ${check.detail}`);
+      if (check.version) lines.push(`  Version: ${check.version}`);
+      if (check.path) lines.push(`  Path: ${check.path}`);
+      if (check.help) lines.push(`  Help: ${check.help}`);
+      lines.push('');
+    }
+    return lines.join('\n').trim();
+  }
+
+  function renderIntegrityReport(report) {
+    if (!integrityPanel) return;
+    latestIntegrityReport = report;
+
+    const summary = report?.summary || {};
+    const platformInfo = report?.platform || {};
+    const checks = Array.isArray(report?.checks) ? report.checks : [];
+    const overall = summary.overall || (report?.ok ? 'ok' : 'error');
+
+    const itemsHtml = checks.map(check => `
+      <article class="app-integrity-item" data-status="${escapeIntegrityHtml(check.status || 'warning')}">
+        <span class="app-integrity-dot" aria-hidden="true"></span>
+        <div>
+          <div class="app-integrity-name">${escapeIntegrityHtml(check.label || check.id || 'Component')}</div>
+          <div class="app-integrity-detail">${escapeIntegrityHtml(check.detail || '')}</div>
+          ${check.path ? `<div class="app-integrity-path">${escapeIntegrityHtml(check.path)}</div>` : ''}
+          ${check.help ? `<div class="app-integrity-help"><strong>Help:</strong> ${escapeIntegrityHtml(check.help)}</div>` : ''}
+        </div>
+      </article>
+    `).join('');
+
+    integrityPanel.innerHTML = `
+      <div class="app-integrity-summary" data-status="${escapeIntegrityHtml(overall)}">
+        <span>${overall === 'ok' ? 'All required checks passed' : overall === 'warning' ? 'Checks completed with warnings' : 'Required components need attention'}</span>
+        <span>✓ ${Number(summary.passed || 0)}</span>
+        <span>⚠ ${Number(summary.warnings || 0)}</span>
+        <span>✕ ${Number(summary.errors || 0)}</span>
+        <span class="app-integrity-platform">${escapeIntegrityHtml(
+          `${platformInfo.system || ''} ${platformInfo.release || ''} · ${platformInfo.machine || ''} · Python ${platformInfo.python || ''}`
+        )}</span>
+      </div>
+      <div class="app-integrity-list">${itemsHtml || '<div class="app-integrity-empty">No checks returned.</div>'}</div>
+    `;
+  }
+
+  function setIntegrityButtonsBusy(busy) {
+    const buttons = [
+      integrityAllButton,
+      integrityMediaButton,
+      integrityCaptionsButton,
+      integrityCopyButton,
+    ].filter(Boolean);
+    for (const button of buttons) {
+      button.disabled = busy;
+    }
+    integrityPanel?.classList.toggle('integrity-check-running', busy);
+  }
+
+  async function runIntegrityCheck(scope = 'all') {
+    if (!integrityPanel) return;
+    setIntegrityButtonsBusy(true);
+    integrityPanel.innerHTML = '<div class="app-integrity-loading">Checking installed components…</div>';
+
+    try {
+      const response = await fetch('/api/integrity-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope }),
+      });
+      const report = await response.json().catch(() => ({}));
+      if (!response.ok && !Array.isArray(report.checks)) {
+        throw new Error(report.error || `Integrity check failed (${response.status}).`);
+      }
+      integrityHasRun = true;
+      renderIntegrityReport(report);
+      await refreshLogs();
+    } catch (error) {
+      integrityHasRun = true;
+      renderIntegrityReport({
+        ok: false,
+        scope,
+        generated_at: new Date().toLocaleString(),
+        summary: {
+          overall: 'error',
+          passed: 0,
+          warnings: 0,
+          errors: 1,
+          total: 1
+        },
+        platform: {
+          system: navigator.platform || 'macOS',
+          release: '',
+          machine: '',
+          python: ''
+        },
+        checks: [{
+          id: 'integrity-check',
+          label: 'Integrity check',
+          status: 'error',
+          detail: error.message || String(error),
+          help: 'Restart the application. If the problem continues, reveal the application log and send it to support.',
+          path: '',
+          version: '',
+          required: true
+        }]
+      });
+    } finally {
+      setIntegrityButtonsBusy(false);
+    }
+  }
+
+  function openLogs() {
+    overlay.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+    refreshLogs();
+    if (!integrityHasRun) {
+      void runIntegrityCheck('all');
+    }
+  }
+
+  function closeLogs() {
+    overlay.classList.remove('open');
+    overlay.setAttribute('aria-hidden', 'true');
+    logsButton.focus();
+  }
+
+  logsButton.addEventListener('click', openLogs);
+  closeButton?.addEventListener('click', closeLogs);
+  refreshButton?.addEventListener('click', refreshLogs);
+  revealButton?.addEventListener('click', async () => {
+    try {
+      const response = await fetch('/api/reveal_app_logs', { method: 'POST' });
+      if (!response.ok) throw new Error(`Request failed (${response.status}).`);
+    } catch (error) {
+      output.textContent += `\nReveal error: ${error.message || error}`;
+    }
+  });
+  copyButton?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(output.textContent || '');
+    } catch (error) {
+      output.textContent += `\nCopy error: ${error.message || error}`;
+    }
+  });
+
+  integrityAllButton?.addEventListener('click', () => runIntegrityCheck('all'));
+  integrityMediaButton?.addEventListener('click', () => runIntegrityCheck('media'));
+  integrityCaptionsButton?.addEventListener('click', () => runIntegrityCheck('captions'));
+  integrityCopyButton?.addEventListener('click', async () => {
+    try {
+      if (!latestIntegrityReport) {
+        await runIntegrityCheck('all');
+      }
+      await navigator.clipboard.writeText(
+        integrityReportText(latestIntegrityReport)
+      );
+    } catch (error) {
+      output.textContent += `\nIntegrity report copy error: ${error.message || error}`;
+    }
+  });
+
+  overlay.addEventListener('click', event => {
+    if (event.target === overlay) closeLogs();
+  });
+  window.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && overlay.classList.contains('open')) {
+      closeLogs();
+    }
+    if ((event.metaKey || event.ctrlKey) &&
+        event.altKey &&
+        event.key.toLowerCase() === 'l') {
+      event.preventDefault();
+      openLogs();
+    }
+  });
+})();
+</script>
+
+
+<script>
+(() => {
+  const badge = document.getElementById('appBuildBadge');
+  if (!badge) return;
+
+  const unresolved =
+    badge.textContent.trim().toLowerCase() === 'dev' ||
+    String(badge.dataset.version || '').includes('__APP_VERSION__') ||
+    String(badge.dataset.build || '').includes('__BUILD_NUMBER__');
+
+  if (!unresolved) return;
+
+  fetch(`/api/app-version?ts=${Date.now()}`, { cache: 'no-store' })
+    .then(response => response.json())
+    .then(payload => {
+      if (!payload?.ok) return;
+      badge.textContent = payload.badge || 'dev';
+      badge.title = payload.title || 'Development build';
+      badge.dataset.version = payload.version || '';
+      badge.dataset.build = payload.build || '';
+      badge.dataset.channel = payload.channel || 'dev';
+    })
+    .catch(() => {
+      badge.textContent = 'dev';
+      badge.title = 'Development build';
+    });
+})();
+</script>
+
 </body>
 </html>

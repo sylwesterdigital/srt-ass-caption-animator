@@ -17,6 +17,7 @@ import urllib.request
 import urllib.parse
 import zipfile
 import time
+import logging
 import hashlib
 
 
@@ -61,6 +62,104 @@ app = Flask(__name__, template_folder="templates")
 app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024 * 1024
 # Enable Flask template auto-reload during development so HTML changes are picked up without restarting.
 app.config["TEMPLATES_AUTO_RELOAD"] = True
+
+APP_DISPLAY_NAME = os.environ.get("CAPTION_ANIMATOR_APP_NAME", "Caption Animator")
+APP_LOG_PATH = os.environ.get(
+    "CAPTION_ANIMATOR_LOG_FILE",
+    os.path.join(os.path.expanduser("~/Library/Logs"), APP_DISPLAY_NAME, "app.log"),
+)
+APP_LOGGER = logging.getLogger("caption_animator")
+
+
+def _configure_app_logging():
+    try:
+        os.makedirs(os.path.dirname(APP_LOG_PATH), exist_ok=True)
+        level_name = os.environ.get("CAPTION_ANIMATOR_LOG_LEVEL", "INFO").upper()
+        level = getattr(logging, level_name, logging.INFO)
+        APP_LOGGER.setLevel(level)
+        APP_LOGGER.propagate = False
+
+        absolute_path = os.path.abspath(APP_LOG_PATH)
+        already_configured = any(
+            isinstance(handler, logging.FileHandler)
+            and os.path.abspath(getattr(handler, "baseFilename", "")) == absolute_path
+            for handler in APP_LOGGER.handlers
+        )
+        if not already_configured:
+            handler = logging.FileHandler(absolute_path, encoding="utf-8")
+            handler.setFormatter(
+                logging.Formatter(
+                    "%(asctime)s %(levelname)s %(name)s: %(message)s"
+                )
+            )
+            APP_LOGGER.addHandler(handler)
+
+        APP_LOGGER.info("Application logging ready: %s", absolute_path)
+    except Exception:
+        # Logging must never prevent the editor from starting.
+        pass
+
+
+_configure_app_logging()
+
+
+@app.before_request
+def _caption_animator_log_request_start():
+    request.environ["caption_animator.request_started"] = time.monotonic()
+
+
+@app.after_request
+def _caption_animator_log_request_end(response):
+    started = request.environ.get("caption_animator.request_started")
+    elapsed_ms = ((time.monotonic() - started) * 1000.0) if started else 0.0
+    APP_LOGGER.info(
+        "%s %s -> %s (%.1f ms)",
+        request.method,
+        request.full_path.rstrip("?"),
+        response.status_code,
+        elapsed_ms,
+    )
+    return response
+
+
+@app.route("/api/app_logs")
+def api_app_logs():
+    try:
+        log_path = os.path.abspath(APP_LOG_PATH)
+        if not os.path.isfile(log_path):
+            return jsonify({"ok": True, "path": log_path, "lines": []})
+
+        with open(log_path, "rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            size = handle.tell()
+            handle.seek(max(0, size - (512 * 1024)), os.SEEK_SET)
+            log_text = handle.read().decode("utf-8", errors="replace")
+
+        return jsonify({
+            "ok": True,
+            "path": log_path,
+            "lines": log_text.splitlines()[-500:],
+        })
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.route("/api/reveal_app_logs", methods=["POST"])
+def api_reveal_app_logs():
+    try:
+        log_path = os.path.abspath(APP_LOG_PATH)
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        if not os.path.exists(log_path):
+            open(log_path, "a", encoding="utf-8").close()
+
+        if platform.system() == "Darwin":
+            subprocess.Popen(["open", "-R", log_path])
+
+        return jsonify({"ok": True, "path": log_path})
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
 
 JOBS = {}
 # Manage uploaded custom fonts for browser preview and FFmpeg/libass rendering.
