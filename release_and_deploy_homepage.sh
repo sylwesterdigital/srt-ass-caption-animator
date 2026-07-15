@@ -209,18 +209,34 @@ if [[ -f "$STATE_FILE" ]]; then
     fi
 
     if [[ "$CURRENT_HEAD" != "${SOURCE_COMMIT:-}" && "$CURRENT_HEAD" != "${RELEASE_COMMIT:-}" ]]; then
-      # Recover the narrow crash window after the metadata commit but before the
-      # state file update.
-      PARENT="$(git rev-parse HEAD^ 2>/dev/null || true)"
-      HEAD_VERSION="$(git show HEAD:VERSION.txt 2>/dev/null | tr -d '[:space:]' || true)"
-      HEAD_BUILD="$(git show HEAD:BUILD_NUMBER.txt 2>/dev/null | tr -cd '0-9' || true)"
-      if [[ "$WORKFLOW_STAGE" == built && "$PARENT" == "$SOURCE_COMMIT" \
-            && "$HEAD_VERSION" == "$RELEASE_VERSION" && "$HEAD_BUILD" == "$RELEASE_BUILD" ]]; then
-        RELEASE_COMMIT="$CURRENT_HEAD"
-        state_write built
-        warn "Recovered state after the release metadata commit."
-      else
-        die "Incomplete state belongs to another commit. Finish it or use --restart deliberately."
+      PUBLISHED_DESCENDANT_RESUME=0
+
+      # Once GitHub publication has completed, the release artifacts are fixed
+      # to RELEASE_COMMIT. A later descendant commit may safely improve only
+      # the remaining homepage/deployment workflow without rebuilding or
+      # republishing the existing release.
+      if [[ "$WORKFLOW_STAGE" == published && -n "${RELEASE_COMMIT:-}" ]]; then
+        if git merge-base --is-ancestor "$RELEASE_COMMIT" "$CURRENT_HEAD"; then
+          PUBLISHED_DESCENDANT_RESUME=1
+          warn "Current HEAD is newer than published release commit $RELEASE_COMMIT."
+          warn "Resuming homepage only for the already-published $RELEASE_TAG; no build number will change."
+        fi
+      fi
+
+      if [[ "$PUBLISHED_DESCENDANT_RESUME" != 1 ]]; then
+        # Recover the narrow crash window after the metadata commit but before
+        # the state file update.
+        PARENT="$(git rev-parse HEAD^ 2>/dev/null || true)"
+        HEAD_VERSION="$(git show HEAD:VERSION.txt 2>/dev/null | tr -d '[:space:]' || true)"
+        HEAD_BUILD="$(git show HEAD:BUILD_NUMBER.txt 2>/dev/null | tr -cd '0-9' || true)"
+        if [[ "$WORKFLOW_STAGE" == built && "$PARENT" == "$SOURCE_COMMIT" \
+              && "$HEAD_VERSION" == "$RELEASE_VERSION" && "$HEAD_BUILD" == "$RELEASE_BUILD" ]]; then
+          RELEASE_COMMIT="$CURRENT_HEAD"
+          state_write built
+          warn "Recovered state after the release metadata commit."
+        else
+          die "Incomplete state belongs to another commit. Finish it or use --restart deliberately."
+        fi
       fi
     fi
 
