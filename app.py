@@ -3,6 +3,7 @@ from flask import Flask, request, send_from_directory, jsonify, render_template,
 
 from werkzeug.utils import secure_filename
 import os
+import sys
 import socket
 import re
 import html
@@ -20,6 +21,7 @@ import zipfile
 import time
 import logging
 import hashlib
+import importlib.metadata as importlib_metadata
 
 
 import platform
@@ -93,7 +95,9 @@ def _read_runtime_metadata(filename, fallback=""):
 def _runtime_version_metadata():
     version = (
         os.environ.get("CUT_APP_VERSION")
+        or os.environ.get("CUT_VERSION")
         or os.environ.get("CAPTION_ANIMATOR_APP_VERSION")
+        or os.environ.get("CAPTION_ANIMATOR_VERSION")
         or _read_runtime_metadata("VERSION.txt", "0.0.0")
     ).strip()
     build = (
@@ -220,9 +224,725 @@ def api_reveal_app_logs():
 
 
 
+def _integrity_item(
+    check_id,
+    label,
+    status,
+    detail,
+    *,
+    help_text="",
+    path_value="",
+    version="",
+    required=True,
+):
+    return {
+        "id": check_id,
+        "label": label,
+        "status": status,
+        "detail": str(detail or ""),
+        "help": str(help_text or ""),
+        "path": str(path_value or ""),
+        "version": str(version or ""),
+        "required": bool(required),
+    }
+
+
+def _integrity_run(command, timeout=10):
+    try:
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+        output = "\n".join(
+            part.strip()
+            for part in (
+                completed.stdout or "",
+                completed.stderr or "",
+            )
+            if part and part.strip()
+        ).strip()
+        return {
+            "ok": completed.returncode == 0,
+            "returncode": completed.returncode,
+            "output": output[-16000:],
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "ok": False,
+            "returncode": None,
+            "output": f"Timed out after {timeout} seconds.",
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "returncode": None,
+            "output": str(exc),
+        }
+
+
+def _integrity_first_line(value):
+    text_value = str(value or "").strip()
+    return text_value.splitlines()[0] if text_value else ""
+
+
+def _integrity_tool(name):
+    candidates = []
+    if name == "ffmpeg" and FFMPEG_BIN:
+        candidates.append(FFMPEG_BIN)
+    if name == "ffprobe" and FFPROBE_BIN:
+        candidates.append(FFPROBE_BIN)
+
+    packaged_bin = globals().get("PACKAGED_BIN_DIR")
+    if packaged_bin:
+        candidates.append(os.path.join(packaged_bin, name))
+
+    resource_root = globals().get("RESOURCE_ROOT", APP_ROOT)
+    candidates.append(os.path.join(resource_root, "bin", name))
+    candidates.append(shutil.which(name))
+
+    seen = set()
+    for candidate in candidates:
+        if not candidate:
+            continue
+        absolute = os.path.abspath(
+            os.path.expanduser(str(candidate))
+        )
+        if absolute in seen:
+            continue
+        seen.add(absolute)
+        if not os.path.isfile(absolute):
+            continue
+        try:
+            current_mode = os.stat(absolute).st_mode
+            os.chmod(
+                absolute,
+                current_mode
+                | stat.S_IXUSR
+                | stat.S_IXGRP
+                | stat.S_IXOTH,
+            )
+        except Exception:
+            pass
+        if os.access(absolute, os.X_OK):
+            return absolute
+    return None
+
+
+def _integrity_package_version(package_name):
+    try:
+        return importlib_metadata.version(package_name)
+    except Exception:
+        return ""
+
+
+def _integrity_storage_checks():
+    data_root = globals().get("DATA_ROOT", APP_ROOT)
+    folders = (
+        ("Application data", data_root),
+        ("Uploads", UPLOAD_DIR),
+        ("Outputs", OUTPUT_DIR),
+        ("UI fonts", UI_FONTS_DIR),
+        ("Tools", TOOLS_DIR),
+    )
+
+    failures = []
+    for label, folder in folders:
+        try:
+            os.makedirs(folder, exist_ok=True)
+            probe = os.path.join(
+                folder,
+                f".caption-animator-write-check-{os.getpid()}",
+            )
+            with open(probe, "w", encoding="utf-8") as handle:
+                handle.write("ok")
+            os.remove(probe)
+        except Exception as exc:
+            failures.append(f"{label}: {exc}")
+
+    if failures:
+        item = _integrity_item(
+            "storage",
+            "Application storage",
+            "error",
+            "One or more application folders are not writable.",
+            help_text=(
+                "Check free disk space and macOS folder permissions. "
+                "Keep the application in /Applications and restart it."
+            ),
+            path_value=data_root,
+        )
+        item["technical"] = failures
+        return [item]
+
+    return [
+        _integrity_item(
+            "storage",
+            "Application storage",
+            "ok",
+            "Required application folders are writable.",
+            path_value=data_root,
+        )
+    ]
+
+
+def _integrity_ffmpeg_checks():
+    ffmpeg = _integrity_tool("ffmpeg")
+    if not ffmpeg:
+        return [
+            _integrity_item(
+                "ffmpeg",
+                "FFmpeg",
+                "error",
+                "FFmpeg was not found or is not executable.",
+                help_text=(
+                    "Reinstall Cut from the signed DMG. "
+                    "FFmpeg is included in the application."
+                ),
+            )
+        ]
+
+    results = []
+    version_result = _integrity_run(
+        [ffmpeg, "-hide_banner", "-version"],
+        timeout=8,
+    )
+    version_line = _integrity_first_line(
+        version_result["output"]
+    )
+    results.append(
+        _integrity_item(
+            "ffmpeg",
+            "FFmpeg",
+            "ok" if version_result["ok"] else "error",
+            version_line or "FFmpeg executable found.",
+            help_text=(
+                ""
+                if version_result["ok"]
+                else "The bundled FFmpeg executable could not start. "
+                "Reinstall the application."
+            ),
+            path_value=ffmpeg,
+            version=version_line,
+        )
+    )
+    if not version_result["ok"]:
+        return results
+
+    filters_result = _integrity_run(
+        [ffmpeg, "-hide_banner", "-filters"],
+        timeout=12,
+    )
+    filters_text = filters_result["output"].lower()
+    has_caption_filter = bool(
+        re.search(r"(?m)^\s*[.A-Z|]{3,}\s+(ass|subtitles)\s", filters_text)
+        or re.search(r"\bsubtitles\b", filters_text)
+        or re.search(r"\bass\b", filters_text)
+    )
+    results.append(
+        _integrity_item(
+            "ffmpeg-caption-filters",
+            "Caption rendering filters",
+            "ok" if has_caption_filter else "error",
+            (
+                "FFmpeg includes ASS/subtitle rendering support."
+                if has_caption_filter
+                else "The FFmpeg build does not expose ASS/subtitle filters."
+            ),
+            help_text=(
+                ""
+                if has_caption_filter
+                else "Use a full FFmpeg build compiled with libass."
+            ),
+            path_value=ffmpeg,
+        )
+    )
+
+    encoders_result = _integrity_run(
+        [ffmpeg, "-hide_banner", "-encoders"],
+        timeout=12,
+    )
+    encoders_text = encoders_result["output"].lower()
+    missing = [
+        encoder
+        for encoder in ("libx264", "aac")
+        if not re.search(
+            rf"\b{re.escape(encoder)}\b",
+            encoders_text,
+        )
+    ]
+    results.append(
+        _integrity_item(
+            "ffmpeg-encoders",
+            "Video export encoders",
+            "ok" if not missing else "error",
+            (
+                "H.264 and AAC export encoders are available."
+                if not missing
+                else "Missing encoder(s): " + ", ".join(missing)
+            ),
+            help_text=(
+                ""
+                if not missing
+                else "Reinstall the application with a full FFmpeg build."
+            ),
+            path_value=ffmpeg,
+        )
+    )
+    return results
+
+
+def _integrity_ffprobe_checks():
+    ffprobe = _integrity_tool("ffprobe")
+    if not ffprobe:
+        return [
+            _integrity_item(
+                "ffprobe",
+                "FFprobe",
+                "error",
+                "FFprobe was not found or is not executable.",
+                help_text=(
+                    "Reinstall Cut. FFprobe is included "
+                    "and is required to inspect imported media."
+                ),
+            )
+        ]
+
+    result = _integrity_run(
+        [ffprobe, "-hide_banner", "-version"],
+        timeout=8,
+    )
+    version_line = _integrity_first_line(result["output"])
+    return [
+        _integrity_item(
+            "ffprobe",
+            "FFprobe",
+            "ok" if result["ok"] else "error",
+            version_line or "FFprobe executable found.",
+            help_text=(
+                ""
+                if result["ok"]
+                else "The bundled FFprobe executable could not start."
+            ),
+            path_value=ffprobe,
+            version=version_line,
+        )
+    ]
+
+
+def _integrity_caption_checks():
+    results = []
+
+    package_checks = (
+        (
+            "pysubs2",
+            "pysubs2",
+            "Caption timing and subtitle conversion",
+        ),
+        (
+            "fonttools",
+            "fontTools",
+            "Custom font inspection",
+        ),
+    )
+    for package_name, module_name, label in package_checks:
+        try:
+            __import__(module_name)
+            version = _integrity_package_version(package_name)
+            results.append(
+                _integrity_item(
+                    f"python-{package_name}",
+                    label,
+                    "ok",
+                    package_name
+                    + " is available"
+                    + (f" ({version})." if version else "."),
+                    version=version,
+                )
+            )
+        except Exception as exc:
+            results.append(
+                _integrity_item(
+                    f"python-{package_name}",
+                    label,
+                    "error",
+                    f"{package_name} could not be imported: {exc}",
+                    help_text=(
+                        "Reinstall Cut. Developers can run: "
+                        f"python -m pip install {package_name}"
+                    ),
+                )
+            )
+
+    try:
+        from faster_whisper import WhisperModel  # noqa: F401
+
+        faster_version = _integrity_package_version(
+            "faster-whisper"
+        )
+        ctranslate_version = _integrity_package_version(
+            "ctranslate2"
+        )
+        versions = [
+            value
+            for value in (
+                (
+                    f"faster-whisper {faster_version}"
+                    if faster_version
+                    else ""
+                ),
+                (
+                    f"CTranslate2 {ctranslate_version}"
+                    if ctranslate_version
+                    else ""
+                ),
+            )
+            if value
+        ]
+        detail = "Faster-Whisper runtime is available."
+        if versions:
+            detail = (
+                "Faster-Whisper runtime is available ("
+                + ", ".join(versions)
+                + ")."
+            )
+        results.append(
+            _integrity_item(
+                "faster-whisper-runtime",
+                "Local transcription runtime",
+                "ok",
+                detail,
+                version=faster_version,
+            )
+        )
+    except Exception as exc:
+        results.append(
+            _integrity_item(
+                "faster-whisper-runtime",
+                "Local transcription runtime",
+                "error",
+                f"Faster-Whisper could not be imported: {exc}",
+                help_text=(
+                    "Reinstall Cut. Developers can run: "
+                    "python -m pip install faster-whisper"
+                ),
+            )
+        )
+
+    model_roots = {
+        os.path.join(
+            globals().get("RESOURCE_ROOT", APP_ROOT),
+            "models",
+        ),
+        os.path.join(
+            globals().get("DATA_ROOT", APP_ROOT),
+            "models",
+        ),
+    }
+    models = []
+    for model_root in model_roots:
+        if not os.path.isdir(model_root):
+            continue
+        for directory, dirs, files in os.walk(model_root):
+            dirs[:] = [
+                value
+                for value in dirs
+                if not value.startswith(".")
+                and value not in {"tmp", ".locks"}
+            ]
+            if "model.bin" in files:
+                models.append(directory)
+            if len(models) >= 10:
+                break
+
+    if models:
+        results.append(
+            _integrity_item(
+                "whisper-model",
+                "Whisper model",
+                "ok",
+                "Local model data is available.",
+                path_value=sorted(models)[0],
+            )
+        )
+    else:
+        results.append(
+            _integrity_item(
+                "whisper-model",
+                "Whisper model",
+                "warning",
+                "No complete local Whisper model was detected.",
+                help_text=(
+                    "The selected model may be downloaded on first use. "
+                    "Internet access and free disk space are required."
+                ),
+                required=False,
+            )
+        )
+
+    try:
+        ui_fonts = _list_ui_fonts()
+        results.append(
+            _integrity_item(
+                "ui-fonts",
+                "Application UI fonts",
+                "ok" if ui_fonts else "warning",
+                (
+                    f"{len(ui_fonts)} UI font "
+                    + ("family" if len(ui_fonts) == 1 else "families")
+                    + " found."
+                    if ui_fonts
+                    else "No UI font family was found."
+                ),
+                help_text=(
+                    ""
+                    if ui_fonts
+                    else "Reinstall the application or place supported font "
+                    "files under Application Support/Cut/fonts/ui."
+                ),
+                path_value=UI_FONTS_DIR,
+                required=False,
+            )
+        )
+    except Exception as exc:
+        results.append(
+            _integrity_item(
+                "ui-fonts",
+                "Application UI fonts",
+                "warning",
+                f"UI font scan failed: {exc}",
+                help_text=(
+                    "Open App Settings and use Rescan after restarting "
+                    "the application."
+                ),
+                path_value=UI_FONTS_DIR,
+                required=False,
+            )
+        )
+
+    return results
+
+
+def _integrity_optional_media_checks():
+    results = []
+
+    for tool_name, label, help_text in (
+        (
+            "yt-dlp",
+            "Social video importer",
+            "Only online imports are affected.",
+        ),
+        (
+            "deno",
+            "Downloader JavaScript runtime",
+            "Some online providers may require Deno.",
+        ),
+    ):
+        path_value = _integrity_tool(tool_name)
+        if not path_value:
+            results.append(
+                _integrity_item(
+                    tool_name,
+                    label,
+                    "warning",
+                    f"{tool_name} was not found.",
+                    help_text=help_text,
+                    required=False,
+                )
+            )
+            continue
+
+        result = _integrity_run(
+            [path_value, "--version"],
+            timeout=8,
+        )
+        version = _integrity_first_line(result["output"])
+        results.append(
+            _integrity_item(
+                tool_name,
+                label,
+                "ok" if result["ok"] else "warning",
+                version or f"{tool_name} executable found.",
+                help_text=(
+                    ""
+                    if result["ok"]
+                    else help_text
+                ),
+                path_value=path_value,
+                version=version,
+                required=False,
+            )
+        )
+
+    resource_root = globals().get("RESOURCE_ROOT", APP_ROOT)
+    search_roots = (
+        os.path.join(resource_root, "tools", "realesrgan"),
+        REALESRGAN_DIR,
+    )
+    binary = None
+    models = None
+    for search_root in search_roots:
+        if not os.path.isdir(search_root):
+            continue
+        try:
+            binary = binary or _find_realesrgan_binary(
+                search_root
+            )
+            models = models or _find_realesrgan_models(
+                search_root
+            )
+        except Exception:
+            pass
+
+    results.append(
+        _integrity_item(
+            "realesrgan",
+            "AI video upscaling",
+            "ok" if binary and models else "warning",
+            (
+                "Real-ESRGAN executable and models are available."
+                if binary and models
+                else "Real-ESRGAN is not fully available."
+            ),
+            help_text=(
+                ""
+                if binary and models
+                else "Only AI upscaling is affected. Standard FFmpeg "
+                "scaling remains available."
+            ),
+            path_value=binary or "",
+            required=False,
+        )
+    )
+
+    return results
+
+
+def _run_component_integrity_check(scope="all"):
+    scope = str(scope or "all").strip().lower()
+    if scope not in {"all", "media", "captions"}:
+        scope = "all"
+
+    checks = []
+    checks.extend(_integrity_storage_checks())
+    checks.extend(_integrity_ffmpeg_checks())
+    checks.extend(_integrity_ffprobe_checks())
+
+    if scope in {"all", "captions"}:
+        checks.extend(_integrity_caption_checks())
+
+    if scope in {"all", "media"}:
+        checks.extend(_integrity_optional_media_checks())
+
+    errors = sum(
+        1
+        for item in checks
+        if item["status"] == "error"
+    )
+    warnings = sum(
+        1
+        for item in checks
+        if item["status"] == "warning"
+    )
+    passed = sum(
+        1
+        for item in checks
+        if item["status"] == "ok"
+    )
+    overall = (
+        "error"
+        if errors
+        else ("warning" if warnings else "ok")
+    )
+
+    report = {
+        "ok": errors == 0,
+        "scope": scope,
+        "summary": {
+            "overall": overall,
+            "passed": passed,
+            "warnings": warnings,
+            "errors": errors,
+            "total": len(checks),
+        },
+        "checks": checks,
+        "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "platform": {
+            "system": platform.system(),
+            "release": platform.release(),
+            "machine": platform.machine(),
+            "python": sys.version.split()[0],
+            "frozen": bool(getattr(sys, "frozen", False)),
+        },
+    }
+
+    APP_LOGGER.info(
+        "Integrity check: scope=%s overall=%s passed=%s "
+        "warnings=%s errors=%s",
+        scope,
+        overall,
+        passed,
+        warnings,
+        errors,
+    )
+    for item in checks:
+        APP_LOGGER.info(
+            "Integrity [%s] %s: %s%s",
+            item["status"].upper(),
+            item["label"],
+            item["detail"],
+            (
+                f" | path={item['path']}"
+                if item.get("path")
+                else ""
+            ),
+        )
+
+    return report
+
+
+@app.route("/api/integrity-check", methods=["POST"])
+def api_integrity_check():
+    try:
+        payload = request.get_json(silent=True) or {}
+        return jsonify(
+            _run_component_integrity_check(
+                payload.get("scope", "all")
+            )
+        )
+    except Exception as exc:
+        APP_LOGGER.exception("Integrity check failed")
+        return jsonify({
+            "ok": False,
+            "error": str(exc),
+            "summary": {
+                "overall": "error",
+                "passed": 0,
+                "warnings": 0,
+                "errors": 1,
+                "total": 1,
+            },
+            "checks": [
+                _integrity_item(
+                    "integrity-check",
+                    "Integrity check",
+                    "error",
+                    str(exc),
+                    help_text=(
+                        "Reveal the application log and send it "
+                        "to support."
+                    ),
+                )
+            ],
+        }), 500
+
+
 JOBS = {}
 # Manage uploaded custom fonts for browser preview and FFmpeg/libass rendering.
 FONTS_DIR = os.path.join(APP_ROOT, "fonts")
+UI_FONTS_DIR = os.path.join(FONTS_DIR, "ui")
 ALLOWED_FONT_EXTENSIONS = {".ttf", ".otf", ".woff", ".woff2"}
 ALLOWED_AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus"}
 
@@ -238,6 +958,7 @@ def ensure_dirs():
     os.makedirs(GLOBAL_OVERLAY_CACHE_DIR, exist_ok=True)
     os.makedirs(SOCIAL_IMPORT_DIR, exist_ok=True)
     os.makedirs(FONTS_DIR, exist_ok=True)
+    os.makedirs(UI_FONTS_DIR, exist_ok=True)
     os.makedirs(TOOLS_DIR, exist_ok=True)
     os.makedirs(REALESRGAN_DIR, exist_ok=True)
 
@@ -4388,6 +5109,273 @@ def process_preview(job_id, video_path, srt_path, ass_path, preview_path, settin
         JOBS[job_id]["message"] = str(exc)
 
 
+def _ui_font_filename_metadata(filename):
+    stem = os.path.splitext(os.path.basename(filename or ""))[0]
+    normalized = re.sub(r"[_\-]+", " ", stem)
+    style = (
+        "italic"
+        if re.search(r"(?i)(italic|oblique)", normalized)
+        else "normal"
+    )
+    normalized = re.sub(
+        r"(?i)\b(variable|roman|upright|italic|oblique)\b",
+        " ",
+        normalized,
+    )
+
+    weight_map = (
+        ("thin", 100),
+        ("extralight", 200),
+        ("extra light", 200),
+        ("ultralight", 200),
+        ("ultra light", 200),
+        ("light", 300),
+        ("regular", 400),
+        ("book", 400),
+        ("normal", 400),
+        ("medium", 500),
+        ("semibold", 600),
+        ("semi bold", 600),
+        ("demibold", 600),
+        ("demi bold", 600),
+        ("extrabold", 800),
+        ("extra bold", 800),
+        ("ultrabold", 800),
+        ("ultra bold", 800),
+        ("black", 900),
+        ("heavy", 900),
+        ("bold", 700),
+    )
+
+    weight = 400
+    lowered = normalized.lower()
+    for label, value in weight_map:
+        if label in lowered:
+            weight = value
+            normalized = re.sub(
+                rf"(?i)\b{re.escape(label)}\b",
+                " ",
+                normalized,
+            )
+            break
+
+    family = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", normalized)
+    family = re.sub(r"\s+", " ", family).strip()
+    return family or "Custom UI Font", weight, style
+
+
+def _ui_font_file_metadata(path_value):
+    filename = os.path.basename(path_value)
+    fallback_family, fallback_weight, fallback_style = (
+        _ui_font_filename_metadata(filename)
+    )
+
+    try:
+        font = TTFont(path_value, lazy=True)
+        names_by_id = {}
+        for record in font["name"].names:
+            try:
+                value = record.toUnicode().strip()
+            except Exception:
+                continue
+            if value:
+                names_by_id.setdefault(record.nameID, [])
+                if value not in names_by_id[record.nameID]:
+                    names_by_id[record.nameID].append(value)
+
+        family = (
+            (names_by_id.get(16) or [None])[0]
+            or (names_by_id.get(1) or [None])[0]
+            or fallback_family
+        )
+
+        style_text = " ".join(
+            filter(
+                None,
+                (
+                    (names_by_id.get(17) or [None])[0],
+                    (names_by_id.get(2) or [None])[0],
+                    filename,
+                ),
+            )
+        )
+        style = (
+            "italic"
+            if re.search(r"(?i)(italic|oblique)", style_text)
+            else "normal"
+        )
+
+        weight = fallback_weight
+        try:
+            weight = int(font["OS/2"].usWeightClass)
+        except Exception:
+            pass
+
+        try:
+            axis = next(
+                item
+                for item in font["fvar"].axes
+                if str(item.axisTag) == "wght"
+            )
+            minimum = int(round(float(axis.minValue)))
+            maximum = int(round(float(axis.maxValue)))
+            if minimum != maximum:
+                weight = f"{minimum} {maximum}"
+        except Exception:
+            pass
+
+        try:
+            font.close()
+        except Exception:
+            pass
+
+        return {
+            "family": str(family).strip() or fallback_family,
+            "weight": weight,
+            "style": style,
+        }
+    except Exception:
+        return {
+            "family": fallback_family,
+            "weight": fallback_weight,
+            "style": fallback_style,
+        }
+
+
+def _list_ui_fonts():
+    ensure_dirs()
+
+    format_priority = {
+        ".woff2": 40,
+        ".woff": 30,
+        ".otf": 20,
+        ".ttf": 10,
+    }
+    families = {}
+
+    for root, dirs, filenames in os.walk(
+        UI_FONTS_DIR,
+        followlinks=False,
+    ):
+        dirs[:] = sorted(
+            directory
+            for directory in dirs
+            if not directory.startswith(".")
+            and directory != "__MACOSX"
+        )
+
+        for filename in sorted(filenames):
+            if filename.startswith("."):
+                continue
+
+            extension = os.path.splitext(filename)[1].lower()
+            if extension not in ALLOWED_FONT_EXTENSIONS:
+                continue
+
+            absolute_path = os.path.join(root, filename)
+            relative_path = os.path.relpath(
+                absolute_path,
+                UI_FONTS_DIR,
+            ).replace(os.sep, "/")
+
+            metadata = _ui_font_file_metadata(absolute_path)
+            family = str(metadata.get("family") or "").strip()
+            if not family:
+                continue
+
+            weight = metadata.get("weight", 400)
+            style = str(metadata.get("style") or "normal").lower()
+            if style not in {"normal", "italic", "oblique"}:
+                style = "normal"
+
+            family_key = re.sub(
+                r"\s+",
+                " ",
+                family,
+            ).strip().casefold()
+            family_id = hashlib.sha1(
+                family_key.encode("utf-8")
+            ).hexdigest()[:12]
+
+            item = families.setdefault(
+                family_key,
+                {
+                    "id": family_id,
+                    "label": family,
+                    "css_family": f"CutUI_{family_id}",
+                    "_faces": {},
+                    "files_found": 0,
+                },
+            )
+            item["files_found"] += 1
+
+            face_key = (str(weight), style)
+            normalized_path = relative_path.lower()
+            score = format_priority.get(extension, 0)
+
+            if (
+                "/web/" in f"/{normalized_path}/"
+                or "/webfonts/" in f"/{normalized_path}/"
+            ):
+                score += 8
+            if "variable" in filename.lower():
+                score += 4
+            score -= min(5, relative_path.count("/"))
+
+            try:
+                cache_token = (
+                    f"{int(os.path.getmtime(absolute_path))}-"
+                    f"{os.path.getsize(absolute_path)}"
+                )
+            except OSError:
+                cache_token = "0"
+
+            candidate = {
+                "url": (
+                    "/ui-fonts/"
+                    + urllib.parse.quote(relative_path, safe="/")
+                    + "?v="
+                    + urllib.parse.quote(cache_token, safe="")
+                ),
+                "weight": weight,
+                "style": style,
+                "format": extension.lstrip("."),
+                "file": relative_path,
+                "_score": score,
+            }
+
+            previous = item["_faces"].get(face_key)
+            if (
+                previous is None
+                or candidate["_score"] > previous["_score"]
+                or (
+                    candidate["_score"] == previous["_score"]
+                    and len(candidate["file"]) < len(previous["file"])
+                )
+            ):
+                item["_faces"][face_key] = candidate
+
+    result = []
+    for item in families.values():
+        faces = []
+        for face in item.pop("_faces").values():
+            face.pop("_score", None)
+            faces.append(face)
+
+        faces.sort(
+            key=lambda face: (
+                face["style"] != "normal",
+                str(face["weight"]),
+                face["file"].casefold(),
+            )
+        )
+        item["faces"] = faces
+        result.append(item)
+
+    result.sort(key=lambda item: item["label"].casefold())
+    return result
+
+
 @app.route("/")
 def index():
     metadata = _runtime_version_metadata()
@@ -4406,6 +5394,38 @@ def index():
 def api_app_version():
     metadata = _runtime_version_metadata()
     return jsonify({"ok": True, **metadata})
+
+
+@app.route("/api/ui-fonts", methods=["GET"])
+def api_ui_fonts():
+    try:
+        fonts = _list_ui_fonts()
+        return jsonify({
+            "ok": True,
+            "fonts": fonts,
+            "count": len(fonts),
+            "directory": UI_FONTS_DIR,
+        })
+    except Exception as exc:
+        APP_LOGGER.exception("UI font scan failed")
+        return jsonify({
+            "ok": False,
+            "error": str(exc),
+            "fonts": [],
+            "directory": UI_FONTS_DIR,
+        }), 500
+
+
+@app.route("/ui-fonts/<path:filename>")
+def serve_ui_font(filename):
+    extension = os.path.splitext(filename or "")[1].lower()
+    if extension not in ALLOWED_FONT_EXTENSIONS:
+        return jsonify({
+            "ok": False,
+            "error": "Font not found.",
+        }), 404
+
+    return send_from_directory(UI_FONTS_DIR, filename)
 
 
 # Return uploaded custom fonts for the Typography UI.

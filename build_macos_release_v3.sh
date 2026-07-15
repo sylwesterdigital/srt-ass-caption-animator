@@ -128,6 +128,48 @@ if [[ -z "${PYTHON_BIN:-}" ]]; then
 fi
 [[ -n "${PYTHON_BIN:-}" && -x "$PYTHON_BIN" ]] || die "Python 3 was not found. Install Homebrew Python 3.12 or set PYTHON_BIN."
 
+"$PYTHON_BIN" - "$PROJECT_ROOT/app.py" "$PROJECT_ROOT/templates/index.html" <<'PYSOURCECHECK'
+from pathlib import Path
+import sys
+
+app_path = Path(sys.argv[1])
+template_path = Path(sys.argv[2])
+app_text = app_path.read_text(encoding="utf-8")
+template_text = template_path.read_text(encoding="utf-8")
+
+required_app_markers = {
+    "runtime version metadata": "def _runtime_version_metadata()",
+    "version API": '@app.route("/api/app-version")',
+    "UI fonts API": '@app.route("/api/ui-fonts", methods=["GET"])',
+    "UI font serving": '@app.route("/ui-fonts/<path:filename>")',
+    "integrity API": '@app.route("/api/integrity-check", methods=["POST"])',
+}
+
+required_template_markers = {
+    "Cut branding": '<div class="project-sidebar-title">Cut</div>',
+    "version badge": 'id="appBuildBadge"',
+    "UI font request": "/api/ui-fonts",
+    "integrity request": "/api/integrity-check",
+}
+
+missing = [
+    f"app.py: {label}"
+    for label, marker in required_app_markers.items()
+    if marker not in app_text
+]
+missing += [
+    f"templates/index.html: {label}"
+    for label, marker in required_template_markers.items()
+    if marker not in template_text
+]
+
+if missing:
+    raise SystemExit(
+        "Release source is incomplete; refusing an expensive build:\n  - "
+        + "\n  - ".join(missing)
+    )
+PYSOURCECHECK
+
 PYTHON_VERSION="$($PYTHON_BIN -c 'import platform; print(platform.python_version())')"
 PYTHON_ARCH="$($PYTHON_BIN -c 'import platform; print(platform.machine())')"
 case "$PYTHON_ARCH" in
@@ -633,7 +675,7 @@ path.write_text(text, encoding="utf-8")
 PY
 
 log "Generating native desktop launcher"
-"$VENV_PYTHON" - "$PAYLOAD_DIR/desktop_launcher.py" "$APP_NAME" "$APP_PORT" "$BUNDLE_ID" <<'PYLAUNCH'
+"$VENV_PYTHON" - "$PAYLOAD_DIR/desktop_launcher.py" "$APP_NAME" "$APP_PORT" "$BUNDLE_ID" "$APP_VERSION" "$BUILD_NUMBER" <<'PYLAUNCH'
 from pathlib import Path
 import sys
 
@@ -641,6 +683,8 @@ output = Path(sys.argv[1])
 app_name = sys.argv[2]
 app_port = int(sys.argv[3])
 app_bundle_id = sys.argv[4]
+app_version = sys.argv[5]
+app_build_number = sys.argv[6]
 template = r'''from __future__ import annotations
 
 import fcntl
@@ -658,6 +702,8 @@ from pathlib import Path
 
 APP_NAME = __APP_NAME__
 APP_BUNDLE_ID = __APP_BUNDLE_ID__
+APP_VERSION = __APP_VERSION__
+APP_BUILD_NUMBER = __APP_BUILD_NUMBER__
 DEFAULT_APP_PORT = __APP_PORT__
 _INSTANCE_LOCK_HANDLE = None
 
@@ -929,6 +975,10 @@ def prepare_runtime() -> tuple[Path, Path]:
     os.environ["PATH"] = os.pathsep.join(dict.fromkeys([p for p in path_entries + existing if p]))
     os.environ["CUT_DATA_DIR"] = str(data)
     os.environ["CAPTION_ANIMATOR_DATA_DIR"] = str(data)
+    os.environ["CUT_APP_VERSION"] = APP_VERSION
+    os.environ["CUT_BUILD_NUMBER"] = APP_BUILD_NUMBER
+    os.environ["CAPTION_ANIMATOR_APP_VERSION"] = APP_VERSION
+    os.environ["CAPTION_ANIMATOR_BUILD_NUMBER"] = APP_BUILD_NUMBER
     os.environ.setdefault("CUT_APP_NAME", APP_NAME)
     os.environ.setdefault("CAPTION_ANIMATOR_APP_NAME", APP_NAME)
     os.environ.setdefault("HF_HOME", str(data / "models" / "huggingface"))
@@ -961,7 +1011,14 @@ def main() -> int:
         logger.info("Starting %s", APP_NAME)
         logger.info("Resources: %s", resources)
         logger.info("Python: %s", sys.version.replace("\n", " "))
-        from app import FFMPEG_BIN, FFPROBE_BIN, app, ensure_dirs
+        from app import (
+            FFMPEG_BIN,
+            FFPROBE_BIN,
+            _list_ui_fonts,
+            _runtime_version_metadata,
+            app,
+            ensure_dirs,
+        )
 
         ensure_dirs()
         if "--smoke-test" in sys.argv:
@@ -976,6 +1033,48 @@ def main() -> int:
                     in {".ttf", ".otf", ".woff", ".woff2"}
                     for path in bundled_ui_fonts.rglob("*")
                 ), "fonts/ui exists but contains no supported font files"
+
+            metadata = _runtime_version_metadata()
+            assert metadata["version"] == APP_VERSION, (
+                f"Runtime version mismatch: {metadata['version']} != {APP_VERSION}"
+            )
+            assert metadata["build"] == APP_BUILD_NUMBER, (
+                f"Runtime build mismatch: {metadata['build']} != {APP_BUILD_NUMBER}"
+            )
+            assert metadata["channel"] == "release", "Packaged app reports a dev channel"
+
+            routes = {rule.rule for rule in app.url_map.iter_rules()}
+            for required_route in (
+                "/api/app-version",
+                "/api/ui-fonts",
+                "/ui-fonts/<path:filename>",
+                "/api/integrity-check",
+            ):
+                assert required_route in routes, f"Missing packaged route: {required_route}"
+
+            ui_fonts = _list_ui_fonts()
+            assert ui_fonts, "No UI font families were found after bundled-font synchronization"
+
+            with app.test_client() as client:
+                version_response = client.get("/api/app-version")
+                assert version_response.status_code == 200, "Version API failed"
+                version_payload = version_response.get_json() or {}
+                assert version_payload.get("badge") == (
+                    f"v{APP_VERSION} · b{APP_BUILD_NUMBER}"
+                ), "Version badge payload is incorrect"
+
+                fonts_response = client.get("/api/ui-fonts")
+                assert fonts_response.status_code == 200, "UI fonts API failed"
+                fonts_payload = fonts_response.get_json() or {}
+                assert fonts_payload.get("ok") is True, "UI fonts API returned an error"
+                assert int(fonts_payload.get("count") or 0) > 0, "UI fonts API returned no fonts"
+
+            logger.info(
+                "Packaged smoke test passed: version=%s build=%s ui_font_families=%s",
+                APP_VERSION,
+                APP_BUILD_NUMBER,
+                len(ui_fonts),
+            )
             return 0
 
         if not acquire_single_instance(data, logger):
@@ -1080,6 +1179,8 @@ if __name__ == "__main__":
 template = (
     template.replace("__APP_NAME__", repr(app_name))
     .replace("__APP_BUNDLE_ID__", repr(app_bundle_id))
+    .replace("__APP_VERSION__", repr(app_version))
+    .replace("__APP_BUILD_NUMBER__", repr(app_build_number))
     .replace("__APP_PORT__", repr(app_port))
 )
 output.write_text(template, encoding="utf-8")
@@ -1214,6 +1315,8 @@ def add_tree(source: Path, destination: str, *, executable_names=()):
 datas = [
     (str(PAYLOAD / "templates"), "templates"),
     (str(PAYLOAD / "assets"), "assets"),
+    (str(PAYLOAD / "VERSION.txt"), "."),
+    (str(PAYLOAD / "BUILD_NUMBER.txt"), "."),
 ]
 binaries = [
     (str(PAYLOAD / "bin" / "ffmpeg"), "bin"),
