@@ -3,6 +3,8 @@ outputs/
 uploads/
 *.mp4
 *.mov
+.DS_Store
+old/
 
 
 # Byte-compiled / optimized / DLL files
