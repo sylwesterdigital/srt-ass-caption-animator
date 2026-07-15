@@ -17,6 +17,8 @@
 #   APP_NAME="Cut"
 #   BUNDLE_ID="fun.workwork.cut"
 #   VERSION="0.1.0"
+#   BUILD_NUMBER_OVERRIDE="12"       # exact build number for resumable workflows
+#   PERSIST_BUILD_NUMBER=1            # write BUILD_NUMBER.txt only after success
 #   PYTHON_BIN="/opt/homebrew/bin/python3.12"
 #   FFMPEG_SOURCE="$HOME/ffmpeg-full/bin/ffmpeg"
 #   FFPROBE_SOURCE="$HOME/ffmpeg-full/bin/ffprobe"
@@ -73,6 +75,20 @@ BUILD_NUMBER_FILE="$PROJECT_ROOT/BUILD_NUMBER.txt"
 log()  { printf '\033[1;36m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33mWARNING:\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31mERROR:\033[0m %s\n' "$*" >&2; exit 1; }
+
+retry_cmd() {
+  local attempts="$1" delay="$2"; shift 2
+  local try=1
+  until "$@"; do
+    local code=$?
+    if [[ "$try" -ge "$attempts" ]]; then
+      return "$code"
+    fi
+    warn "Network command failed (attempt $try/$attempts). Retrying in ${delay}s: $*"
+    sleep "$delay"
+    try=$((try + 1))
+  done
+}
 
 cleanup_on_error() {
   local status=$?
@@ -141,9 +157,19 @@ if [[ -f "$BUILD_NUMBER_FILE" ]]; then
   PREVIOUS_BUILD="$(tr -cd '0-9' < "$BUILD_NUMBER_FILE")"
   PREVIOUS_BUILD="${PREVIOUS_BUILD:-0}"
 fi
-BUILD_NUMBER="$((10#$PREVIOUS_BUILD + 1))"
-printf '%s\n' "$BUILD_NUMBER" > "$BUILD_NUMBER_FILE"
-log "Version: $APP_VERSION (build $BUILD_NUMBER)"
+
+PERSIST_BUILD_NUMBER="${PERSIST_BUILD_NUMBER:-1}"
+if [[ -n "${BUILD_NUMBER_OVERRIDE:-}" ]]; then
+  [[ "$BUILD_NUMBER_OVERRIDE" =~ ^[0-9]+$ ]] \
+    || die "BUILD_NUMBER_OVERRIDE must contain digits only."
+  BUILD_NUMBER="$((10#$BUILD_NUMBER_OVERRIDE))"
+else
+  BUILD_NUMBER="$((10#$PREVIOUS_BUILD + 1))"
+fi
+
+[[ "$BUILD_NUMBER" -gt 0 ]] || die "Build number must be greater than zero."
+case "$PERSIST_BUILD_NUMBER" in 0|1) ;; *) die "PERSIST_BUILD_NUMBER must be 0 or 1." ;; esac
+log "Version: $APP_VERSION (build $BUILD_NUMBER; previous persisted build $PREVIOUS_BUILD)"
 
 rm -rf "$PAYLOAD_DIR" "$DIST_DIR" "$WORK_DIR"
 mkdir -p "$PAYLOAD_DIR" "$DOWNLOAD_DIR" "$DIST_DIR" "$WORK_DIR" "$RELEASE_DIR"
@@ -1184,9 +1210,9 @@ if [[ -n "$NOTARY_PROFILE" ]]; then
   rm -f "$NOTARY_APP_ZIP"
   ditto -c -k --sequesterRsrc --keepParent "$DIST_APP" "$NOTARY_APP_ZIP"
   log "Submitting app bundle to Apple notarization service"
-  xcrun notarytool submit "$NOTARY_APP_ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
-  xcrun stapler staple "$DIST_APP"
-  xcrun stapler validate "$DIST_APP"
+  retry_cmd 3 12 xcrun notarytool submit "$NOTARY_APP_ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
+  retry_cmd 3 8 xcrun stapler staple "$DIST_APP"
+  retry_cmd 3 5 xcrun stapler validate "$DIST_APP"
   /usr/sbin/spctl --assess --type execute --verbose=2 "$DIST_APP"
 fi
 
@@ -1216,10 +1242,10 @@ fi
 
 if [[ -n "$NOTARY_PROFILE" ]]; then
   log "Submitting DMG to Apple notarization service"
-  xcrun notarytool submit "$DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
+  retry_cmd 3 12 xcrun notarytool submit "$DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
   log "Stapling notarization ticket to DMG"
-  xcrun stapler staple "$DMG_PATH"
-  xcrun stapler validate "$DMG_PATH"
+  retry_cmd 3 8 xcrun stapler staple "$DMG_PATH"
+  retry_cmd 3 5 xcrun stapler validate "$DMG_PATH"
 fi
 
 log "Writing SHA-256 checksums"
@@ -1227,6 +1253,15 @@ log "Writing SHA-256 checksums"
   cd "$RELEASE_DIR"
   shasum -a 256 "$(basename "$ZIP_PATH")" "$(basename "$DMG_PATH")" > "${APP_SAFE_NAME}-v${APP_VERSION}-b${BUILD_NUMBER}-SHA256.txt"
 )
+
+if [[ "$PERSIST_BUILD_NUMBER" == "1" ]]; then
+  BUILD_NUMBER_TMP="${BUILD_NUMBER_FILE}.tmp.$$"
+  printf '%s\n' "$BUILD_NUMBER" > "$BUILD_NUMBER_TMP"
+  mv -f "$BUILD_NUMBER_TMP" "$BUILD_NUMBER_FILE"
+  log "Persisted successful build number: $BUILD_NUMBER"
+else
+  log "Build number persistence disabled; BUILD_NUMBER.txt was not changed"
+fi
 
 printf '\n\033[1;32mRelease complete.\033[0m\n'
 printf 'App:  %s\n' "$DIST_APP"

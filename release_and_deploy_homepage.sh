@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# One command: build Cut, publish the GitHub release, then update the homepage.
+# Resumable Cut release pipeline.
+# A failure after the signed build does not trigger another build or build-number
+# increment. Re-run the same command and the state machine resumes from the last
+# completed phase.
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -14,12 +17,25 @@ DELETE_REMOTE=1
 ALLOW_DIRTY="${ALLOW_DIRTY:-0}"
 PUSH_CURRENT_BRANCH="${PUSH_CURRENT_BRANCH:-1}"
 COMMIT_RELEASE_METADATA="${COMMIT_RELEASE_METADATA:-1}"
+PREFLIGHT_ONLY=0
+RESTART_WORKFLOW=0
+SHOW_STATUS=0
 
 RELEASE_SCRIPT="${RELEASE_SCRIPT:-./release_signed.sh}"
 PUBLISH_SCRIPT="${PUBLISH_SCRIPT:-./publish_github_release.sh}"
 HOMEPAGE_SCRIPT="${HOMEPAGE_SCRIPT:-./deploy_homepage.sh}"
-HOMEPAGE_URL="${HOMEPAGE_URL:-https://mojoworks.xyz/labs/cut/}"
+STATE_FILE="${STATE_FILE:-release/.release-workflow-state.env}"
 LAST_RELEASE_ENV="${LAST_RELEASE_ENV:-release/.last-release.env}"
+
+GITHUB_REPO="${GITHUB_REPO:-sylwesterdigital/srt-ass-caption-animator}"
+HOMEPAGE_URL="${HOMEPAGE_URL:-https://mojoworks.xyz/labs/cut/}"
+REMOTE_USER="${REMOTE_USER:-root}"
+REMOTE_HOST="${REMOTE_HOST:-yolo.cx}"
+REMOTE_PORT="${REMOTE_PORT:-18021}"
+REMOTE_DIR="${REMOTE_DIR:-/var/www/mojoworks/labs/cut}"
+MACOS_SIGN_IDENTITY="${MACOS_SIGN_IDENTITY:-B97863CA4E17170FCD5FBFA4C76A8DF3D91D5F6B}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-workwork-caption-notary}"
+MIN_FREE_GB="${MIN_FREE_GB:-8}"
 
 log() { printf '\033[1;36m==>\033[0m %s\n' "$*"; }
 ok() { printf '\033[1;32mOK\033[0m %s\n' "$*"; }
@@ -32,290 +48,459 @@ Usage:
   ./release_and_deploy_homepage.sh
   ./release_and_deploy_homepage.sh --version 0.1.1
   ./release_and_deploy_homepage.sh --prerelease
-  ./release_and_deploy_homepage.sh --skip-build
-  ./release_and_deploy_homepage.sh --homepage-dry-run
+  ./release_and_deploy_homepage.sh --preflight-only
+  ./release_and_deploy_homepage.sh --status
+  ./release_and_deploy_homepage.sh --restart
 
-Default workflow:
-  1. Build, sign, notarize, and staple Cut.app/DMG.
-  2. Publish the release as GitHub Latest.
-  3. Wait until the new Cut asset is visible through GitHub.
-  4. Deploy the homepage with links to that release.
-  5. Delete obsolete remote homepage files.
-  6. Verify release.json on the public website.
+Reliability:
+  - all network/authentication endpoints are checked before a new build starts;
+  - the planned build number is written to a state file before the build;
+  - BUILD_NUMBER.txt is changed only after a successful signed/notarized build;
+  - after a build, retrying skips the build and reuses its verified artifacts;
+  - after GitHub publication, retrying performs only the homepage phase;
+  - a new GitHub release stays draft until all assets finish uploading.
 
 Options:
-  --version VERSION       Set VERSION.txt before building
-  --published             Publish as stable GitHub Latest (default)
-  --prerelease            Publish as a prerelease
-  --draft                 Create/update a draft; homepage deployment is skipped
-  --skip-build            Publish the newest existing assets in ./release
+  --version VERSION       Build this marketing version without modifying it before preflight
+  --published             Stable GitHub Latest release (default)
+  --prerelease            GitHub prerelease; homepage points to prerelease
+  --draft                 Keep GitHub release as draft; skip homepage
+  --skip-build            Adopt the newest existing verified Cut build
   --skip-homepage         Do not deploy the homepage
-  --homepage-dry-run      Build homepage but simulate rsync
-  --keep-remote-files     Do not pass --delete-remote
+  --homepage-dry-run      Simulate homepage rsync
+  --keep-remote-files     Do not remove obsolete remote homepage files
   --allow-dirty           Permit uncommitted source changes
   --no-push               Do not push the current branch before tagging
   --no-metadata-commit    Do not commit VERSION.txt / BUILD_NUMBER.txt
+  --preflight-only        Run checks without building or reserving a build number
+  --status                Show resumable workflow state
+  --restart               Archive incomplete state and deliberately start a new build number
   -h, --help              Show help
 USAGE
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --version)
-      [[ $# -ge 2 ]] || die "--version requires a value"
-      VERSION_OVERRIDE="$2"
-      shift 2
-      ;;
-    --published)
-      RELEASE_MODE="published"
-      shift
-      ;;
-    --prerelease)
-      RELEASE_MODE="prerelease"
-      shift
-      ;;
-    --draft)
-      RELEASE_MODE="draft"
-      shift
-      ;;
-    --skip-build)
-      SKIP_BUILD=1
-      shift
-      ;;
-    --skip-homepage)
-      SKIP_HOMEPAGE=1
-      shift
-      ;;
-    --homepage-dry-run)
-      HOMEPAGE_DRY_RUN=1
-      shift
-      ;;
-    --keep-remote-files)
-      DELETE_REMOTE=0
-      shift
-      ;;
-    --allow-dirty)
-      ALLOW_DIRTY=1
-      shift
-      ;;
-    --no-push)
-      PUSH_CURRENT_BRANCH=0
-      shift
-      ;;
-    --no-metadata-commit)
-      COMMIT_RELEASE_METADATA=0
-      shift
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      die "Unknown option: $1"
-      ;;
+    --version) [[ $# -ge 2 ]] || die "--version requires a value"; VERSION_OVERRIDE="$2"; shift 2 ;;
+    --published) RELEASE_MODE=published; shift ;;
+    --prerelease) RELEASE_MODE=prerelease; shift ;;
+    --draft) RELEASE_MODE=draft; shift ;;
+    --skip-build) SKIP_BUILD=1; shift ;;
+    --skip-homepage) SKIP_HOMEPAGE=1; shift ;;
+    --homepage-dry-run) HOMEPAGE_DRY_RUN=1; shift ;;
+    --keep-remote-files) DELETE_REMOTE=0; shift ;;
+    --allow-dirty) ALLOW_DIRTY=1; shift ;;
+    --no-push) PUSH_CURRENT_BRANCH=0; shift ;;
+    --no-metadata-commit) COMMIT_RELEASE_METADATA=0; shift ;;
+    --preflight-only) PREFLIGHT_ONLY=1; shift ;;
+    --status) SHOW_STATUS=1; shift ;;
+    --restart) RESTART_WORKFLOW=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) die "Unknown option: $1" ;;
   esac
 done
 
-case "$RELEASE_MODE" in
-  published|prerelease|draft) ;;
-  *) die "RELEASE_MODE must be published, prerelease, or draft." ;;
-esac
+case "$RELEASE_MODE" in published|prerelease|draft) ;; *) die "Invalid release mode: $RELEASE_MODE" ;; esac
+
+# State fields. The file is generated by this script and lives under ignored release/.
+WORKFLOW_SCHEMA="2"
+WORKFLOW_STAGE=""
+STATE_RELEASE_MODE=""
+RELEASE_VERSION=""
+RELEASE_BUILD=""
+RELEASE_ARCH=""
+RELEASE_TAG=""
+SOURCE_COMMIT=""
+RELEASE_COMMIT=""
+RELEASE_DMG=""
+RELEASE_ZIP=""
+RELEASE_SHA=""
+RELEASE_URL=""
+
+state_write() {
+  local stage="$1"
+  WORKFLOW_STAGE="$stage"
+  mkdir -p "$(dirname "$STATE_FILE")"
+  local tmp="${STATE_FILE}.tmp.$$"
+  {
+    printf 'WORKFLOW_SCHEMA=%q\n' "$WORKFLOW_SCHEMA"
+    printf 'WORKFLOW_STAGE=%q\n' "$WORKFLOW_STAGE"
+    printf 'STATE_RELEASE_MODE=%q\n' "$STATE_RELEASE_MODE"
+    printf 'RELEASE_VERSION=%q\n' "$RELEASE_VERSION"
+    printf 'RELEASE_BUILD=%q\n' "$RELEASE_BUILD"
+    printf 'RELEASE_ARCH=%q\n' "$RELEASE_ARCH"
+    printf 'RELEASE_TAG=%q\n' "$RELEASE_TAG"
+    printf 'SOURCE_COMMIT=%q\n' "$SOURCE_COMMIT"
+    printf 'RELEASE_COMMIT=%q\n' "$RELEASE_COMMIT"
+    printf 'RELEASE_DMG=%q\n' "$RELEASE_DMG"
+    printf 'RELEASE_ZIP=%q\n' "$RELEASE_ZIP"
+    printf 'RELEASE_SHA=%q\n' "$RELEASE_SHA"
+    printf 'RELEASE_URL=%q\n' "$RELEASE_URL"
+    printf 'STATE_UPDATED_AT=%q\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } > "$tmp"
+  mv -f "$tmp" "$STATE_FILE"
+}
+
+state_show() {
+  if [[ ! -f "$STATE_FILE" ]]; then
+    echo "No resumable release state exists."
+    return 0
+  fi
+  # shellcheck disable=SC1090
+  source "$STATE_FILE"
+  cat <<STATUS
+Stage:      ${WORKFLOW_STAGE:-unknown}
+Mode:       ${STATE_RELEASE_MODE:-unknown}
+Version:    ${RELEASE_VERSION:-unknown}
+Build:      ${RELEASE_BUILD:-unknown}
+Tag:        ${RELEASE_TAG:-unknown}
+Source:     ${SOURCE_COMMIT:-unknown}
+Release:    ${RELEASE_COMMIT:-not committed}
+DMG:        ${RELEASE_DMG:-not built}
+GitHub:     ${RELEASE_URL:-not published}
+State file: $STATE_FILE
+STATUS
+}
+
+if [[ "$SHOW_STATUS" == "1" ]]; then state_show; exit 0; fi
 
 command -v git >/dev/null 2>&1 || die "git is required."
-command -v gh >/dev/null 2>&1 || die "GitHub CLI is required."
-command -v curl >/dev/null 2>&1 || die "curl is required."
-command -v python3 >/dev/null 2>&1 || die "python3 is required."
-gh auth status >/dev/null 2>&1 || die "Run gh auth login first."
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "Run inside the Git repository."
+CURRENT_HEAD="$(git rev-parse HEAD)"
 
-[[ -x "$PUBLISH_SCRIPT" ]] || die "Missing executable: $PUBLISH_SCRIPT"
-
-if [[ ! -x "$HOMEPAGE_SCRIPT" && -x "./homepage/deploy_homepage.sh" ]]; then
-  HOMEPAGE_SCRIPT="./homepage/deploy_homepage.sh"
+if [[ "$RESTART_WORKFLOW" == "1" && -f "$STATE_FILE" ]]; then
+  mkdir -p "$(dirname "$STATE_FILE")"
+  archived="${STATE_FILE}.abandoned.$(date +%Y%m%d%H%M%S)"
+  mv "$STATE_FILE" "$archived"
+  warn "Archived previous workflow state: $archived"
 fi
 
-if [[ "$SKIP_HOMEPAGE" == "0" && "$RELEASE_MODE" != "draft" ]]; then
-  [[ -x "$HOMEPAGE_SCRIPT" ]] || die "Homepage deployment script not found: $HOMEPAGE_SCRIPT"
+if [[ -f "$STATE_FILE" ]]; then
+  # shellcheck disable=SC1090
+  source "$STATE_FILE"
+  [[ "${WORKFLOW_SCHEMA:-}" == "2" ]] || die "Unsupported state schema. Use --restart."
+
+  if [[ "$WORKFLOW_STAGE" == complete && -n "${RELEASE_COMMIT:-}" && "$CURRENT_HEAD" != "$RELEASE_COMMIT" ]]; then
+    archived="${STATE_FILE}.completed.${RELEASE_TAG:-unknown}"
+    mv "$STATE_FILE" "$archived"
+    log "Previous release is complete; starting a new workflow for current HEAD."
+    WORKFLOW_STAGE=""
+    STATE_RELEASE_MODE=""
+    RELEASE_VERSION=""
+    RELEASE_BUILD=""
+    RELEASE_ARCH=""
+    RELEASE_TAG=""
+    SOURCE_COMMIT=""
+    RELEASE_COMMIT=""
+    RELEASE_DMG=""
+    RELEASE_ZIP=""
+    RELEASE_SHA=""
+    RELEASE_URL=""
+  else
+    [[ -z "$VERSION_OVERRIDE" || "$VERSION_OVERRIDE" == "$RELEASE_VERSION" ]] \
+      || die "State is for version $RELEASE_VERSION. Use --restart for $VERSION_OVERRIDE."
+    [[ "$RELEASE_MODE" == "$STATE_RELEASE_MODE" ]] \
+      || die "State mode is $STATE_RELEASE_MODE, requested mode is $RELEASE_MODE. Use --restart."
+
+    if [[ "$WORKFLOW_STAGE" == complete ]]; then
+      ok "Release $RELEASE_TAG and homepage deployment are already complete."
+      state_show
+      exit 0
+    fi
+
+    if [[ "$CURRENT_HEAD" != "${SOURCE_COMMIT:-}" && "$CURRENT_HEAD" != "${RELEASE_COMMIT:-}" ]]; then
+      # Recover the narrow crash window after the metadata commit but before the
+      # state file update.
+      PARENT="$(git rev-parse HEAD^ 2>/dev/null || true)"
+      HEAD_VERSION="$(git show HEAD:VERSION.txt 2>/dev/null | tr -d '[:space:]' || true)"
+      HEAD_BUILD="$(git show HEAD:BUILD_NUMBER.txt 2>/dev/null | tr -cd '0-9' || true)"
+      if [[ "$WORKFLOW_STAGE" == built && "$PARENT" == "$SOURCE_COMMIT" \
+            && "$HEAD_VERSION" == "$RELEASE_VERSION" && "$HEAD_BUILD" == "$RELEASE_BUILD" ]]; then
+        RELEASE_COMMIT="$CURRENT_HEAD"
+        state_write built
+        warn "Recovered state after the release metadata commit."
+      else
+        die "Incomplete state belongs to another commit. Finish it or use --restart deliberately."
+      fi
+    fi
+
+    log "Resuming $RELEASE_TAG from phase: $WORKFLOW_STAGE"
+  fi
 fi
 
-if [[ -n "$VERSION_OVERRIDE" ]]; then
-  [[ "$VERSION_OVERRIDE" =~ ^[0-9]+([.][0-9]+){1,3}([_-][0-9A-Za-z.-]+)?$ ]] \
+if [[ -z "$WORKFLOW_STAGE" ]]; then
+  [[ -z "$VERSION_OVERRIDE" || "$VERSION_OVERRIDE" =~ ^[0-9]+([.][0-9]+){1,3}([_-][0-9A-Za-z.-]+)?$ ]] \
     || die "Invalid version: $VERSION_OVERRIDE"
-  printf '%s\n' "$VERSION_OVERRIDE" > VERSION.txt
-  log "Version set to $VERSION_OVERRIDE"
+  RELEASE_VERSION="${VERSION_OVERRIDE:-$(tr -d '[:space:]' < VERSION.txt 2>/dev/null || true)}"
+  [[ -n "$RELEASE_VERSION" ]] || RELEASE_VERSION="0.1.0"
+  PREVIOUS_BUILD="$(tr -cd '0-9' < BUILD_NUMBER.txt 2>/dev/null || true)"
+  PREVIOUS_BUILD="${PREVIOUS_BUILD:-0}"
+  RELEASE_BUILD="$((10#$PREVIOUS_BUILD + 1))"
+  RELEASE_TAG="v${RELEASE_VERSION}-b${RELEASE_BUILD}"
+  STATE_RELEASE_MODE="$RELEASE_MODE"
+  SOURCE_COMMIT="$CURRENT_HEAD"
 fi
 
-if [[ "$ALLOW_DIRTY" != "1" ]]; then
-  DIRTY_SOURCE="$(
+check_clean_source() {
+  [[ "$ALLOW_DIRTY" == "1" ]] && return 0
+  local dirty
+  dirty="$(
     git status --porcelain --untracked-files=all \
       | sed -E 's/^.. //' \
       | grep -Ev '^(\.macos-build/|release/|homepage/\.deploy_build/|VERSION\.txt$|BUILD_NUMBER\.txt$|DEV_BUILD_NUMBER\.txt$)' \
       || true
   )"
-  if [[ -n "$DIRTY_SOURCE" ]]; then
+  if [[ -n "$dirty" ]]; then
     git status --short
-    die "Commit the current Cut source before releasing, or use --allow-dirty deliberately."
+    die "Commit or ignore the current source before releasing."
   fi
+  git diff --cached --quiet || die "The Git index already contains staged changes."
+}
+
+preflight() {
+  local phase="$1"
+  log "Preflight checks for phase: $phase"
+
+  command -v curl >/dev/null 2>&1 || die "curl is required."
+  command -v gh >/dev/null 2>&1 || die "GitHub CLI is required."
+  command -v python3 >/dev/null 2>&1 || die "python3 is required."
+  command -v ssh >/dev/null 2>&1 || die "ssh is required."
+  command -v rsync >/dev/null 2>&1 || [[ -x /opt/homebrew/bin/rsync ]] || die "rsync is required."
+  [[ "$(uname -s)" == Darwin ]] || die "The signed release must run on macOS."
+  [[ -x "$PUBLISH_SCRIPT" ]] || die "Missing executable: $PUBLISH_SCRIPT"
+  [[ -x "$RELEASE_SCRIPT" || "$phase" != build ]] || die "Missing executable: $RELEASE_SCRIPT"
+
+  if [[ "$SKIP_HOMEPAGE" == 0 && "$RELEASE_MODE" != draft ]]; then
+    if [[ ! -x "$HOMEPAGE_SCRIPT" && -x ./homepage/deploy_homepage.sh ]]; then
+      HOMEPAGE_SCRIPT=./homepage/deploy_homepage.sh
+    fi
+    [[ -x "$HOMEPAGE_SCRIPT" ]] || die "Missing executable: $HOMEPAGE_SCRIPT"
+    [[ -f homepage/index.html ]] || die "Missing homepage/index.html"
+  fi
+
+  check_clean_source
+  git remote get-url origin >/dev/null 2>&1 || die "Git remote origin is missing."
+  gh auth status >/dev/null 2>&1 || die "GitHub CLI auth failed. Run: gh auth login"
+  gh api "repos/$GITHUB_REPO" --jq .full_name >/dev/null \
+    || die "GitHub API/repository access failed."
+  GIT_TERMINAL_PROMPT=0 git ls-remote origin HEAD >/dev/null \
+    || die "Git remote is not reachable."
+  curl --fail --silent --show-error --location --max-time 20 \
+    "https://api.github.com/repos/$GITHUB_REPO" -o /dev/null \
+    || die "GitHub HTTPS API is not reachable."
+
+  if [[ "$phase" == build ]]; then
+    command -v xcrun >/dev/null 2>&1 || die "xcrun is required."
+    command -v security >/dev/null 2>&1 || die "security is required."
+    security find-identity -v -p codesigning \
+      | grep -F "$MACOS_SIGN_IDENTITY" >/dev/null \
+      || die "Developer ID identity not found: $MACOS_SIGN_IDENTITY"
+    xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" --output-format json >/dev/null \
+      || die "Apple notarization service/profile is unavailable: $NOTARY_PROFILE"
+    curl --fail --silent --show-error --location --max-time 20 \
+      'https://cdn.jsdelivr.net/npm/lil-gui@0.20/+esm' -o /dev/null \
+      || die "jsDelivr dependency is unavailable."
+
+    FREE_KB="$(df -Pk . | awk 'NR==2 {print $4}')"
+    REQUIRED_KB="$((MIN_FREE_GB * 1024 * 1024))"
+    [[ "$FREE_KB" -ge "$REQUIRED_KB" ]] \
+      || die "At least ${MIN_FREE_GB} GB free disk space is required."
+  fi
+
+  if [[ "$SKIP_HOMEPAGE" == 0 && "$RELEASE_MODE" != draft ]]; then
+    if ! command -v terser >/dev/null 2>&1 \
+       && [[ ! -x homepage/node_modules/.bin/terser ]]; then
+      command -v npx >/dev/null 2>&1 || die "Terser or npx is required for homepage minification."
+      NO_UPDATE_NOTIFIER=1 NPM_CONFIG_UPDATE_NOTIFIER=false \
+        npx --yes terser --version >/dev/null \
+        || die "Terser could not be prepared before the release."
+    fi
+
+    ssh -o BatchMode=yes -o ConnectTimeout=15 -p "$REMOTE_PORT" \
+      "$REMOTE_USER@$REMOTE_HOST" \
+      "REMOTE_DIR=$(printf '%q' "$REMOTE_DIR") bash -s" <<'REMOTE_CHECK'
+set -e
+if [[ -d "$REMOTE_DIR" ]]; then
+  [[ -w "$REMOTE_DIR" ]]
+else
+  parent="$(dirname "$REMOTE_DIR")"
+  [[ -d "$parent" && -w "$parent" ]]
 fi
+REMOTE_CHECK
+    curl --fail --silent --show-error --location --max-time 20 "$HOMEPAGE_URL" -o /dev/null \
+      || die "Public homepage is not reachable: $HOMEPAGE_URL"
+  fi
 
-if [[ "$SKIP_BUILD" == "0" ]]; then
-  [[ -x "$RELEASE_SCRIPT" ]] || die "Missing executable: $RELEASE_SCRIPT"
-  log "Building, signing, notarizing, and stapling Cut"
-  "$RELEASE_SCRIPT"
-  ok "macOS release assets created"
-
-  if [[ "$COMMIT_RELEASE_METADATA" == "1" ]]; then
-    LATEST_DMG="$(
-      find release -maxdepth 1 -type f         -name 'Cut-v*-b*-macOS-*.dmg' -print0       | xargs -0 ls -1t 2>/dev/null       | head -n 1 || true
-    )"
-    [[ -n "$LATEST_DMG" ]]       || die "The build completed but no Cut DMG was found."
-
-    DMG_NAME="$(basename "$LATEST_DMG")"
-    RELEASE_VERSION="${DMG_NAME#Cut-v}"
-    RELEASE_VERSION="${RELEASE_VERSION%%-b*}"
-    RELEASE_BUILD="${DMG_NAME#*-b}"
-    RELEASE_BUILD="${RELEASE_BUILD%%-macOS-*}"
-
-    git add VERSION.txt BUILD_NUMBER.txt
-    if ! git diff --cached --quiet -- VERSION.txt BUILD_NUMBER.txt; then
-      log "Committing release metadata"
-      git commit -m "Release Cut ${RELEASE_VERSION} build ${RELEASE_BUILD}"
-      ok "Release metadata committed"
-    else
-      log "Release metadata is already committed"
+  if [[ -z "$WORKFLOW_STAGE" || "$WORKFLOW_STAGE" == planned ]]; then
+    if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+      die "Local tag already exists: $RELEASE_TAG"
+    fi
+    if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+      die "Remote tag already exists: $RELEASE_TAG"
     fi
   fi
-else
-  warn "Skipping build; the newest existing assets in ./release will be published."
-fi
 
-log "Publishing GitHub release as $RELEASE_MODE"
-ALLOW_DIRTY="$ALLOW_DIRTY" \
-PUSH_CURRENT_BRANCH="$PUSH_CURRENT_BRANCH" \
-GITHUB_RELEASE_MODE="$RELEASE_MODE" \
-LAST_RELEASE_ENV="$LAST_RELEASE_ENV" \
-"$PUBLISH_SCRIPT"
+  ok "Preflight passed; no version/build files were changed"
+}
 
-[[ -f "$LAST_RELEASE_ENV" ]] || die "Release metadata was not created: $LAST_RELEASE_ENV"
-# shellcheck disable=SC1090
-source "$LAST_RELEASE_ENV"
+resolve_artifacts() {
+  local dmgs=()
+  shopt -s nullglob
+  dmgs=(release/Cut-v"$RELEASE_VERSION"-b"$RELEASE_BUILD"-macOS-*.dmg)
+  shopt -u nullglob
+  [[ "${#dmgs[@]}" -eq 1 ]] || return 1
 
-[[ -n "${RELEASE_TAG:-}" ]] || die "Release tag is missing."
-[[ -n "${RELEASE_URL:-}" ]] || die "Release URL is missing."
+  RELEASE_DMG="${dmgs[0]}"
+  local name="$(basename "$RELEASE_DMG")"
+  RELEASE_ARCH="${name#*macOS-}"
+  RELEASE_ARCH="${RELEASE_ARCH%.dmg}"
+  RELEASE_ZIP="release/Cut-v${RELEASE_VERSION}-b${RELEASE_BUILD}-macOS-${RELEASE_ARCH}.zip"
+  RELEASE_SHA="release/Cut-v${RELEASE_VERSION}-b${RELEASE_BUILD}-SHA256.txt"
+  [[ -f "$RELEASE_ZIP" && -f "$RELEASE_SHA" ]] || return 1
+  (
+    cd release
+    shasum -a 256 -c "$(basename "$RELEASE_SHA")" >/dev/null
+  ) || return 1
+  return 0
+}
 
-if [[ "$RELEASE_MODE" == "draft" ]]; then
-  warn "Draft release created. Homepage deployment was skipped because drafts are not public."
-  printf '\nRelease:\n%s\n' "$RELEASE_URL"
+# Phase-aware preflight happens on every invocation, including resumes. A lost
+# connection therefore fails before any expensive remaining action.
+case "$WORKFLOW_STAGE" in
+  ""|planned) PREFLIGHT_PHASE=build ;;
+  built) PREFLIGHT_PHASE=publish ;;
+  published) PREFLIGHT_PHASE=homepage ;;
+  *) PREFLIGHT_PHASE=publish ;;
+esac
+preflight "$PREFLIGHT_PHASE"
+
+if [[ "$PREFLIGHT_ONLY" == 1 ]]; then
+  ok "Preflight only: planned release is $RELEASE_TAG. Nothing was built or bumped."
   exit 0
 fi
 
-log "Waiting for GitHub to expose $RELEASE_TAG and its Cut assets"
-RELEASE_VISIBLE=0
-for attempt in $(seq 1 18); do
-  RELEASE_JSON="$(
-    gh release view "$RELEASE_TAG" \
-      --json isDraft,isPrerelease,assets,url \
-      2>/dev/null || true
-  )"
+if [[ -z "$WORKFLOW_STAGE" ]]; then
+  state_write planned
+  log "Reserved $RELEASE_TAG in resumable state; BUILD_NUMBER.txt remains unchanged until build success."
+fi
 
-  if RELEASE_JSON="$RELEASE_JSON" python3 - <<'PY'
-import json
-import os
-import sys
+if [[ "$WORKFLOW_STAGE" == planned ]]; then
+  if resolve_artifacts; then
+    warn "Recovered a complete verified build from disk; rebuilding is unnecessary."
+    printf '%s\n' "$RELEASE_VERSION" > VERSION.txt
+    printf '%s\n' "$RELEASE_BUILD" > BUILD_NUMBER.txt
+    state_write built
+  elif [[ "$SKIP_BUILD" == 1 ]]; then
+    die "--skip-build was requested, but verified artifacts for $RELEASE_TAG were not found."
+  else
+    log "Building, signing, notarizing, and stapling $RELEASE_TAG"
+    VERSION="$RELEASE_VERSION" \
+    BUILD_NUMBER_OVERRIDE="$RELEASE_BUILD" \
+    PERSIST_BUILD_NUMBER=1 \
+    MACOS_SIGN_IDENTITY="$MACOS_SIGN_IDENTITY" \
+    NOTARY_PROFILE="$NOTARY_PROFILE" \
+      "$RELEASE_SCRIPT"
 
-try:
-    data = json.loads(os.environ.get("RELEASE_JSON") or "{}")
-except Exception:
-    raise SystemExit(1)
+    resolve_artifacts || die "Build returned successfully, but the expected verified artifacts are missing."
+    printf '%s\n' "$RELEASE_VERSION" > VERSION.txt
+    [[ "$(tr -cd '0-9' < BUILD_NUMBER.txt)" == "$RELEASE_BUILD" ]] \
+      || die "Builder did not persist the expected successful build number."
+    state_write built
+    ok "Build complete. Future retries will reuse $RELEASE_DMG."
+  fi
+fi
 
-assets = data.get("assets") or []
-names = [str(asset.get("name") or "") for asset in assets]
-valid = (
-    not data.get("isDraft")
-    and any(name.startswith("Cut-v") and name.endswith(".dmg") for name in names)
-    and any(name.startswith("Cut-v") and name.endswith(".zip") for name in names)
-    and any(name.startswith("Cut-v") and "SHA256" in name for name in names)
-)
-raise SystemExit(0 if valid else 1)
-PY
-  then
-    RELEASE_VISIBLE=1
-    break
+if [[ "$WORKFLOW_STAGE" == built ]]; then
+  resolve_artifacts || die "Saved build artifacts are missing or fail checksum verification."
+
+  if [[ "$COMMIT_RELEASE_METADATA" == 1 ]]; then
+    git add -- VERSION.txt BUILD_NUMBER.txt
+    if ! git diff --cached --quiet -- VERSION.txt BUILD_NUMBER.txt; then
+      log "Committing release metadata only"
+      git commit -m "Release Cut ${RELEASE_VERSION} build ${RELEASE_BUILD}"
+    fi
+  fi
+  RELEASE_COMMIT="$(git rev-parse HEAD)"
+  state_write built
+
+  log "Publishing $RELEASE_TAG; this phase is idempotent and retry-safe"
+  ALLOW_DIRTY="$ALLOW_DIRTY" \
+  PUSH_CURRENT_BRANCH="$PUSH_CURRENT_BRANCH" \
+  GITHUB_RELEASE_MODE="$RELEASE_MODE" \
+  RELEASE_TAG="$RELEASE_TAG" \
+  RELEASE_DMG_PATH="$RELEASE_DMG" \
+  LAST_RELEASE_ENV="$LAST_RELEASE_ENV" \
+    "$PUBLISH_SCRIPT"
+
+  [[ -f "$LAST_RELEASE_ENV" ]] || die "Publisher did not create $LAST_RELEASE_ENV"
+  # shellcheck disable=SC1090
+  source "$LAST_RELEASE_ENV"
+  [[ "$RELEASE_TAG" == "v${RELEASE_VERSION}-b${RELEASE_BUILD}" ]] \
+    || die "Publisher returned unexpected release tag: $RELEASE_TAG"
+  state_write published
+  ok "GitHub phase complete. Future retries will not rebuild or republish."
+fi
+
+if [[ "$WORKFLOW_STAGE" == published ]]; then
+  if [[ "$RELEASE_MODE" == draft ]]; then
+    warn "Draft release complete. Homepage is intentionally unchanged."
+    state_write complete
+    exit 0
   fi
 
-  info="GitHub release propagation attempt ${attempt}/18"
-  printf '==> %s\n' "$info"
-  sleep 5
-done
+  if [[ "$SKIP_HOMEPAGE" == 1 ]]; then
+    warn "Homepage skipped by request. Workflow remains at published for a later retry."
+    exit 0
+  fi
 
-[[ "$RELEASE_VISIBLE" == "1" ]] \
-  || die "The release exists, but its complete Cut assets were not visible after 90 seconds."
+  HOMEPAGE_CHANNEL=stable
+  [[ "$RELEASE_MODE" == prerelease ]] && HOMEPAGE_CHANNEL=prerelease
+  HOMEPAGE_ARGS=(--release-channel "$HOMEPAGE_CHANNEL")
+  [[ "$DELETE_REMOTE" == 1 ]] && HOMEPAGE_ARGS+=(--delete-remote)
+  [[ "$HOMEPAGE_DRY_RUN" == 1 ]] && HOMEPAGE_ARGS+=(--dry-run --keep-build)
 
-ok "GitHub release and assets are public"
+  log "Deploying homepage for $RELEASE_TAG"
+  "$HOMEPAGE_SCRIPT" "${HOMEPAGE_ARGS[@]}"
 
-if [[ "$SKIP_HOMEPAGE" == "1" ]]; then
-  warn "Homepage deployment skipped."
-  printf '\nRelease:\n%s\n' "$RELEASE_URL"
-  exit 0
-fi
+  if [[ "$HOMEPAGE_DRY_RUN" == 1 ]]; then
+    warn "Homepage dry run finished. Workflow remains at published; rerun without --homepage-dry-run."
+    exit 0
+  fi
 
-HOMEPAGE_CHANNEL="stable"
-[[ "$RELEASE_MODE" == "prerelease" ]] && HOMEPAGE_CHANNEL="prerelease"
-
-HOMEPAGE_ARGS=(--release-channel "$HOMEPAGE_CHANNEL")
-[[ "$DELETE_REMOTE" == "1" ]] && HOMEPAGE_ARGS+=(--delete-remote)
-[[ "$HOMEPAGE_DRY_RUN" == "1" ]] && HOMEPAGE_ARGS+=(--dry-run --keep-build)
-
-log "Updating the Cut homepage for $RELEASE_TAG"
-"$HOMEPAGE_SCRIPT" "${HOMEPAGE_ARGS[@]}"
-
-if [[ "$HOMEPAGE_DRY_RUN" == "1" ]]; then
-  warn "Homepage deployment was a dry run. The GitHub release is public, but the live homepage was not changed."
-  exit 0
-fi
-
-log "Verifying public homepage release metadata"
-VERIFY_OK=0
-for attempt in $(seq 1 12); do
-  RELEASE_METADATA="$(
-    curl --fail --silent --show-error --location \
-      "${HOMEPAGE_URL%/}/release.json?tag=${RELEASE_TAG}&attempt=${attempt}" \
-      2>/dev/null || true
-  )"
-
-  if RELEASE_METADATA="$RELEASE_METADATA" EXPECTED_TAG="$RELEASE_TAG" python3 - <<'PY'
-import json
-import os
-
+  VERIFY_OK=0
+  for attempt in $(seq 1 12); do
+    metadata="$(
+      curl --fail --silent --show-error --location \
+        "${HOMEPAGE_URL%/}/release.json?tag=${RELEASE_TAG}&attempt=${attempt}" \
+        2>/dev/null || true
+    )"
+    if RELEASE_METADATA="$metadata" EXPECTED_TAG="$RELEASE_TAG" python3 - <<'PYVERIFY'
+import json, os
 try:
     data = json.loads(os.environ.get("RELEASE_METADATA") or "{}")
 except Exception:
     raise SystemExit(1)
-
-tag = str(data.get("tag") or "")
-download = str(data.get("download_url") or "")
-expected = os.environ["EXPECTED_TAG"]
-
 valid = (
-    tag == expected
-    and "/releases/download/" in download
-    and "/Cut-" in download
+    str(data.get("tag") or "") == os.environ["EXPECTED_TAG"]
+    and "/releases/download/" in str(data.get("download_url") or "")
+    and "/Cut-" in str(data.get("download_url") or "")
 )
 raise SystemExit(0 if valid else 1)
-PY
-  then
-    VERIFY_OK=1
-    break
-  fi
+PYVERIFY
+    then
+      VERIFY_OK=1
+      break
+    fi
+    log "Homepage propagation attempt $attempt/12"
+    sleep 5
+  done
+  [[ "$VERIFY_OK" == 1 ]] || die "Homepage deployment could not be verified. Rerun to retry homepage only."
 
-  printf '==> Homepage propagation attempt %s/12\n' "$attempt"
-  sleep 5
-done
-
-[[ "$VERIFY_OK" == "1" ]] \
-  || die "The release was published, but the public homepage does not yet report $RELEASE_TAG."
+  state_write complete
+fi
 
 printf '\n'
-ok "Release and homepage deployment completed"
+ok "Release and homepage workflow complete"
 printf 'GitHub:   %s\n' "$RELEASE_URL"
 printf 'Homepage: %s\n' "$HOMEPAGE_URL"
 printf 'Tag:      %s\n' "$RELEASE_TAG"

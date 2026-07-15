@@ -53,6 +53,17 @@ trap 'code=$?; printf "%bFAILED%b at line %s, exit %s.\n" "${RED}${BOLD}" "$RESE
 
 need_bin(){ command -v "$1" >/dev/null 2>&1 || die "Required tool '$1' not found."; }
 has_bin(){ command -v "$1" >/dev/null 2>&1; }
+retry_cmd(){
+  local attempts="$1" delay="$2"; shift 2
+  local try=1
+  until "$@"; do
+    local code=$?
+    if [[ "$try" -ge "$attempts" ]]; then return "$code"; fi
+    warn "Command failed (attempt $try/$attempts). Retrying in ${delay}s: $*"
+    sleep "$delay"
+    try=$((try + 1))
+  done
+}
 
 usage(){
   cat <<'USAGE'
@@ -412,21 +423,33 @@ fi
 
 step "Deploy"
 if [[ "$DO_DRY_RUN" -eq 0 ]]; then
-  ssh -p "$REMOTE_PORT" "$REMOTE_USER@$REMOTE_HOST" "mkdir -p '$REMOTE_DIR'"
+  retry_cmd 4 8 ssh -o BatchMode=yes -o ConnectTimeout=15 \
+    -p "$REMOTE_PORT" "$REMOTE_USER@$REMOTE_HOST" "mkdir -p '$REMOTE_DIR'"
 else
   info "Dry run: remote mkdir skipped"
 fi
 
-flags=(-avz --human-readable --itemize-changes --chmod="$REMOTE_CHMOD")
+flags=(
+  -avz
+  --human-readable
+  --itemize-changes
+  --chmod="$REMOTE_CHMOD"
+  --partial
+  --partial-dir=.rsync-partial
+  --delay-updates
+)
 [[ "$DO_DRY_RUN" -eq 0 ]] || flags+=(--dry-run)
-[[ "$DO_DELETE_REMOTE" -eq 0 ]] || flags+=(--delete)
+[[ "$DO_DELETE_REMOTE" -eq 0 ]] || flags+=(--delete-delay)
 use_chown=0
 if "$RSYNC_BIN" --help 2>&1 | grep -q -- '--chown'; then flags+=(--chown="$REMOTE_OWNER"); use_chown=1; fi
-"$RSYNC_BIN" "${flags[@]}" -e "ssh -p $REMOTE_PORT" "$BUILD_DIR/" "$REMOTE_USER@$REMOTE_HOST:$REMOTE_DIR/"
+retry_cmd 4 10 "$RSYNC_BIN" "${flags[@]}" \
+  -e "ssh -o BatchMode=yes -o ConnectTimeout=15 -p $REMOTE_PORT" \
+  "$BUILD_DIR/" "$REMOTE_USER@$REMOTE_HOST:$REMOTE_DIR/"
 ok "Rsync completed"
 
 if [[ "$DO_DRY_RUN" -eq 0 && "$use_chown" -eq 0 ]]; then
-  ssh -p "$REMOTE_PORT" "$REMOTE_USER@$REMOTE_HOST" "chown -R '$REMOTE_OWNER' '$REMOTE_DIR'"
+  retry_cmd 4 8 ssh -o BatchMode=yes -o ConnectTimeout=15 \
+    -p "$REMOTE_PORT" "$REMOTE_USER@$REMOTE_HOST" "chown -R '$REMOTE_OWNER' '$REMOTE_DIR'"
 fi
 
 if [[ "$DO_DRY_RUN" -eq 0 && "$DO_VERIFY_REMOTE" -eq 1 ]]; then
