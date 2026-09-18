@@ -1617,19 +1617,29 @@ if grep -Eq '/(opt/homebrew|usr/local)/(Cellar|opt)/' <<<"$PACKAGED_OTOOL_OUTPUT
   die "Packaged FFmpeg/FFprobe still reference Homebrew paths outside the app bundle."
 fi
 
-# Audit the full collected Mach-O graph as well. A direct FFmpeg executable can
-# point at an in-app dylib whose own dependency still points back to Homebrew;
-# that would work on the build Mac but fail on a clean user's Mac.
+# Audit the collected native graph for developer-machine Homebrew references.
+# Do not invoke `file` + `otool` once per file: a PyInstaller app can contain
+# thousands of native modules, which made this phase appear hung for many
+# minutes. Restrict the scan to loadable/native candidates and inspect them in
+# batches. `otool` may reject shell scripts or other executable resources; those
+# diagnostics are intentionally ignored while valid Mach-O output is retained.
+AUDIT_CANDIDATE_COUNT="$(
+  find "$DIST_APP/Contents/MacOS" "$DIST_APP/Contents/Frameworks" -type f \
+    \( -name '*.dylib' -o -name '*.so' -o -perm -111 \) -print 2>/dev/null \
+    | wc -l | tr -d '[:space:]'
+)"
+log "Checking ${AUDIT_CANDIDATE_COUNT:-0} native runtime candidates for external Homebrew references"
 BAD_MACHO_REFS="$(
-  find "$DIST_APP/Contents/MacOS" "$DIST_APP/Contents/Frameworks" -type f -print0 2>/dev/null \
-    | while IFS= read -r -d '' macho; do
-        desc="$(/usr/bin/file "$macho" 2>/dev/null || true)"
-        [[ "$desc" == *"Mach-O"* ]] || continue
-        deps="$(/usr/bin/otool -L "$macho" 2>/dev/null || true)"
-        if grep -Eq '/(opt/homebrew|usr/local)/(Cellar|opt)/' <<<"$deps"; then
-          printf '%s\n%s\n' "$macho" "$deps"
-        fi
-      done
+  find "$DIST_APP/Contents/MacOS" "$DIST_APP/Contents/Frameworks" -type f \
+    \( -name '*.dylib' -o -name '*.so' -o -perm -111 \) -print0 2>/dev/null \
+    | { xargs -0 -n 64 /usr/bin/otool -L 2>/dev/null || true; } \
+    | awk '
+        /^[^[:space:]].*:$/ { current=$0; next }
+        /\/(opt\/homebrew|usr\/local)\/(Cellar|opt)\// {
+          if (current != last) { print current; last=current }
+          print
+        }
+      '
 )"
 if [[ -n "$BAD_MACHO_REFS" ]]; then
   printf '%s\n' "$BAD_MACHO_REFS" >&2

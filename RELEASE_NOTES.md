@@ -1,5 +1,12 @@
 # Cut {{VERSION}} — Build {{BUILD_NUMBER}}
 
+## Update 0.1.5
+
+- Replaced the release-time native dependency audit that launched file and otool once for every bundled file.
+- The portability check now scans only dylibs, Python extension modules, and executable candidates, then runs otool in batches.
+- The audit still rejects any packaged runtime dependency that points back to /opt/homebrew or /usr/local Homebrew paths.
+- The builder now prints the native candidate count so this phase has visible progress instead of appearing frozen.
+
 ## Update 0.1.4
 
 - Replaced the fragile third-party FFmpeg alt-name provisioning path with Homebrew core ffmpeg@6 as the deterministic automatic build source.

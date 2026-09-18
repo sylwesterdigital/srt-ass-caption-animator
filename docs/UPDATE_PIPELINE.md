@@ -92,3 +92,11 @@ FFmpeg discovery no longer relies on one ambiguous Homebrew prefix. The watcher 
 A fresh watcher process now initializes a lightweight Python 3 interpreter immediately so update ingestion works before release Python 3.12 is provisioned. Release preflight still pins Homebrew Python 3.12 for the macOS build.
 
 The macOS builder independently prefers `ffmpeg@6` when it is invoked outside the watcher. FFmpeg and FFprobe are supplied to PyInstaller as native binaries, allowing PyInstaller to recursively collect non-system dylibs, rewrite macOS load paths and re-sign collected Mach-O files. The final app audit runs the packaged tools with a minimal environment and rejects any Mach-O dependency in `Contents/MacOS` or `Contents/Frameworks` that still points to Homebrew outside `Cut.app`.
+
+## 0.1.5 — Batched native-runtime audit
+
+The packaged-runtime portability audit now scans only native/loadable candidates
+(`*.dylib`, `*.so`, and executable files) and invokes `otool` in batches instead
+of launching `file` and `otool` once for every file in the PyInstaller bundle.
+This preserves the external-Homebrew dependency check while avoiding the long
+silent phase that could look like a hung release build.
