@@ -133,18 +133,36 @@ ensure_formula(){
 }
 
 ffmpeg_has_required_features(){
-  local ffmpeg="$1"
+  local ffmpeg="$1" encoders filters
   [[ -n "$ffmpeg" && -x "$ffmpeg" ]] || return 1
-  "$ffmpeg" -hide_banner -encoders 2>/dev/null | grep -F libx264 >/dev/null || return 1
-  "$ffmpeg" -hide_banner -filters 2>/dev/null | grep -E '(^|[[:space:]])(ass|subtitles)([[:space:]]|$)' >/dev/null || return 1
+
+  # Do not pipe FFmpeg directly into grep while `set -o pipefail` is active.
+  # grep may exit as soon as it sees a match, FFmpeg then receives SIGPIPE, and
+  # the pipeline is reported as a failure even though the requested feature is
+  # present. Capture complete output first, then inspect the shell buffer.
+  encoders="$("$ffmpeg" -hide_banner -encoders 2>&1)" || return 1
+  filters="$("$ffmpeg" -hide_banner -filters 2>&1)" || return 1
+
+  grep -Fq 'libx264' <<<"$encoders" || return 1
+  grep -Eq '(^|[[:space:]])(ass|subtitles)([[:space:]]|$)' <<<"$filters" || return 1
   return 0
 }
 
 ffprobe_next_to(){
-  local ffmpeg="$1" candidate
-  candidate="$(dirname "$ffmpeg")/ffprobe"
-  [[ -x "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
-  candidate="$(dirname "$ffmpeg")/ffprobe-alt"
+  local ffmpeg="$1" dir candidate
+  dir="$(dirname "$ffmpeg")"
+  case "$(basename "$ffmpeg")" in
+    ffmpeg-alt)
+      candidate="$dir/ffprobe-alt"
+      [[ -x "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
+      candidate="$dir/ffprobe"
+      ;;
+    *)
+      candidate="$dir/ffprobe"
+      [[ -x "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
+      candidate="$dir/ffprobe-alt"
+      ;;
+  esac
   [[ -x "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
   return 1
 }
@@ -202,13 +220,15 @@ install_full_ffmpeg(){
   info "The FFmpeg currently available is not suitable for Cut."
   info "Installing an isolated full FFmpeg build with libass and x264 support."
 
-  "$brew" tap homebrew-ffmpeg/ffmpeg
+  HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1 "$brew" tap homebrew-ffmpeg/ffmpeg
   if ! "$brew" list --versions homebrew-ffmpeg/ffmpeg/ffmpeg >/dev/null 2>&1; then
-    "$brew" install homebrew-ffmpeg/ffmpeg/ffmpeg --with-alt-name
+    HOMEBREW_NO_ASK=1 HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1 \
+      "$brew" install homebrew-ffmpeg/ffmpeg/ffmpeg --with-alt-name
   else
     prefix="$($brew --prefix homebrew-ffmpeg/ffmpeg/ffmpeg 2>/dev/null || true)"
     if [[ -z "$prefix" || ! -x "$prefix/bin/ffmpeg-alt" || ! -x "$prefix/bin/ffprobe-alt" ]]; then
-      "$brew" reinstall homebrew-ffmpeg/ffmpeg/ffmpeg --with-alt-name
+      HOMEBREW_NO_ASK=1 HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1 \
+        "$brew" reinstall homebrew-ffmpeg/ffmpeg/ffmpeg --with-alt-name
     fi
   fi
 

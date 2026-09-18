@@ -76,3 +76,9 @@ The resulting ZIP is created under `archive/` and can be consumed by the watcher
 ## Build-runtime dependency repair (0.1.2)
 
 The watcher can ingest and apply update archives before checking heavyweight release dependencies. This is intentional: an update must be able to repair a broken build prerequisite. For macOS release builds, the watcher validates FFmpeg by capabilities (libx264 plus ASS/subtitle filters), not merely by the presence of an `ffmpeg` command. It prefers an explicitly configured full build, then the isolated `homebrew-ffmpeg` alt-name formula, then a known developer full build, and finally PATH only if the candidate passes the capability checks. The selected FFmpeg/FFprobe binaries are copied into the signed Cut application; end-user Macs are never searched for FFmpeg, yt-dlp, Deno, or other release-time tools.
+## 0.1.3 release-toolchain repair
+
+The FFmpeg capability check must never stream FFmpeg directly into `grep -q` while Bash `pipefail` is enabled. A successful early grep match can close the pipe, FFmpeg receives SIGPIPE, and the pipeline is reported as failed. The watcher and macOS builder now capture the complete encoder/filter output first and then inspect that buffer.
+
+The macOS builder also audits the final bundled FFmpeg and FFprobe from inside `Cut.app` with a minimal environment. The release fails if either executable cannot start, if ASS/subtitles or libx264 disappeared during collection, or if the packaged binaries still retain absolute Homebrew Cellar/opt references. This keeps build-machine discovery separate from end-user runtime behavior.
+

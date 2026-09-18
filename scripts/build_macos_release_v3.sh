@@ -310,7 +310,8 @@ FFPROBE_SOURCE="$(find_tool "${FFPROBE_SOURCE:-}" "$HOME/ffmpeg-full/bin/ffprobe
 
 log "Bundling FFmpeg: $FFMPEG_SOURCE"
 for native_tool in "$FFMPEG_SOURCE" "$FFPROBE_SOURCE"; do
-  if /usr/bin/file "$native_tool" | grep 'Mach-O' >/dev/null; then
+  TOOL_FILE_DESC="$(/usr/bin/file "$native_tool" 2>/dev/null || true)"
+  if [[ "$TOOL_FILE_DESC" == *"Mach-O"* ]]; then
     TOOL_ARCHS="$(/usr/bin/lipo -archs "$native_tool" 2>/dev/null || true)"
     if [[ -n "$TOOL_ARCHS" && " $TOOL_ARCHS " != *" $TARGET_ARCH "* ]]; then
       die "$native_tool does not contain the required $TARGET_ARCH architecture (found: $TOOL_ARCHS)."
@@ -321,10 +322,19 @@ cp "$FFMPEG_SOURCE" "$PAYLOAD_DIR/bin/ffmpeg"
 cp "$FFPROBE_SOURCE" "$PAYLOAD_DIR/bin/ffprobe"
 chmod 755 "$PAYLOAD_DIR/bin/ffmpeg" "$PAYLOAD_DIR/bin/ffprobe"
 
-if ! "$PAYLOAD_DIR/bin/ffmpeg" -hide_banner -filters 2>/dev/null | grep -E '(^|[[:space:]])ass([[:space:]]|$)' >/dev/null; then
-  die "The selected FFmpeg does not include the libass 'ass' filter required for burned-in captions."
+# Capture FFmpeg output before grepping. Direct `ffmpeg | grep -q` checks are
+# unreliable under pipefail because grep can close the pipe after a match and
+# FFmpeg then exits with SIGPIPE (141), turning a successful feature check into
+# a false failure.
+FFMPEG_FILTERS_OUTPUT="$("$PAYLOAD_DIR/bin/ffmpeg" -hide_banner -filters 2>&1)" \
+  || die "The selected FFmpeg could not enumerate filters."
+FFMPEG_ENCODERS_OUTPUT="$("$PAYLOAD_DIR/bin/ffmpeg" -hide_banner -encoders 2>&1)" \
+  || die "The selected FFmpeg could not enumerate encoders."
+
+if ! grep -Eq '(^|[[:space:]])(ass|subtitles)([[:space:]]|$)' <<<"$FFMPEG_FILTERS_OUTPUT"; then
+  die "The selected FFmpeg does not include the libass ASS/subtitles filters required for burned-in captions."
 fi
-if ! "$PAYLOAD_DIR/bin/ffmpeg" -hide_banner -encoders 2>/dev/null | grep 'libx264' >/dev/null; then
+if ! grep -Fq 'libx264' <<<"$FFMPEG_ENCODERS_OUTPUT"; then
   die "The selected FFmpeg does not include libx264, which the app uses for video export."
 fi
 
@@ -1512,7 +1522,8 @@ while IFS= read -r helper; do
   case "$(basename "$helper")" in
     realesrgan-ncnn-vulkan|realesrgan-ncnn-vulkan.exe) chmod 755 "$helper" ;;
   esac
-  if /usr/bin/file "$helper" | grep 'Mach-O' >/dev/null; then
+  HELPER_FILE_DESC="$(/usr/bin/file "$helper" 2>/dev/null || true)"
+  if [[ "$HELPER_FILE_DESC" == *"Mach-O"* ]]; then
     if [[ -n "$MACOS_SIGN_IDENTITY" ]]; then
       /usr/bin/codesign --force --options runtime --timestamp --sign "$MACOS_SIGN_IDENTITY" "$helper"
     else
@@ -1540,6 +1551,36 @@ log "Validating app bundle"
     warn "Gatekeeper assessment will be repeated after notarization."
   fi
 }
+
+log "Auditing packaged media runtime"
+PACKAGED_FFMPEG="$(find "$DIST_APP/Contents" -type f -path '*/bin/ffmpeg' -print -quit)"
+PACKAGED_FFPROBE="$(find "$DIST_APP/Contents" -type f -path '*/bin/ffprobe' -print -quit)"
+[[ -n "$PACKAGED_FFMPEG" && -x "$PACKAGED_FFMPEG" ]] || die "Packaged FFmpeg was not found inside $DIST_APP."
+[[ -n "$PACKAGED_FFPROBE" && -x "$PACKAGED_FFPROBE" ]] || die "Packaged FFprobe was not found inside $DIST_APP."
+
+PACKAGED_FILTERS_OUTPUT="$(env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin HOME="$HOME" \
+  "$PACKAGED_FFMPEG" -hide_banner -filters 2>&1)" \
+  || die "Packaged FFmpeg cannot start without the developer shell environment."
+PACKAGED_ENCODERS_OUTPUT="$(env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin HOME="$HOME" \
+  "$PACKAGED_FFMPEG" -hide_banner -encoders 2>&1)" \
+  || die "Packaged FFmpeg cannot enumerate encoders without the developer shell environment."
+grep -Eq '(^|[[:space:]])(ass|subtitles)([[:space:]]|$)' <<<"$PACKAGED_FILTERS_OUTPUT" \
+  || die "Packaged FFmpeg lost ASS/subtitles support during collection."
+grep -Fq 'libx264' <<<"$PACKAGED_ENCODERS_OUTPUT" \
+  || die "Packaged FFmpeg lost libx264 during collection."
+env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin HOME="$HOME" "$PACKAGED_FFPROBE" -hide_banner -version >/dev/null 2>&1 \
+  || die "Packaged FFprobe cannot start without the developer shell environment."
+
+# A distributable app must not retain Homebrew Cellar/opt references. System
+# libraries and @rpath/@loader_path references are fine; developer-machine
+# absolute Homebrew paths are not.
+PACKAGED_OTOOL_OUTPUT="$(/usr/bin/otool -L "$PACKAGED_FFMPEG" "$PACKAGED_FFPROBE" 2>&1)" \
+  || die "Could not inspect packaged FFmpeg/FFprobe dependencies."
+if grep -Eq '/(opt/homebrew|usr/local)/(Cellar|opt)/' <<<"$PACKAGED_OTOOL_OUTPUT"; then
+  printf '%s\n' "$PACKAGED_OTOOL_OUTPUT" >&2
+  die "Packaged FFmpeg/FFprobe still reference Homebrew paths outside the app bundle."
+fi
+log "Packaged FFmpeg/FFprobe are self-contained and pass capability checks"
 
 log "Running packaged smoke test"
 "$DIST_APP/Contents/MacOS/$APP_NAME" --smoke-test

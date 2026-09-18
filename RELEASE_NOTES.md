@@ -1,5 +1,13 @@
 # Cut {{VERSION}} — Build {{BUILD_NUMBER}}
 
+## Update 0.1.3
+
+- Fixed a Bash pipefail/SIGPIPE bug that falsely reported a valid FFmpeg build as missing libx264 or ASS/subtitle filters.
+- The watcher now captures FFmpeg encoder/filter output before checking capabilities, so successful matches cannot be turned into pipeline failures.
+- The macOS builder uses the same pipefail-safe checks before packaging.
+- The release build now runs the bundled FFmpeg and FFprobe with a minimal environment and fails if they still depend on Homebrew Cellar/opt paths outside Cut.app.
+- Homebrew provisioning runs without auto-update chatter or confirmation prompts when it is actually needed; an already valid isolated FFmpeg installation is reused.
+
 ## Update 0.1.2
 
 - Fixed the watcher so update ingestion no longer depends on release-time FFmpeg or other heavyweight build prerequisites.

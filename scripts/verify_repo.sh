@@ -58,6 +58,12 @@ if grep -F 'ensure_formula ffmpeg ffmpeg' scripts/watch-update.sh >/dev/null; th
 fi
 grep -F 'homebrew-ffmpeg/ffmpeg/ffmpeg' scripts/watch-update.sh >/dev/null || die "watcher cannot provision a full FFmpeg build"
 grep -F 'if ! select_full_ffmpeg; then' scripts/watch-update.sh >/dev/null || die "watcher does not validate FFmpeg capabilities"
+grep -F 'encoders="$("$ffmpeg" -hide_banner -encoders 2>&1)"' scripts/watch-update.sh >/dev/null \
+  || die "watcher FFmpeg capability checks are not pipefail-safe"
+grep -F 'FFMPEG_ENCODERS_OUTPUT=' scripts/build_macos_release_v3.sh >/dev/null \
+  || die "builder FFmpeg capability checks are not pipefail-safe"
+grep -F 'Auditing packaged media runtime' scripts/build_macos_release_v3.sh >/dev/null \
+  || die "builder does not audit the packaged FFmpeg runtime"
 ok "yt-dlp, EJS, Deno and FFmpeg are app-owned in packaged builds"
 
 info "Release entry points"
