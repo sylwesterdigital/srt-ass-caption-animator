@@ -1,5 +1,13 @@
 # Cut {{VERSION}} — Build {{BUILD_NUMBER}}
 
+## Update 0.1.2
+
+- Fixed the watcher so update ingestion no longer depends on release-time FFmpeg or other heavyweight build prerequisites.
+- FFmpeg is now selected by capabilities, requiring both libx264 and ASS/subtitle filters instead of trusting whichever ffmpeg happens to be first on PATH.
+- If no suitable FFmpeg is available, the watcher can install the isolated homebrew-ffmpeg build with alt command names, avoiding conflicts with Homebrew core ffmpeg.
+- The selected FFmpeg and FFprobe are still copied into the signed Cut application; end-user Macs are never searched for FFmpeg, yt-dlp or Deno.
+- The watcher can now receive a future repair update even when the current release toolchain is broken.
+
 ## Update 0.1.1
 
 - Reworked online media import so packaged Cut never searches for or executes a random user-installed yt-dlp.

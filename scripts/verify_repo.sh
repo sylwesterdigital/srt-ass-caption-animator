@@ -53,6 +53,11 @@ fi
 grep -F 'yt-dlp[default]' scripts/requirements-macos.txt >/dev/null || die "yt-dlp[default] is not bundled"
 grep -F '"yt_dlp_ejs"' scripts/build_macos_release_v3.sh >/dev/null || die "yt_dlp_ejs is not collected by PyInstaller"
 grep -F 'f"deno:{deno_bin}"' app.py >/dev/null || die "app.py does not pin yt-dlp to the bundled Deno runtime"
+if grep -F 'ensure_formula ffmpeg ffmpeg' scripts/watch-update.sh >/dev/null; then
+  die "watcher still assumes the Homebrew core FFmpeg is suitable"
+fi
+grep -F 'homebrew-ffmpeg/ffmpeg/ffmpeg' scripts/watch-update.sh >/dev/null || die "watcher cannot provision a full FFmpeg build"
+grep -F 'if ! select_full_ffmpeg; then' scripts/watch-update.sh >/dev/null || die "watcher does not validate FFmpeg capabilities"
 ok "yt-dlp, EJS, Deno and FFmpeg are app-owned in packaged builds"
 
 info "Release entry points"

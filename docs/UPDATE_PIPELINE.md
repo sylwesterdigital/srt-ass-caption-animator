@@ -71,3 +71,8 @@ DELETE_PATHS='obsolete/file:obsolete/directory'
 ```
 
 The resulting ZIP is created under `archive/` and can be consumed by the watcher.
+
+
+## Build-runtime dependency repair (0.1.2)
+
+The watcher can ingest and apply update archives before checking heavyweight release dependencies. This is intentional: an update must be able to repair a broken build prerequisite. For macOS release builds, the watcher validates FFmpeg by capabilities (libx264 plus ASS/subtitle filters), not merely by the presence of an `ffmpeg` command. It prefers an explicitly configured full build, then the isolated `homebrew-ffmpeg` alt-name formula, then a known developer full build, and finally PATH only if the candidate passes the capability checks. The selected FFmpeg/FFprobe binaries are copied into the signed Cut application; end-user Macs are never searched for FFmpeg, yt-dlp, Deno, or other release-time tools.

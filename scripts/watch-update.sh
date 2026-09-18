@@ -132,6 +132,89 @@ ensure_formula(){
   "$brew" install "$formula"
 }
 
+ffmpeg_has_required_features(){
+  local ffmpeg="$1"
+  [[ -n "$ffmpeg" && -x "$ffmpeg" ]] || return 1
+  "$ffmpeg" -hide_banner -encoders 2>/dev/null | grep -F libx264 >/dev/null || return 1
+  "$ffmpeg" -hide_banner -filters 2>/dev/null | grep -E '(^|[[:space:]])(ass|subtitles)([[:space:]]|$)' >/dev/null || return 1
+  return 0
+}
+
+ffprobe_next_to(){
+  local ffmpeg="$1" candidate
+  candidate="$(dirname "$ffmpeg")/ffprobe"
+  [[ -x "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
+  candidate="$(dirname "$ffmpeg")/ffprobe-alt"
+  [[ -x "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
+  return 1
+}
+
+select_full_ffmpeg(){
+  local brew prefix ffmpeg ffprobe candidate
+  local -a candidates=()
+
+  if [[ -n "${FFMPEG_SOURCE:-}" ]]; then
+    candidates+=("$FFMPEG_SOURCE")
+  fi
+
+  brew="$(brew_bin || true)"
+  if [[ -n "$brew" ]]; then
+    prefix="$($brew --prefix homebrew-ffmpeg/ffmpeg/ffmpeg 2>/dev/null || true)"
+    if [[ -n "$prefix" ]]; then
+      [[ -x "$prefix/bin/ffmpeg-alt" ]] && candidates+=("$prefix/bin/ffmpeg-alt")
+      [[ -x "$prefix/bin/ffmpeg" ]] && candidates+=("$prefix/bin/ffmpeg")
+    fi
+  fi
+
+  # Developer-machine compatibility only. The resulting application embeds the
+  # selected binary and never searches these paths on an end-user Mac.
+  [[ -x "$HOME/ffmpeg-full/bin/ffmpeg" ]] && candidates+=("$HOME/ffmpeg-full/bin/ffmpeg")
+  candidate="$(command -v ffmpeg 2>/dev/null || true)"
+  [[ -n "$candidate" ]] && candidates+=("$candidate")
+
+  local seen='|'
+  for ffmpeg in "${candidates[@]}"; do
+    [[ "$seen" == *"|$ffmpeg|"* ]] && continue
+    seen+="$ffmpeg|"
+    ffmpeg_has_required_features "$ffmpeg" || continue
+
+    if [[ -n "${FFPROBE_SOURCE:-}" && -x "$FFPROBE_SOURCE" ]]; then
+      ffprobe="$FFPROBE_SOURCE"
+    else
+      ffprobe="$(ffprobe_next_to "$ffmpeg" || true)"
+    fi
+    [[ -n "$ffprobe" && -x "$ffprobe" ]] || continue
+
+    export FFMPEG_SOURCE="$ffmpeg"
+    export FFPROBE_SOURCE="$ffprobe"
+    return 0
+  done
+  return 1
+}
+
+install_full_ffmpeg(){
+  local brew prefix
+  brew="$(brew_bin || true)"
+  [[ -n "$brew" ]] || die "A full FFmpeg build is required and Homebrew is not installed."
+  [[ "$AUTO_INSTALL_DEPS" == "1" ]] || die "No FFmpeg with libx264 + libass was found. Enable automatic dependency installation or provide FFMPEG_SOURCE/FFPROBE_SOURCE."
+
+  step "Full FFmpeg runtime"
+  info "The FFmpeg currently available is not suitable for Cut."
+  info "Installing an isolated full FFmpeg build with libass and x264 support."
+
+  "$brew" tap homebrew-ffmpeg/ffmpeg
+  if ! "$brew" list --versions homebrew-ffmpeg/ffmpeg/ffmpeg >/dev/null 2>&1; then
+    "$brew" install homebrew-ffmpeg/ffmpeg/ffmpeg --with-alt-name
+  else
+    prefix="$($brew --prefix homebrew-ffmpeg/ffmpeg/ffmpeg 2>/dev/null || true)"
+    if [[ -z "$prefix" || ! -x "$prefix/bin/ffmpeg-alt" || ! -x "$prefix/bin/ffprobe-alt" ]]; then
+      "$brew" reinstall homebrew-ffmpeg/ffmpeg/ffmpeg --with-alt-name
+    fi
+  fi
+
+  select_full_ffmpeg || die "Full FFmpeg installation completed, but Cut still cannot find a build containing libx264 and ASS/subtitle filters."
+}
+
 ensure_dependencies(){
   step "Local build prerequisites"
   [[ "$(uname -s)" == "Darwin" ]] || die "The macOS release watcher must run on macOS."
@@ -152,7 +235,6 @@ ensure_dependencies(){
   ensure_formula rsync rsync
   ensure_formula brotli brotli
   ensure_formula node node
-  ensure_formula ffmpeg ffmpeg
 
   BREW_FOR_PY="$(brew_bin || true)"
   BREW_PY_PREFIX=""
@@ -172,17 +254,16 @@ ensure_dependencies(){
   PYVER="$($PYTHON_BIN -c 'import platform; print(platform.python_version())')"
   [[ "$PYVER" == 3.12.* ]] || die "Release Python must be 3.12; found $PYVER at $PYTHON_BIN"
 
-  FFMPEG_CHECK="$(command -v ffmpeg)"
-  FFPROBE_CHECK="$(command -v ffprobe || true)"
-  [[ -x "$FFPROBE_CHECK" ]] || die "ffprobe is missing from the FFmpeg installation."
-  "$FFMPEG_CHECK" -hide_banner -encoders 2>/dev/null | grep -F libx264 >/dev/null \
-    || die "FFmpeg does not include libx264."
-  "$FFMPEG_CHECK" -hide_banner -filters 2>/dev/null | grep -E '(^|[[:space:]])(ass|subtitles)[[:space:]]' >/dev/null \
-    || die "FFmpeg does not include ASS/subtitle filters."
+  if ! select_full_ffmpeg; then
+    install_full_ffmpeg
+  fi
 
-  export FFMPEG_SOURCE="$FFMPEG_CHECK"
-  export FFPROBE_SOURCE="$FFPROBE_CHECK"
-  ok "Python $PYVER, FFmpeg, GitHub CLI, rsync, Brotli and Node are ready"
+  FFMPEG_VERSION="$($FFMPEG_SOURCE -hide_banner -version 2>/dev/null | head -n 1 || true)"
+  ok "Python $PYVER is ready"
+  ok "Full FFmpeg: $FFMPEG_SOURCE"
+  [[ -z "$FFMPEG_VERSION" ]] || printf '  %b%s%b\n' "$DIM" "$FFMPEG_VERSION" "$RESET"
+  ok "FFprobe: $FFPROBE_SOURCE"
+  ok "GitHub CLI, rsync, Brotli and Node are ready"
 }
 
 archive_signature(){ shasum -a 256 "$1" | awk '{print $1}'; }
@@ -531,7 +612,12 @@ banner(){
 }
 
 banner
-ensure_dependencies
+# Update ingestion must stay independent from heavyweight release dependencies.
+# Otherwise a future update cannot repair a broken compiler/runtime prerequisite.
+have git || die "git is required to apply updates."
+have unzip || die "unzip is required to apply updates."
+have shasum || die "shasum is required to verify updates."
+have python3 || die "python3 is required to verify update manifests."
 "$SCRIPT_DIR/verify_repo.sh" || die "Repository verification failed before watcher startup."
 
 if [[ -f "$STATE_FILE" ]]; then
