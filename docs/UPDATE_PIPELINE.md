@@ -100,3 +100,13 @@ The packaged-runtime portability audit now scans only native/loadable candidates
 of launching `file` and `otool` once for every file in the PyInstaller bundle.
 This preserves the external-Homebrew dependency check while avoiding the long
 silent phase that could look like a hung release build.
+
+## 0.1.6 — SDL3 runtime packaging repair
+
+Homebrew's current SDL2 package is `sdl2-compat`, which presents an SDL2 ABI but loads
+SDL3 dynamically at runtime. Because SDL3 is intentionally not a direct Mach-O linkage,
+PyInstaller cannot discover it from `otool -L` alone. Cut now detects this arrangement,
+embeds `libSDL3.0.dylib` explicitly, rewrites the packaged SDL2 compatibility layer to
+search `@loader_path`, and verifies the packaged FFmpeg/FFprobe executables under a hard
+timeout before notarization. The watcher also records its PID and automatically removes
+stale lock directories left by interrupted releases.

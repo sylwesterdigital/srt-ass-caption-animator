@@ -68,9 +68,17 @@ die(){ fail "$*"; exit 1; }
 
 cleanup_lock(){ rm -rf "$LOCK_DIR"; }
 if [[ "$MODE" != "status" ]]; then
+  owner=""
   if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-    die "Cut update watcher is already running: $LOCK_DIR"
+    owner="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+    if [[ "$owner" =~ ^[0-9]+$ ]] && kill -0 "$owner" 2>/dev/null; then
+      die "Cut update watcher is already running as PID $owner: $LOCK_DIR"
+    fi
+    warn "Removing stale Cut watcher lock: $LOCK_DIR"
+    rm -rf "$LOCK_DIR"
+    mkdir "$LOCK_DIR" || die "Could not recreate watcher lock: $LOCK_DIR"
   fi
+  printf '%s\n' "$$" > "$LOCK_DIR/pid"
   trap cleanup_lock EXIT INT TERM
 fi
 
@@ -272,6 +280,28 @@ show_ffmpeg_diagnostics(){
   done
 }
 
+ensure_sdl3_runtime(){
+  local brew prefix ffmpeg_deps
+  [[ -n "${FFMPEG_SOURCE:-}" && -x "$FFMPEG_SOURCE" ]] || return 0
+  ffmpeg_deps="$(/usr/bin/otool -L "$FFMPEG_SOURCE" 2>/dev/null || true)"
+  grep -Fq 'libSDL2-2.0.0.dylib' <<<"$ffmpeg_deps" || return 0
+
+  brew="$(brew_bin || true)"
+  [[ -n "$brew" ]] || die "FFmpeg uses SDL2/sdl2-compat but Homebrew is unavailable, so SDL3 cannot be prepared for packaging."
+  prefix="$($brew --prefix sdl3 2>/dev/null || true)"
+  if [[ -z "$prefix" || ! -f "$prefix/lib/libSDL3.0.dylib" ]]; then
+    [[ "$AUTO_INSTALL_DEPS" == "1" ]] || die "FFmpeg uses sdl2-compat and requires SDL3. Install with: brew install sdl3"
+    step "SDL3 runtime"
+    info "Installing SDL3 required by Homebrew sdl2-compat."
+    HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1 "$brew" install sdl3
+    prefix="$($brew --prefix sdl3 2>/dev/null || true)"
+  fi
+  [[ -n "$prefix" && -f "$prefix/lib/libSDL3.0.dylib" ]] \
+    || die "SDL3 installation completed but libSDL3.0.dylib was not found."
+  export SDL3_SOURCE="$prefix/lib/libSDL3.0.dylib"
+  ok "SDL3 runtime: $SDL3_SOURCE"
+}
+
 install_full_ffmpeg(){
   local brew prefix
   brew="$(brew_bin || true)"
@@ -345,6 +375,7 @@ ensure_dependencies(){
     show_ffmpeg_diagnostics
     install_full_ffmpeg
   fi
+  ensure_sdl3_runtime
 
   FFMPEG_VERSION="$($FFMPEG_SOURCE -hide_banner -version 2>/dev/null | head -n 1 || true)"
   ok "Python $PYVER is ready"

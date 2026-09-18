@@ -1,5 +1,13 @@
 # Cut {{VERSION}} — Build {{BUILD_NUMBER}}
 
+## Update 0.1.6
+
+- Fixed the packaged FFmpeg/FFprobe hang caused by Homebrew's SDL2 compatibility layer dynamically loading SDL3.
+- The macOS builder now embeds libSDL3.0.dylib explicitly whenever FFmpeg links libSDL2-2.0.0.dylib.
+- The packaged sdl2-compat dylib is rewritten to use an app-local @loader_path instead of a Homebrew SDL3 rpath.
+- Packaged FFmpeg/FFprobe verification now has a hard 15-second timeout, so a native runtime failure cannot freeze the release pipeline behind a modal dialog.
+- The watcher now provisions SDL3 when required and records its PID so stale lock directories can be recovered safely.
+
 ## Update 0.1.5
 
 - Replaced the release-time native dependency audit that launched file and otool once for every bundled file.

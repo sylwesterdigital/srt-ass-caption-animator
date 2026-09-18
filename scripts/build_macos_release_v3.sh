@@ -355,6 +355,43 @@ cp "$FFMPEG_SOURCE" "$PAYLOAD_DIR/bin/ffmpeg"
 cp "$FFPROBE_SOURCE" "$PAYLOAD_DIR/bin/ffprobe"
 chmod 755 "$PAYLOAD_DIR/bin/ffmpeg" "$PAYLOAD_DIR/bin/ffprobe"
 
+# Homebrew switched SDL2 consumers to sdl2-compat. That compatibility dylib
+# deliberately loads SDL3 at runtime instead of linking it, so PyInstaller cannot
+# discover SDL3 from the Mach-O dependency graph. If FFmpeg links SDL2, explicitly
+# vendor SDL3 and later give sdl2-compat an app-local @loader_path search path.
+rm -f "$PAYLOAD_DIR/bin/libSDL3.0.dylib" "$PAYLOAD_DIR/bin/libSDL3.dylib"
+FFMPEG_OTOOL_SOURCE="$(/usr/bin/otool -L "$FFMPEG_SOURCE" 2>/dev/null || true)"
+if grep -Fq 'libSDL2-2.0.0.dylib' <<<"$FFMPEG_OTOOL_SOURCE"; then
+  BREW_FOR_SDL="$(command -v brew 2>/dev/null || true)"
+  [[ -n "$BREW_FOR_SDL" ]] || [[ ! -x /opt/homebrew/bin/brew ]] || BREW_FOR_SDL=/opt/homebrew/bin/brew
+  [[ -n "$BREW_FOR_SDL" ]] || [[ ! -x /usr/local/bin/brew ]] || BREW_FOR_SDL=/usr/local/bin/brew
+  [[ -n "$BREW_FOR_SDL" ]] || die "FFmpeg uses SDL2/sdl2-compat but Homebrew was not found, so SDL3 cannot be bundled."
+
+  SDL3_PREFIX="$($BREW_FOR_SDL --prefix sdl3 2>/dev/null || true)"
+  SDL3_SOURCE=""
+  for candidate in \
+    "$SDL3_PREFIX/lib/libSDL3.0.dylib" \
+    "$SDL3_PREFIX/lib/libSDL3.dylib"; do
+    if [[ -n "$SDL3_PREFIX" && -f "$candidate" ]]; then
+      SDL3_SOURCE="$candidate"
+      break
+    fi
+  done
+  [[ -n "$SDL3_SOURCE" ]] || die "FFmpeg uses Homebrew sdl2-compat, but SDL3 was not found. Run: brew install sdl3"
+
+  SDL3_FILE_DESC="$(/usr/bin/file "$SDL3_SOURCE" 2>/dev/null || true)"
+  if [[ "$SDL3_FILE_DESC" == *"Mach-O"* ]]; then
+    SDL3_ARCHS="$(/usr/bin/lipo -archs "$SDL3_SOURCE" 2>/dev/null || true)"
+    if [[ -n "$SDL3_ARCHS" && " $SDL3_ARCHS " != *" $TARGET_ARCH "* ]]; then
+      die "$SDL3_SOURCE does not contain required $TARGET_ARCH architecture (found: $SDL3_ARCHS)."
+    fi
+  fi
+
+  cp -L "$SDL3_SOURCE" "$PAYLOAD_DIR/bin/libSDL3.0.dylib"
+  chmod 755 "$PAYLOAD_DIR/bin/libSDL3.0.dylib"
+  log "Bundling SDL3 runtime required by Homebrew sdl2-compat: $SDL3_SOURCE"
+fi
+
 # Validate the exact executables that enter PyInstaller's binary dependency
 # graph. PyInstaller treats Analysis.binaries as native binaries, recursively
 # collects their non-system dylibs on macOS, rewrites load paths, and re-signs
@@ -1414,6 +1451,10 @@ binaries = [
     (str(PAYLOAD / "bin" / "ffmpeg"), "bin"),
     (str(PAYLOAD / "bin" / "ffprobe"), "bin"),
 ]
+# sdl2-compat dlopens SDL3 at runtime, so dependency scanners cannot discover it.
+# Put SDL3 at the Frameworks root beside the collected SDL2 compatibility dylib.
+if (PAYLOAD / "bin" / "libSDL3.0.dylib").exists():
+    binaries.append((str(PAYLOAD / "bin" / "libSDL3.0.dylib"), "."))
 if (PAYLOAD / "bin" / "deno").exists():
     binaries.append((str(PAYLOAD / "bin" / "deno"), "bin"))
 if (PAYLOAD / "fonts").is_dir():
@@ -1550,6 +1591,34 @@ log "Building ${APP_NAME}.app with PyInstaller"
 DIST_APP="$DIST_DIR/${APP_NAME}.app"
 [[ -d "$DIST_APP" ]] || die "PyInstaller did not produce $DIST_APP"
 
+# PyInstaller sees libSDL2 but cannot infer SDL3 because Homebrew's sdl2-compat
+# opens SDL3 dynamically. Ensure both are colocated in Contents/Frameworks and
+# replace sdl2-compat's Homebrew SDL3 rpath with @loader_path before final signing.
+PACKAGED_SDL2="$(find "$DIST_APP/Contents/Frameworks" -type f -name 'libSDL2-2.0.0.dylib' -print -quit 2>/dev/null || true)"
+PACKAGED_SDL3="$(find "$DIST_APP/Contents/Frameworks" -type f -name 'libSDL3.0.dylib' -print -quit 2>/dev/null || true)"
+if [[ -n "$PACKAGED_SDL2" ]]; then
+  [[ -n "$PACKAGED_SDL3" ]] || die "Packaged sdl2-compat was collected without libSDL3.0.dylib."
+  ln -sfn "$(basename "$PACKAGED_SDL3")" "$(dirname "$PACKAGED_SDL3")/libSDL3.dylib"
+
+  while IFS= read -r rpath; do
+    case "$rpath" in
+      /opt/homebrew/*|/usr/local/*)
+        /usr/bin/install_name_tool -delete_rpath "$rpath" "$PACKAGED_SDL2" 2>/dev/null || true
+        ;;
+    esac
+  done < <(
+    /usr/bin/otool -l "$PACKAGED_SDL2" 2>/dev/null \
+      | awk '/cmd LC_RPATH/{want=1; next} want && /path /{print $2; want=0}'
+  )
+
+  if ! /usr/bin/otool -l "$PACKAGED_SDL2" 2>/dev/null \
+      | awk '/cmd LC_RPATH/{want=1; next} want && /path /{print $2; want=0}' \
+      | grep -Fxq '@loader_path'; then
+    /usr/bin/install_name_tool -add_rpath '@loader_path' "$PACKAGED_SDL2"
+  fi
+  log "Prepared app-local SDL3 runtime for sdl2-compat"
+fi
+
 # Real-ESRGAN is copied as a resource so PyInstaller does not reject an Intel
 # helper in an Apple-silicon app. Restore its execute bit, sign nested Mach-O
 # helpers, then re-sign the outer bundle.
@@ -1594,18 +1663,60 @@ PACKAGED_FFPROBE="$(find "$DIST_APP/Contents" -type f -path '*/bin/ffprobe' -pri
 [[ -n "$PACKAGED_FFMPEG" && -x "$PACKAGED_FFMPEG" ]] || die "Packaged FFmpeg was not found inside $DIST_APP."
 [[ -n "$PACKAGED_FFPROBE" && -x "$PACKAGED_FFPROBE" ]] || die "Packaged FFprobe was not found inside $DIST_APP."
 
-PACKAGED_FILTERS_OUTPUT="$(env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin HOME="$HOME" \
-  "$PACKAGED_FFMPEG" -hide_banner -filters 2>&1)" \
-  || die "Packaged FFmpeg cannot start without the developer shell environment."
-PACKAGED_ENCODERS_OUTPUT="$(env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin HOME="$HOME" \
-  "$PACKAGED_FFMPEG" -hide_banner -encoders 2>&1)" \
+# Never let a malformed native dependency turn release verification into an
+# indefinite GUI/modal hang. Run packaged command probes in their own process
+# group and enforce a hard timeout using Python, which is available on every build.
+run_packaged_probe() {
+  local timeout_seconds="$1"; shift
+  "$PYTHON_BIN" - "$timeout_seconds" "$@" <<'PYPROBE'
+import os, signal, subprocess, sys
+seconds=float(sys.argv[1]); cmd=sys.argv[2:]
+env={"PATH":"/usr/bin:/bin:/usr/sbin:/sbin", "HOME":os.path.expanduser("~")}
+p=subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                   env=env, start_new_session=True)
+try:
+    out,_=p.communicate(timeout=seconds)
+except subprocess.TimeoutExpired:
+    try: os.killpg(p.pid, signal.SIGKILL)
+    except ProcessLookupError: pass
+    out,_=p.communicate()
+    if out: sys.stdout.write(out)
+    sys.exit(124)
+if out: sys.stdout.write(out)
+sys.exit(p.returncode)
+PYPROBE
+}
+
+PACKAGED_VERSION_OUTPUT="$(run_packaged_probe 15 "$PACKAGED_FFMPEG" -hide_banner -version)" \
+  || die "Packaged FFmpeg could not start within 15 seconds. Check SDL3 and other runtime dependencies."
+PACKAGED_FILTERS_OUTPUT="$(run_packaged_probe 15 "$PACKAGED_FFMPEG" -hide_banner -filters)" \
+  || die "Packaged FFmpeg cannot enumerate filters without the developer shell environment."
+PACKAGED_ENCODERS_OUTPUT="$(run_packaged_probe 15 "$PACKAGED_FFMPEG" -hide_banner -encoders)" \
   || die "Packaged FFmpeg cannot enumerate encoders without the developer shell environment."
+PACKAGED_FFPROBE_OUTPUT="$(run_packaged_probe 15 "$PACKAGED_FFPROBE" -hide_banner -version)" \
+  || die "Packaged FFprobe could not start within 15 seconds. Check SDL3 and other runtime dependencies."
 grep -Eq '(^|[[:space:]])(ass|subtitles)([[:space:]]|$)' <<<"$PACKAGED_FILTERS_OUTPUT" \
   || die "Packaged FFmpeg lost ASS/subtitles support during collection."
 grep -Fq 'libx264' <<<"$PACKAGED_ENCODERS_OUTPUT" \
   || die "Packaged FFmpeg lost libx264 during collection."
-env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin HOME="$HOME" "$PACKAGED_FFPROBE" -hide_banner -version >/dev/null 2>&1 \
-  || die "Packaged FFprobe cannot start without the developer shell environment."
+
+# If sdl2-compat is present, SDL3 must be packaged beside it and sdl2-compat
+# must not retain the Homebrew-only SDL3 rpath that caused the modal
+# 'Failed loading SDL3 library' hang on clean/runtime-isolated launches.
+PACKAGED_SDL2="$(find "$DIST_APP/Contents/Frameworks" -type f -name 'libSDL2-2.0.0.dylib' -print -quit 2>/dev/null || true)"
+if [[ -n "$PACKAGED_SDL2" ]]; then
+  PACKAGED_SDL3="$(find "$DIST_APP/Contents/Frameworks" -type f -name 'libSDL3.0.dylib' -print -quit 2>/dev/null || true)"
+  [[ -n "$PACKAGED_SDL3" ]] || die "sdl2-compat is packaged but libSDL3.0.dylib is missing."
+  SDL2_RPATHS="$(/usr/bin/otool -l "$PACKAGED_SDL2" 2>/dev/null \
+    | awk '/cmd LC_RPATH/{want=1; next} want && /path /{print $2; want=0}')"
+  if grep -Eq '^/(opt/homebrew|usr/local)/' <<<"$SDL2_RPATHS"; then
+    printf '%s\n' "$SDL2_RPATHS" >&2
+    die "Packaged sdl2-compat still contains an external Homebrew SDL3 rpath."
+  fi
+  grep -Fxq '@loader_path' <<<"$SDL2_RPATHS" \
+    || die "Packaged sdl2-compat does not have an app-local @loader_path SDL3 search path."
+  log "SDL2 compatibility layer has bundled SDL3 runtime"
+fi
 
 # A distributable app must not retain Homebrew Cellar/opt references. System
 # libraries and @rpath/@loader_path references are fine; developer-machine
