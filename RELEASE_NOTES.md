@@ -1,5 +1,15 @@
 # Cut {{VERSION}} — Build {{BUILD_NUMBER}}
 
+## Update 0.1.1
+
+- Reworked online media import so packaged Cut never searches for or executes a random user-installed yt-dlp.
+- Bundles yt-dlp[default], the matching yt-dlp-ejs package, Deno, FFmpeg and FFprobe as application-owned runtime components.
+- Invokes yt-dlp through the signed Cut executable itself and pins the bundled Deno/FFmpeg paths while ignoring user yt-dlp config and plugin directories.
+- Moved release and maintenance shell tooling under scripts/ with one current macOS builder; legacy builder names now forward to it.
+- Added scripts/watch-update.sh to monitor archive/Cut-update-v*.zip, verify incremental updates, commit them, build/sign/notarize, publish GitHub releases and redeploy the homepage.
+- Added automatic dependency checks/install for Homebrew-managed build prerequisites and stale Python build-environment detection.
+- Added scripts/verify_repo.sh and scripts/make-update.sh for deterministic verification and future incremental update packages.
+
 This release introduces the **Cut** product identity and consolidates the latest editing, caption, installation, and release-workflow improvements.
 
 ## Highlights

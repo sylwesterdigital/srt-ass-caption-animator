@@ -330,7 +330,8 @@ def _integrity_tool(name):
 
     resource_root = globals().get("RESOURCE_ROOT", APP_ROOT)
     candidates.append(os.path.join(resource_root, "bin", name))
-    candidates.append(shutil.which(name))
+    if not getattr(sys, "frozen", False):
+        candidates.append(shutil.which(name))
 
     seen = set()
     for candidate in candidates:
@@ -357,6 +358,59 @@ def _integrity_tool(name):
             pass
         if os.access(absolute, os.X_OK):
             return absolute
+    return None
+
+
+def _yt_dlp_command():
+    """Return the app-owned yt-dlp command; never use a random system yt-dlp in a frozen build."""
+    try:
+        import yt_dlp  # noqa: F401
+    except Exception:
+        return None
+
+    if getattr(sys, "frozen", False):
+        # The PyInstaller launcher owns this CLI mode and imports the bundled
+        # yt_dlp package from the same signed application bundle.
+        return [sys.executable, "--yt-dlp-cli"]
+
+    # Development mode still uses the active Python environment rather than a
+    # globally installed yt-dlp executable.
+    return [sys.executable, "-m", "yt_dlp"]
+
+
+def _bundled_runtime_tool(name):
+    """Resolve bundled native helpers first and avoid user PATH in packaged builds."""
+    candidates = []
+    packaged_bin = globals().get("PACKAGED_BIN_DIR")
+    if packaged_bin:
+        candidates.append(os.path.join(packaged_bin, name))
+
+    resource_root = globals().get("RESOURCE_ROOT")
+    if resource_root:
+        candidates.append(os.path.join(resource_root, "bin", name))
+
+    # Development mode may use a developer-installed tool. Frozen production
+    # builds intentionally do not consult the user's PATH.
+    if not getattr(sys, "frozen", False):
+        candidates.append(shutil.which(name))
+
+    seen = set()
+    for candidate in candidates:
+        if not candidate:
+            continue
+        candidate = os.path.abspath(os.path.expanduser(str(candidate)))
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if not os.path.isfile(candidate):
+            continue
+        try:
+            current_mode = os.stat(candidate).st_mode
+            os.chmod(candidate, current_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        except Exception:
+            pass
+        if os.access(candidate, os.X_OK):
+            return candidate
     return None
 
 
@@ -757,49 +811,57 @@ def _integrity_caption_checks():
 def _integrity_optional_media_checks():
     results = []
 
-    for tool_name, label, help_text in (
-        (
-            "yt-dlp",
-            "Social video importer",
-            "Only online imports are affected.",
-        ),
-        (
-            "deno",
-            "Downloader JavaScript runtime",
-            "Some online providers may require Deno.",
-        ),
-    ):
-        path_value = _integrity_tool(tool_name)
-        if not path_value:
-            results.append(
-                _integrity_item(
-                    tool_name,
-                    label,
-                    "warning",
-                    f"{tool_name} was not found.",
-                    help_text=help_text,
-                    required=False,
-                )
+    ytdlp_cmd = _yt_dlp_command()
+    if not ytdlp_cmd:
+        results.append(
+            _integrity_item(
+                "yt-dlp",
+                "Social video importer",
+                "warning",
+                "The bundled yt-dlp Python package is unavailable.",
+                help_text="Reinstall Cut; online imports use the copy embedded in the application.",
+                required=False,
             )
-            continue
-
-        result = _integrity_run(
-            [path_value, "--version"],
-            timeout=8,
         )
+    else:
+        result = _integrity_run([*ytdlp_cmd, "--version"], timeout=12)
         version = _integrity_first_line(result["output"])
         results.append(
             _integrity_item(
-                tool_name,
-                label,
+                "yt-dlp",
+                "Social video importer",
                 "ok" if result["ok"] else "warning",
-                version or f"{tool_name} executable found.",
-                help_text=(
-                    ""
-                    if result["ok"]
-                    else help_text
-                ),
-                path_value=path_value,
+                version or "Bundled yt-dlp package found.",
+                help_text=("" if result["ok"] else "The embedded yt-dlp runtime could not start."),
+                path_value=" ".join(ytdlp_cmd),
+                version=version,
+                required=False,
+            )
+        )
+
+    deno_path = _bundled_runtime_tool("deno") or _integrity_tool("deno")
+    if not deno_path:
+        results.append(
+            _integrity_item(
+                "deno",
+                "Downloader JavaScript runtime",
+                "warning",
+                "Bundled Deno runtime was not found.",
+                help_text="Some online providers may require Deno. Reinstall Cut.",
+                required=False,
+            )
+        )
+    else:
+        result = _integrity_run([deno_path, "--version"], timeout=8)
+        version = _integrity_first_line(result["output"])
+        results.append(
+            _integrity_item(
+                "deno",
+                "Downloader JavaScript runtime",
+                "ok" if result["ok"] else "warning",
+                version or "Bundled Deno executable found.",
+                help_text=("" if result["ok"] else "The embedded Deno runtime could not start."),
+                path_value=deno_path,
                 version=version,
                 required=False,
             )
@@ -6039,62 +6101,74 @@ def download_social_video_job(job_id, url, settings):
         ensure_dirs()
         _set_job_progress(job_id, status="preparing", message="Preparing social video download...", phase="social_import")
 
-        ytdlp_bin = shutil.which("yt-dlp") or shutil.which("yt_dlp")
-        if not ytdlp_bin:
-            raise RuntimeError("yt-dlp was not found. Install it with: python -m pip install -U yt-dlp")
+        ytdlp_cmd = _yt_dlp_command()
+        if not ytdlp_cmd:
+            raise RuntimeError(
+                "The embedded yt-dlp package is unavailable. Reinstall Cut; "
+                "the application does not use a system-installed yt-dlp."
+            )
 
         caption_mode = str(settings.get("caption_mode") or "none").strip().lower()
         caption_language = str(settings.get("caption_language") or "en").strip() or "en"
         work_dir = os.path.abspath(os.path.join(SOCIAL_IMPORT_DIR, secure_filename(job_id)))
         os.makedirs(work_dir, exist_ok=True)
 
-        # Build the subprocess environment explicitly so Flask-launched yt-dlp can find Homebrew tools.
-        # This keeps deno/node/ffmpeg discovery aligned with the same shell command that works in Terminal.
+        # Production downloads use only application-owned helpers. Do not inherit
+        # Homebrew, pipx, user-local binaries, or arbitrary PATH entries.
         ytdlp_env = os.environ.copy()
+        deno_bin = _bundled_runtime_tool("deno") or _integrity_tool("deno")
         path_parts = []
         for candidate in [
-            os.path.dirname(ytdlp_bin),
+            globals().get("PACKAGED_BIN_DIR"),
             os.path.dirname(FFMPEG_BIN) if FFMPEG_BIN else "",
-            "/opt/homebrew/bin",
-            "/usr/local/bin",
+            os.path.dirname(deno_bin) if deno_bin else "",
             "/usr/bin",
             "/bin",
+            "/usr/sbin",
+            "/sbin",
         ]:
             if candidate and os.path.isdir(candidate) and candidate not in path_parts:
                 path_parts.append(candidate)
-        for candidate in str(ytdlp_env.get("PATH") or "").split(os.pathsep):
-            if candidate and candidate not in path_parts:
-                path_parts.append(candidate)
+
+        if not getattr(sys, "frozen", False):
+            for candidate in str(ytdlp_env.get("PATH") or "").split(os.pathsep):
+                if candidate and candidate not in path_parts:
+                    path_parts.append(candidate)
+
         ytdlp_env["PATH"] = os.pathsep.join(path_parts)
         ytdlp_env.setdefault("PYTHONIOENCODING", "utf-8")
 
-        # Detect supported yt-dlp flags once and only add options accepted by the installed version.
-        # Remote EJS components are enabled when supported because YouTube n-challenges can require them.
+        # Query the embedded package itself. The build bundles yt-dlp[default],
+        # including the matching yt-dlp-ejs package, so no external yt-dlp
+        # executable or remote EJS package is required.
         help_text = ""
         try:
             help_result = subprocess.run(
-                [ytdlp_bin, "--help"],
+                [*ytdlp_cmd, "--help"],
                 capture_output=True,
                 text=True,
                 env=ytdlp_env,
-                timeout=10,
+                timeout=12,
             )
             help_text = "\n".join([help_result.stdout or "", help_result.stderr or ""])
         except Exception:
             help_text = ""
 
         ytdlp_shared_args = [
+            "--ignore-config",
             "--no-playlist",
             "--newline",
             "--restrict-filenames",
             "--no-mtime",
         ]
 
-        if "--remote-components" in help_text:
-            ytdlp_shared_args += ["--remote-components", "ejs:github"]
+        if "--no-plugin-dirs" in help_text:
+            ytdlp_shared_args += ["--no-plugin-dirs"]
 
-        if "--js-runtimes" in help_text and shutil.which("deno", path=ytdlp_env["PATH"]):
-            ytdlp_shared_args += ["--js-runtimes", "deno"]
+        if "--js-runtimes" in help_text and deno_bin:
+            if "--no-js-runtimes" in help_text:
+                ytdlp_shared_args += ["--no-js-runtimes"]
+            ytdlp_shared_args += ["--js-runtimes", f"deno:{deno_bin}"]
 
         if "--ffmpeg-location" in help_text and FFMPEG_BIN and os.path.exists(FFMPEG_BIN):
             ytdlp_shared_args += ["--ffmpeg-location", os.path.dirname(FFMPEG_BIN)]
@@ -6104,7 +6178,7 @@ def download_social_video_job(job_id, url, settings):
         # Download media first without subtitle flags so subtitle rate limits can never fail the video import.
         # Vulnerable block: URL is validated before this point and is passed as a single subprocess argument.
         video_cmd = [
-            ytdlp_bin,
+            *ytdlp_cmd,
             *ytdlp_shared_args,
             "-o", output_template,
             url,
@@ -6121,7 +6195,7 @@ def download_social_video_job(job_id, url, settings):
 
             try:
                 metadata_cmd = [
-                    ytdlp_bin,
+                    *ytdlp_cmd,
                     *ytdlp_shared_args,
                     "--skip-download",
                     "-J",
@@ -6192,7 +6266,7 @@ def download_social_video_job(job_id, url, settings):
             if selected_caption_language:
                 _set_job_progress(job_id, status="rendering", message="Downloading available captions...", phase="social_import")
                 caption_cmd = [
-                    ytdlp_bin,
+                    *ytdlp_cmd,
                     *ytdlp_shared_args,
                     "--skip-download",
                     "--sub-langs", selected_caption_language,

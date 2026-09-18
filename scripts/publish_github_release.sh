@@ -3,7 +3,8 @@
 # draft until every asset is uploaded, then it is promoted to the requested mode.
 set -Eeuo pipefail
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT"
 
 APP_SAFE_NAME="${APP_SAFE_NAME:-Cut}"

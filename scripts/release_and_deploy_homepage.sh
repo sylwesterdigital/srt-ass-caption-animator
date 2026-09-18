@@ -5,7 +5,8 @@
 # completed phase.
 set -Eeuo pipefail
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT"
 
 RELEASE_MODE="${RELEASE_MODE:-published}"
@@ -21,9 +22,9 @@ PREFLIGHT_ONLY=0
 RESTART_WORKFLOW=0
 SHOW_STATUS=0
 
-RELEASE_SCRIPT="${RELEASE_SCRIPT:-./release_signed.sh}"
-PUBLISH_SCRIPT="${PUBLISH_SCRIPT:-./publish_github_release.sh}"
-HOMEPAGE_SCRIPT="${HOMEPAGE_SCRIPT:-./deploy_homepage.sh}"
+RELEASE_SCRIPT="${RELEASE_SCRIPT:-$SCRIPT_DIR/release_signed.sh}"
+PUBLISH_SCRIPT="${PUBLISH_SCRIPT:-$SCRIPT_DIR/publish_github_release.sh}"
+HOMEPAGE_SCRIPT="${HOMEPAGE_SCRIPT:-$SCRIPT_DIR/deploy_homepage.sh}"
 STATE_FILE="${STATE_FILE:-release/.release-workflow-state.env}"
 LAST_RELEASE_ENV="${LAST_RELEASE_ENV:-release/.last-release.env}"
 
@@ -45,12 +46,12 @@ die() { printf '\033[1;31mERROR:\033[0m %s\n' "$*" >&2; exit 1; }
 usage() {
   cat <<'USAGE'
 Usage:
-  ./release_and_deploy_homepage.sh
-  ./release_and_deploy_homepage.sh --version 0.1.1
-  ./release_and_deploy_homepage.sh --prerelease
-  ./release_and_deploy_homepage.sh --preflight-only
-  ./release_and_deploy_homepage.sh --status
-  ./release_and_deploy_homepage.sh --restart
+  ./scripts/release_and_deploy_homepage.sh
+  ./scripts/release_and_deploy_homepage.sh --version 0.1.1
+  ./scripts/release_and_deploy_homepage.sh --prerelease
+  ./scripts/release_and_deploy_homepage.sh --preflight-only
+  ./scripts/release_and_deploy_homepage.sh --status
+  ./scripts/release_and_deploy_homepage.sh --restart
 
 Reliability:
   - all network/authentication endpoints are checked before a new build starts;
@@ -287,8 +288,8 @@ preflight() {
   [[ -x "$RELEASE_SCRIPT" || "$phase" != build ]] || die "Missing executable: $RELEASE_SCRIPT"
 
   if [[ "$SKIP_HOMEPAGE" == 0 && "$RELEASE_MODE" != draft ]]; then
-    if [[ ! -x "$HOMEPAGE_SCRIPT" && -x ./homepage/deploy_homepage.sh ]]; then
-      HOMEPAGE_SCRIPT=./homepage/deploy_homepage.sh
+    if [[ ! -x "$HOMEPAGE_SCRIPT" && -x $SCRIPT_DIR/deploy_homepage.sh ]]; then
+      HOMEPAGE_SCRIPT=$SCRIPT_DIR/deploy_homepage.sh
     fi
     [[ -x "$HOMEPAGE_SCRIPT" ]] || die "Missing executable: $HOMEPAGE_SCRIPT"
     [[ -f homepage/index.html ]] || die "Missing homepage/index.html"

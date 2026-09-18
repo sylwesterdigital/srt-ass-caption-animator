@@ -38,7 +38,8 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
 
 APP_NAME="${APP_NAME:-Cut}"
@@ -110,23 +111,32 @@ command -v unzip >/dev/null 2>&1 || die "unzip is required."
 [[ -f "$PROJECT_ROOT/templates/index.html" ]] || die "Missing templates/index.html"
 [[ -d "$PROJECT_ROOT/assets" ]] || die "Missing assets/"
 
-# Prefer a Homebrew Python because macOS system Python causes pywebview focus issues.
+# Release builds use a controlled Python runtime. The watcher installs Homebrew
+# Python 3.12 when necessary and passes PYTHON_BIN explicitly.
 if [[ -z "${PYTHON_BIN:-}" ]]; then
+  BREW_PY312=""
+  if command -v brew >/dev/null 2>&1; then
+    BREW_PY312="$(brew --prefix python@3.12 2>/dev/null || true)/bin/python3.12"
+  elif [[ -x /opt/homebrew/bin/brew ]]; then
+    BREW_PY312="$(/opt/homebrew/bin/brew --prefix python@3.12 2>/dev/null || true)/bin/python3.12"
+  elif [[ -x /usr/local/bin/brew ]]; then
+    BREW_PY312="$(/usr/local/bin/brew --prefix python@3.12 2>/dev/null || true)/bin/python3.12"
+  fi
   for candidate in \
+    "$BREW_PY312" \
     /opt/homebrew/bin/python3.12 \
     /usr/local/bin/python3.12 \
+    "$(command -v python3.12 2>/dev/null || true)" \
     /opt/homebrew/bin/python3.13 \
     /usr/local/bin/python3.13 \
-    "$(command -v python3.12 2>/dev/null || true)" \
-    "$(command -v python3.13 2>/dev/null || true)" \
-    "$(command -v python3 2>/dev/null || true)"; do
+    "$(command -v python3.13 2>/dev/null || true)"; do
     if [[ -n "$candidate" && -x "$candidate" ]]; then
       PYTHON_BIN="$candidate"
       break
     fi
   done
 fi
-[[ -n "${PYTHON_BIN:-}" && -x "$PYTHON_BIN" ]] || die "Python 3 was not found. Install Homebrew Python 3.12 or set PYTHON_BIN."
+[[ -n "${PYTHON_BIN:-}" && -x "$PYTHON_BIN" ]] || die "Python 3.12 was not found. Run scripts/watch-update.sh or install Homebrew python@3.12."
 
 "$PYTHON_BIN" - "$PROJECT_ROOT/app.py" "$PROJECT_ROOT/templates/index.html" <<'PYSOURCECHECK'
 from pathlib import Path
@@ -174,6 +184,10 @@ if missing:
 PYSOURCECHECK
 
 PYTHON_VERSION="$($PYTHON_BIN -c 'import platform; print(platform.python_version())')"
+case "$PYTHON_VERSION" in
+  3.12.*|3.13.*) ;;
+  *) die "Unsupported release Python $PYTHON_VERSION. Use Python 3.12 (preferred) or 3.13; Python 3.14 is intentionally excluded from release builds." ;;
+esac
 PYTHON_ARCH="$($PYTHON_BIN -c 'import platform; print(platform.machine())')"
 case "$PYTHON_ARCH" in
   arm64|aarch64) TARGET_ARCH="arm64"; DENO_ARCH="aarch64" ;;
@@ -182,9 +196,6 @@ case "$PYTHON_ARCH" in
 esac
 
 log "Builder Python: $PYTHON_BIN ($PYTHON_VERSION, $TARGET_ARCH)"
-if [[ "$PYTHON_VERSION" == 3.14* ]]; then
-  warn "Python 3.14 may have fewer prebuilt ML wheels. Python 3.12 is the safest build interpreter."
-fi
 
 # Version and monotonically increasing build number.
 if [[ -n "${VERSION:-}" ]]; then
@@ -317,7 +328,7 @@ if ! "$PAYLOAD_DIR/bin/ffmpeg" -hide_banner -encoders 2>/dev/null | grep 'libx26
   die "The selected FFmpeg does not include libx264, which the app uses for video export."
 fi
 
-log "Embedding yt-dlp Python package behind Cut's signed CLI wrapper"
+log "Embedding yt-dlp[default] and yt-dlp-ejs inside Cut"
 
 if [[ "$BUNDLE_DENO" == "1" ]]; then
   log "Bundling Deno JavaScript runtime for current yt-dlp YouTube support"
@@ -358,10 +369,18 @@ if [[ "$BUNDLE_REALESRGAN" == "1" ]]; then
   fi
 fi
 
-# Create/reuse an isolated build environment.
+# Create/reuse an isolated build environment, but never reuse a venv created
+# by another Python version or architecture.
+if [[ -x "$VENV_DIR/bin/python" ]]; then
+  VENV_VERSION="$($VENV_DIR/bin/python -c 'import platform; print(platform.python_version())' 2>/dev/null || true)"
+  VENV_ARCH="$($VENV_DIR/bin/python -c 'import platform; print(platform.machine())' 2>/dev/null || true)"
+  if [[ "$VENV_VERSION" != "$PYTHON_VERSION" || "$VENV_ARCH" != "$PYTHON_ARCH" ]]; then
+    warn "Recreating stale build venv ($VENV_VERSION/$VENV_ARCH -> $PYTHON_VERSION/$PYTHON_ARCH)."
+    rm -rf "$VENV_DIR"
+  fi
+fi
 if [[ ! -x "$VENV_DIR/bin/python" ]]; then
   log "Creating build virtual environment"
-  rm -rf "$VENV_DIR"
   "$PYTHON_BIN" -m venv "$VENV_DIR"
 fi
 VENV_PYTHON="$VENV_DIR/bin/python"
@@ -369,19 +388,7 @@ VENV_PIP="$VENV_DIR/bin/pip"
 
 log "Installing packaging and runtime dependencies"
 "$VENV_PYTHON" -m pip install --upgrade pip setuptools wheel
-"$VENV_PIP" install --upgrade \
-  "pyinstaller>=6.21,<7" \
-  "pyinstaller-hooks-contrib" \
-  "Flask>=3.1,<4" \
-  "Werkzeug>=3.1,<4" \
-  "pysubs2>=1.8,<2" \
-  "fonttools>=4.59" \
-  "Pillow>=11" \
-  "CairoSVG>=2.7" \
-  "numpy>=1.26" \
-  "faster-whisper>=1.2" \
-  "yt-dlp" \
-  "pywebview>=6"
+"$VENV_PIP" install --upgrade -r "$SCRIPT_DIR/requirements-macos.txt"
 
 # Pre-download the default Faster-Whisper model. Other model choices still download
 # on first use into the user's Application Support cache.
@@ -439,7 +446,6 @@ replacements = {
     'app = Flask(__name__, template_folder="templates")': 'app = Flask(__name__, template_folder=os.path.join(RESOURCE_ROOT, "templates"))',
     'app.config["TEMPLATES_AUTO_RELOAD"] = True': 'app.config["TEMPLATES_AUTO_RELOAD"] = False',
     'tempfile.mkdtemp(prefix="libass_fonts_", dir=APP_ROOT)': 'tempfile.mkdtemp(prefix="libass_fonts_", dir=DATA_ROOT)',
-    'ytdlp_bin = shutil.which("yt-dlp") or shutil.which("yt_dlp")': 'ytdlp_bin = _resolve_packaged_tool("yt-dlp") or shutil.which("yt_dlp")',
     'app.run(host="127.0.0.1", port=5151, debug=True, threaded=False, use_reloader=True)': 'app.run(host="127.0.0.1", port=5151, debug=False, threaded=True, use_reloader=False)',
 }
 for old, new in replacements.items():
@@ -453,11 +459,9 @@ new_ffmpeg = '''PACKAGED_BIN_DIR = os.path.join(RESOURCE_ROOT, "bin")
 
 
 def _resolve_packaged_tool(name, legacy_path=None):
-    candidates = [
-        os.path.join(PACKAGED_BIN_DIR, name),
-        legacy_path,
-        shutil.which(name),
-    ]
+    candidates = [os.path.join(PACKAGED_BIN_DIR, name)]
+    if not getattr(sys, "frozen", False):
+        candidates.extend([legacy_path, shutil.which(name)])
     for candidate in candidates:
         if candidate and os.path.isfile(candidate):
             try:
@@ -973,9 +977,8 @@ def prepare_runtime() -> tuple[Path, Path]:
     )
 
     bundled_bin = resources / "bin"
-    path_entries = [str(bundled_bin), "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
-    existing = os.environ.get("PATH", "").split(os.pathsep)
-    os.environ["PATH"] = os.pathsep.join(dict.fromkeys([p for p in path_entries + existing if p]))
+    path_entries = [str(bundled_bin), "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+    os.environ["PATH"] = os.pathsep.join(dict.fromkeys([p for p in path_entries if p]))
     os.environ["CUT_DATA_DIR"] = str(data)
     os.environ["CAPTION_ANIMATOR_DATA_DIR"] = str(data)
     os.environ["CUT_APP_VERSION"] = APP_VERSION
@@ -1072,16 +1075,14 @@ def main() -> int:
             ui_fonts = _list_ui_fonts()
             assert ui_fonts, "No UI font families were found after bundled-font synchronization"
 
-            ytdlp_path = resources / "bin" / "yt-dlp"
-            assert ytdlp_path.is_file(), "Signed yt-dlp wrapper is missing"
             ytdlp_result = subprocess.run(
-                [str(ytdlp_path), "--version"],
+                [sys.executable, "--yt-dlp-cli", "--version"],
                 capture_output=True,
                 text=True,
                 timeout=20,
             )
             assert ytdlp_result.returncode == 0, (
-                "Signed yt-dlp wrapper failed: "
+                "Embedded yt-dlp CLI failed: "
                 + (ytdlp_result.stderr or ytdlp_result.stdout or "").strip()
             )
 
@@ -1393,6 +1394,7 @@ for package in (
     "fontTools",
     "pysubs2",
     "yt_dlp",
+    "yt_dlp_ejs",
 ):
     try:
         pkg_datas, pkg_binaries, pkg_hiddenimports = collect_all(package)
@@ -1501,18 +1503,6 @@ log "Building ${APP_NAME}.app with PyInstaller"
 
 DIST_APP="$DIST_DIR/${APP_NAME}.app"
 [[ -d "$DIST_APP" ]] || die "PyInstaller did not produce $DIST_APP"
-
-# Use the signed Cut executable itself as the yt-dlp host. This avoids the
-# PyInstaller one-file Team-ID mismatch caused by the upstream yt-dlp_macos
-# executable extracting a differently signed Python framework.
-YTDLP_WRAPPER="$DIST_APP/Contents/Frameworks/bin/yt-dlp"
-mkdir -p "$(dirname "$YTDLP_WRAPPER")"
-cat > "$YTDLP_WRAPPER" <<SH
-#!/bin/sh
-HERE="\$(CDPATH= cd -- "\$(dirname -- "\$0")" && pwd)"
-exec "\$HERE/../../MacOS/${APP_NAME}" --yt-dlp-cli "\$@"
-SH
-chmod 755 "$YTDLP_WRAPPER"
 
 # Real-ESRGAN is copied as a resource so PyInstaller does not reject an Intel
 # helper in an Apple-silicon app. Restore its execute bit, sign nested Mach-O

@@ -4,7 +4,11 @@ set -Eeuo pipefail
 # deploy_homepage.sh — build and deploy the Cut homepage.
 # Source is never modified; all changes happen in an isolated build copy.
 
-PROJECT_DIR="${PROJECT_DIR:-/Users/smielniczuk/Documents/works/srt-ass-caption-animator/homepage}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$ROOT"
+
+PROJECT_DIR="${PROJECT_DIR:-$ROOT/homepage}"
 SOURCE_HTML="${SOURCE_HTML:-index.html}"
 BUILD_ROOT="${BUILD_ROOT:-$PROJECT_DIR/.deploy_build}"
 
@@ -68,10 +72,10 @@ retry_cmd(){
 
 usage(){
   cat <<'USAGE'
-Usage: ./deploy_homepage.sh [options]
+Usage: ./scripts/deploy_homepage.sh [options]
 
 Defaults:
-  Source: /Users/smielniczuk/Documents/works/srt-ass-caption-animator/homepage
+  Source: <repo>/homepage
   Target: root@yolo.cx:18021:/var/www/mojoworks/labs/cut
   URL:    https://mojoworks.xyz/labs/cut/
 

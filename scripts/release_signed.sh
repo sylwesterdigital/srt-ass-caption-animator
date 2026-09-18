@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT"
 
-BUILDER="${BUILDER:-./build_macos_release_v3.sh}"
+BUILDER="${BUILDER:-$SCRIPT_DIR/build_macos_release_v3.sh}"
 [[ -x "$BUILDER" ]] || {
   echo "ERROR: $BUILDER is missing or not executable." >&2
-  echo "Place release_signed.sh and build_macos_release_v3.sh in the project root." >&2
+  echo "Expected builder: $SCRIPT_DIR/build_macos_release_v3.sh" >&2
   exit 1
 }
 
