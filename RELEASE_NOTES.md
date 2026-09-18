@@ -1,5 +1,14 @@
 # Cut {{VERSION}} — Build {{BUILD_NUMBER}}
 
+## Update 0.1.4
+
+- Replaced the fragile third-party FFmpeg alt-name provisioning path with Homebrew core ffmpeg@6 as the deterministic automatic build source.
+- ffmpeg@6 is keg-only and can coexist with any existing ffmpeg command while providing libx264 and libass required by Cut.
+- FFmpeg discovery now checks exact formula prefixes, installed Cellar kegs, explicit developer overrides and PATH candidates, with verbose diagnostics for rejected binaries.
+- FFmpeg validation now checks build configuration plus encoder/filter enumeration instead of relying on one ambiguous Homebrew path.
+- Fresh watcher processes initialize a lightweight Python 3 interpreter before update ingestion, then pin Python 3.12 only for release builds.
+- The macOS builder now independently prefers ffmpeg@6 and audits the complete packaged Mach-O graph for Homebrew paths outside Cut.app.
+
 ## Update 0.1.3
 
 - Fixed a Bash pipefail/SIGPIPE bug that falsely reported a valid FFmpeg build as missing libx264 or ASS/subtitle filters.

@@ -19,6 +19,10 @@ RETRY_SECONDS="${CUT_UPDATE_RETRY_SECONDS:-60}"
 AUTO_INSTALL_DEPS="${CUT_UPDATE_AUTO_INSTALL_DEPS:-1}"
 AUTO_RELEASE="${CUT_UPDATE_AUTO_RELEASE:-1}"
 
+# Lightweight update ingestion only needs any available Python 3. The release
+# preflight later replaces this with the pinned Homebrew Python 3.12.
+PYTHON_BIN="${PYTHON_BIN:-$(command -v python3 2>/dev/null || true)}"
+
 MODE="watch"
 PROCESS_FILE=""
 case "${1:-}" in
@@ -133,16 +137,20 @@ ensure_formula(){
 }
 
 ffmpeg_has_required_features(){
-  local ffmpeg="$1" encoders filters
+  local ffmpeg="$1" buildconf encoders filters
   [[ -n "$ffmpeg" && -x "$ffmpeg" ]] || return 1
 
-  # Do not pipe FFmpeg directly into grep while `set -o pipefail` is active.
-  # grep may exit as soon as it sees a match, FFmpeg then receives SIGPIPE, and
-  # the pipeline is reported as a failure even though the requested feature is
-  # present. Capture complete output first, then inspect the shell buffer.
+  # First use FFmpeg's own build configuration. This is considerably more
+  # stable across FFmpeg releases than parsing the human-formatted tables.
+  buildconf="$("$ffmpeg" -hide_banner -buildconf 2>&1)" || return 1
+  [[ "$buildconf" == *"--enable-libx264"* ]] || return 1
+  [[ "$buildconf" == *"--enable-libass"* ]] || return 1
+
+  # Also prove the executable can enumerate the compiled encoder/filter sets;
+  # this catches broken dynamic-library installations. Capture all output first
+  # so Bash pipefail/SIGPIPE can never turn an early grep match into failure.
   encoders="$("$ffmpeg" -hide_banner -encoders 2>&1)" || return 1
   filters="$("$ffmpeg" -hide_banner -filters 2>&1)" || return 1
-
   grep -Fq 'libx264' <<<"$encoders" || return 1
   grep -Eq '(^|[[:space:]])(ass|subtitles)([[:space:]]|$)' <<<"$filters" || return 1
   return 0
@@ -153,48 +161,77 @@ ffprobe_next_to(){
   dir="$(dirname "$ffmpeg")"
   case "$(basename "$ffmpeg")" in
     ffmpeg-alt)
-      candidate="$dir/ffprobe-alt"
-      [[ -x "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
-      candidate="$dir/ffprobe"
+      for candidate in "$dir/ffprobe-alt" "$dir/ffprobe"; do
+        [[ -x "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
+      done
       ;;
     *)
-      candidate="$dir/ffprobe"
-      [[ -x "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
-      candidate="$dir/ffprobe-alt"
+      for candidate in "$dir/ffprobe" "$dir/ffprobe-alt"; do
+        [[ -x "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
+      done
       ;;
   esac
-  [[ -x "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
   return 1
 }
 
-select_full_ffmpeg(){
-  local brew prefix ffmpeg ffprobe candidate
-  local -a candidates=()
+append_ffmpeg_candidate(){
+  local candidate="$1"
+  [[ -n "$candidate" && -x "$candidate" ]] || return 0
+  FFMPEG_CANDIDATES+=("$candidate")
+}
 
-  if [[ -n "${FFMPEG_SOURCE:-}" ]]; then
-    candidates+=("$FFMPEG_SOURCE")
-  fi
+select_full_ffmpeg(){
+  local brew prefix ffmpeg ffprobe candidate cellar
+  FFMPEG_CANDIDATES=()
+
+  # Explicit configuration always wins.
+  append_ffmpeg_candidate "${FFMPEG_SOURCE:-}"
 
   brew="$(brew_bin || true)"
   if [[ -n "$brew" ]]; then
-    prefix="$($brew --prefix homebrew-ffmpeg/ffmpeg/ffmpeg 2>/dev/null || true)"
-    if [[ -n "$prefix" ]]; then
-      [[ -x "$prefix/bin/ffmpeg-alt" ]] && candidates+=("$prefix/bin/ffmpeg-alt")
-      [[ -x "$prefix/bin/ffmpeg" ]] && candidates+=("$prefix/bin/ffmpeg")
+    # Use Homebrew's versioned core FFmpeg as the deterministic build-machine
+    # source. It is keg-only, can coexist with other FFmpeg installs, and its
+    # current formula enables both libx264 and libass.
+    prefix="$("$brew" --prefix ffmpeg@6 2>/dev/null || true)"
+    [[ -z "$prefix" ]] || append_ffmpeg_candidate "$prefix/bin/ffmpeg"
+
+    # Existing standard/tap installs remain valid fallbacks if they actually
+    # pass capability checks. This also lets a developer provide a newer full
+    # FFmpeg without changing the release policy.
+    prefix="$("$brew" --prefix ffmpeg 2>/dev/null || true)"
+    [[ -z "$prefix" ]] || {
+      append_ffmpeg_candidate "$prefix/bin/ffmpeg"
+      append_ffmpeg_candidate "$prefix/bin/ffmpeg-alt"
+    }
+    prefix="$("$brew" --prefix homebrew-ffmpeg/ffmpeg/ffmpeg 2>/dev/null || true)"
+    [[ -z "$prefix" ]] || {
+      append_ffmpeg_candidate "$prefix/bin/ffmpeg-alt"
+      append_ffmpeg_candidate "$prefix/bin/ffmpeg"
+    }
+
+    # Homebrew prefix aliases can be confusing when core and tap formulae have
+    # the same basename. Scan installed Cellar kegs as a final deterministic
+    # discovery step instead of guessing a symlink path.
+    cellar="$("$brew" --cellar 2>/dev/null || true)"
+    if [[ -n "$cellar" && -d "$cellar" ]]; then
+      while IFS= read -r candidate; do
+        append_ffmpeg_candidate "$candidate"
+      done < <(find "$cellar" -maxdepth 4 -type f \( -name ffmpeg -o -name ffmpeg-alt \) -path '*/bin/*' -perm -111 -print 2>/dev/null | sort -r)
     fi
   fi
 
-  # Developer-machine compatibility only. The resulting application embeds the
-  # selected binary and never searches these paths on an end-user Mac.
-  [[ -x "$HOME/ffmpeg-full/bin/ffmpeg" ]] && candidates+=("$HOME/ffmpeg-full/bin/ffmpeg")
+  # Explicit legacy developer bundle and PATH are only build-machine fallbacks.
+  append_ffmpeg_candidate "$HOME/ffmpeg-full/bin/ffmpeg"
   candidate="$(command -v ffmpeg 2>/dev/null || true)"
-  [[ -n "$candidate" ]] && candidates+=("$candidate")
+  append_ffmpeg_candidate "$candidate"
 
   local seen='|'
-  for ffmpeg in "${candidates[@]}"; do
+  for ffmpeg in "${FFMPEG_CANDIDATES[@]}"; do
     [[ "$seen" == *"|$ffmpeg|"* ]] && continue
     seen+="$ffmpeg|"
-    ffmpeg_has_required_features "$ffmpeg" || continue
+    if ! ffmpeg_has_required_features "$ffmpeg"; then
+      continue
+    fi
 
     if [[ -n "${FFPROBE_SOURCE:-}" && -x "$FFPROBE_SOURCE" ]]; then
       ffprobe="$FFPROBE_SOURCE"
@@ -202,6 +239,7 @@ select_full_ffmpeg(){
       ffprobe="$(ffprobe_next_to "$ffmpeg" || true)"
     fi
     [[ -n "$ffprobe" && -x "$ffprobe" ]] || continue
+    "$ffprobe" -hide_banner -version >/dev/null 2>&1 || continue
 
     export FFMPEG_SOURCE="$ffmpeg"
     export FFPROBE_SOURCE="$ffprobe"
@@ -210,29 +248,58 @@ select_full_ffmpeg(){
   return 1
 }
 
+show_ffmpeg_diagnostics(){
+  local ffmpeg output
+  warn "No discovered FFmpeg candidate passed Cut's required capability checks."
+  if [[ ${#FFMPEG_CANDIDATES[@]} -eq 0 ]]; then
+    warn "No FFmpeg executables were discovered."
+    return 0
+  fi
+  for ffmpeg in "${FFMPEG_CANDIDATES[@]}"; do
+    [[ -n "$ffmpeg" ]] || continue
+    printf '  candidate: %s\n' "$ffmpeg" >&2
+    if [[ ! -x "$ffmpeg" ]]; then
+      printf '    not executable\n' >&2
+      continue
+    fi
+    output="$("$ffmpeg" -hide_banner -buildconf 2>&1 || true)"
+    if [[ -z "$output" ]]; then
+      printf '    could not execute -buildconf\n' >&2
+    else
+      if [[ "$output" == *"--enable-libx264"* ]]; then printf '    libx264: yes\n' >&2; else printf '    libx264: no\n' >&2; fi
+      if [[ "$output" == *"--enable-libass"* ]]; then printf '    libass:  yes\n' >&2; else printf '    libass:  no\n' >&2; fi
+    fi
+  done
+}
+
 install_full_ffmpeg(){
   local brew prefix
   brew="$(brew_bin || true)"
   [[ -n "$brew" ]] || die "A full FFmpeg build is required and Homebrew is not installed."
-  [[ "$AUTO_INSTALL_DEPS" == "1" ]] || die "No FFmpeg with libx264 + libass was found. Enable automatic dependency installation or provide FFMPEG_SOURCE/FFPROBE_SOURCE."
+  [[ "$AUTO_INSTALL_DEPS" == "1" ]] || die "No FFmpeg with libx264 + libass was found. Set FFMPEG_SOURCE/FFPROBE_SOURCE or enable automatic dependency installation."
 
   step "Full FFmpeg runtime"
-  info "The FFmpeg currently available is not suitable for Cut."
-  info "Installing an isolated full FFmpeg build with libass and x264 support."
+  info "Installing Homebrew ffmpeg@6 as Cut's isolated build-time FFmpeg source."
+  info "This formula is keg-only; it does not replace the ffmpeg command on your PATH."
 
-  HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1 "$brew" tap homebrew-ffmpeg/ffmpeg
-  if ! "$brew" list --versions homebrew-ffmpeg/ffmpeg/ffmpeg >/dev/null 2>&1; then
-    HOMEBREW_NO_ASK=1 HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1 \
-      "$brew" install homebrew-ffmpeg/ffmpeg/ffmpeg --with-alt-name
+  if "$brew" list --versions ffmpeg@6 >/dev/null 2>&1; then
+    HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1 "$brew" reinstall ffmpeg@6
   else
-    prefix="$($brew --prefix homebrew-ffmpeg/ffmpeg/ffmpeg 2>/dev/null || true)"
-    if [[ -z "$prefix" || ! -x "$prefix/bin/ffmpeg-alt" || ! -x "$prefix/bin/ffprobe-alt" ]]; then
-      HOMEBREW_NO_ASK=1 HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1 \
-        "$brew" reinstall homebrew-ffmpeg/ffmpeg/ffmpeg --with-alt-name
-    fi
+    HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1 "$brew" install ffmpeg@6
   fi
 
-  select_full_ffmpeg || die "Full FFmpeg installation completed, but Cut still cannot find a build containing libx264 and ASS/subtitle filters."
+  prefix="$("$brew" --prefix ffmpeg@6 2>/dev/null || true)"
+  [[ -n "$prefix" && -x "$prefix/bin/ffmpeg" && -x "$prefix/bin/ffprobe" ]] \
+    || die "Homebrew installed ffmpeg@6 but its ffmpeg/ffprobe executables were not found."
+
+  export FFMPEG_SOURCE="$prefix/bin/ffmpeg"
+  export FFPROBE_SOURCE="$prefix/bin/ffprobe"
+  if ! ffmpeg_has_required_features "$FFMPEG_SOURCE"; then
+    show_ffmpeg_diagnostics
+    die "ffmpeg@6 installed, but the executable does not expose libx264 + libass as required."
+  fi
+  "$FFPROBE_SOURCE" -hide_banner -version >/dev/null 2>&1 \
+    || die "ffmpeg@6 installed, but ffprobe cannot start."
 }
 
 ensure_dependencies(){
@@ -275,6 +342,7 @@ ensure_dependencies(){
   [[ "$PYVER" == 3.12.* ]] || die "Release Python must be 3.12; found $PYVER at $PYTHON_BIN"
 
   if ! select_full_ffmpeg; then
+    show_ffmpeg_diagnostics
     install_full_ffmpeg
   fi
 

@@ -82,3 +82,13 @@ The FFmpeg capability check must never stream FFmpeg directly into `grep -q` whi
 
 The macOS builder also audits the final bundled FFmpeg and FFprobe from inside `Cut.app` with a minimal environment. The release fails if either executable cannot start, if ASS/subtitles or libx264 disappeared during collection, or if the packaged binaries still retain absolute Homebrew Cellar/opt references. This keeps build-machine discovery separate from end-user runtime behavior.
 
+
+## 0.1.4 FFmpeg provisioning repair
+
+The release watcher now uses Homebrew core `ffmpeg@6` as the deterministic build-machine source when it has to provision FFmpeg automatically. The versioned formula is keg-only, has bottled arm64 Sequoia builds, and enables both `libx264` and `libass`; it can therefore coexist with whatever `ffmpeg` command the developer already has on PATH. Existing explicit/full FFmpeg installs remain valid only when they pass the same capability checks.
+
+FFmpeg discovery no longer relies on one ambiguous Homebrew prefix. The watcher checks the versioned formula first, then valid existing formulae, then scans installed Cellar kegs and finally developer fallbacks. Capability validation checks FFmpeg's own `-buildconf` output plus encoder/filter enumeration, and failed candidates are printed verbosely instead of collapsing into a generic error.
+
+A fresh watcher process now initializes a lightweight Python 3 interpreter immediately so update ingestion works before release Python 3.12 is provisioned. Release preflight still pins Homebrew Python 3.12 for the macOS build.
+
+The macOS builder independently prefers `ffmpeg@6` when it is invoked outside the watcher. FFmpeg and FFprobe are supplied to PyInstaller as native binaries, allowing PyInstaller to recursively collect non-system dylibs, rewrite macOS load paths and re-sign collected Mach-O files. The final app audit runs the packaged tools with a minimal environment and rejects any Mach-O dependency in `Contents/MacOS` or `Contents/Frameworks` that still points to Homebrew outside `Cut.app`.

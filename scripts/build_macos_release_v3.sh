@@ -288,25 +288,58 @@ text = text.replace(
 path.write_text(text, encoding="utf-8")
 PYHTML
 
-find_tool() {
-  local env_value="$1"
-  local legacy_value="$2"
-  local command_name="$3"
-  if [[ -n "$env_value" && -x "$env_value" ]]; then
-    printf '%s\n' "$env_value"
-    return 0
+resolve_ffmpeg_pair() {
+  local brew prefix ffmpeg ffprobe candidate buildconf encoders filters
+  local -a candidates=()
+
+  if [[ -n "${FFMPEG_SOURCE:-}" && -x "$FFMPEG_SOURCE" ]]; then
+    candidates+=("$FFMPEG_SOURCE")
   fi
-  if [[ -n "$legacy_value" && -x "$legacy_value" ]]; then
-    printf '%s\n' "$legacy_value"
-    return 0
+
+  brew="$(command -v brew 2>/dev/null || true)"
+  if [[ -z "$brew" && -x /opt/homebrew/bin/brew ]]; then brew=/opt/homebrew/bin/brew; fi
+  if [[ -z "$brew" && -x /usr/local/bin/brew ]]; then brew=/usr/local/bin/brew; fi
+  if [[ -n "$brew" ]]; then
+    prefix="$("$brew" --prefix ffmpeg@6 2>/dev/null || true)"
+    [[ -z "$prefix" || ! -x "$prefix/bin/ffmpeg" ]] || candidates+=("$prefix/bin/ffmpeg")
   fi
-  command -v "$command_name" 2>/dev/null || return 1
+
+  [[ ! -x "$HOME/ffmpeg-full/bin/ffmpeg" ]] || candidates+=("$HOME/ffmpeg-full/bin/ffmpeg")
+  candidate="$(command -v ffmpeg 2>/dev/null || true)"
+  [[ -z "$candidate" ]] || candidates+=("$candidate")
+
+  local seen='|'
+  for ffmpeg in "${candidates[@]}"; do
+    [[ "$seen" == *"|$ffmpeg|"* ]] && continue
+    seen+="$ffmpeg|"
+
+    buildconf="$("$ffmpeg" -hide_banner -buildconf 2>&1 || true)"
+    [[ "$buildconf" == *"--enable-libx264"* && "$buildconf" == *"--enable-libass"* ]] || continue
+    encoders="$("$ffmpeg" -hide_banner -encoders 2>&1 || true)"
+    filters="$("$ffmpeg" -hide_banner -filters 2>&1 || true)"
+    grep -Fq 'libx264' <<<"$encoders" || continue
+    grep -Eq '(^|[[:space:]])(ass|subtitles)([[:space:]]|$)' <<<"$filters" || continue
+
+    if [[ -n "${FFPROBE_SOURCE:-}" && -x "$FFPROBE_SOURCE" ]]; then
+      ffprobe="$FFPROBE_SOURCE"
+    else
+      ffprobe="$(dirname "$ffmpeg")/ffprobe"
+      if [[ ! -x "$ffprobe" && "$(basename "$ffmpeg")" == "ffmpeg-alt" ]]; then
+        ffprobe="$(dirname "$ffmpeg")/ffprobe-alt"
+      fi
+    fi
+    [[ -x "$ffprobe" ]] || continue
+    "$ffprobe" -hide_banner -version >/dev/null 2>&1 || continue
+
+    FFMPEG_SOURCE="$ffmpeg"
+    FFPROBE_SOURCE="$ffprobe"
+    export FFMPEG_SOURCE FFPROBE_SOURCE
+    return 0
+  done
+  return 1
 }
 
-FFMPEG_SOURCE="$(find_tool "${FFMPEG_SOURCE:-}" "$HOME/ffmpeg-full/bin/ffmpeg" ffmpeg || true)"
-FFPROBE_SOURCE="$(find_tool "${FFPROBE_SOURCE:-}" "$HOME/ffmpeg-full/bin/ffprobe" ffprobe || true)"
-[[ -n "$FFMPEG_SOURCE" ]] || die "FFmpeg was not found. Set FFMPEG_SOURCE or install a full FFmpeg build."
-[[ -n "$FFPROBE_SOURCE" ]] || die "ffprobe was not found. Set FFPROBE_SOURCE."
+resolve_ffmpeg_pair || die "No build-time FFmpeg with libx264 + libass was found. Run scripts/watch-update.sh so it can provision the pinned ffmpeg@6 build, or set FFMPEG_SOURCE/FFPROBE_SOURCE explicitly."
 
 log "Bundling FFmpeg: $FFMPEG_SOURCE"
 for native_tool in "$FFMPEG_SOURCE" "$FFPROBE_SOURCE"; do
@@ -322,21 +355,24 @@ cp "$FFMPEG_SOURCE" "$PAYLOAD_DIR/bin/ffmpeg"
 cp "$FFPROBE_SOURCE" "$PAYLOAD_DIR/bin/ffprobe"
 chmod 755 "$PAYLOAD_DIR/bin/ffmpeg" "$PAYLOAD_DIR/bin/ffprobe"
 
-# Capture FFmpeg output before grepping. Direct `ffmpeg | grep -q` checks are
-# unreliable under pipefail because grep can close the pipe after a match and
-# FFmpeg then exits with SIGPIPE (141), turning a successful feature check into
-# a false failure.
+# Validate the exact executables that enter PyInstaller's binary dependency
+# graph. PyInstaller treats Analysis.binaries as native binaries, recursively
+# collects their non-system dylibs on macOS, rewrites load paths, and re-signs
+# the collected Mach-O files.
+FFMPEG_BUILDCONF_OUTPUT="$("$PAYLOAD_DIR/bin/ffmpeg" -hide_banner -buildconf 2>&1)" \
+  || die "The selected FFmpeg could not report its build configuration."
+[[ "$FFMPEG_BUILDCONF_OUTPUT" == *"--enable-libx264"* ]] \
+  || die "The selected FFmpeg was not built with libx264."
+[[ "$FFMPEG_BUILDCONF_OUTPUT" == *"--enable-libass"* ]] \
+  || die "The selected FFmpeg was not built with libass."
 FFMPEG_FILTERS_OUTPUT="$("$PAYLOAD_DIR/bin/ffmpeg" -hide_banner -filters 2>&1)" \
   || die "The selected FFmpeg could not enumerate filters."
 FFMPEG_ENCODERS_OUTPUT="$("$PAYLOAD_DIR/bin/ffmpeg" -hide_banner -encoders 2>&1)" \
   || die "The selected FFmpeg could not enumerate encoders."
-
-if ! grep -Eq '(^|[[:space:]])(ass|subtitles)([[:space:]]|$)' <<<"$FFMPEG_FILTERS_OUTPUT"; then
-  die "The selected FFmpeg does not include the libass ASS/subtitles filters required for burned-in captions."
-fi
-if ! grep -Fq 'libx264' <<<"$FFMPEG_ENCODERS_OUTPUT"; then
-  die "The selected FFmpeg does not include libx264, which the app uses for video export."
-fi
+grep -Eq '(^|[[:space:]])(ass|subtitles)([[:space:]]|$)' <<<"$FFMPEG_FILTERS_OUTPUT" \
+  || die "The selected FFmpeg does not expose ASS/subtitles filters."
+grep -Fq 'libx264' <<<"$FFMPEG_ENCODERS_OUTPUT" \
+  || die "The selected FFmpeg does not expose libx264."
 
 log "Embedding yt-dlp[default] and yt-dlp-ejs inside Cut"
 
@@ -1579,6 +1615,25 @@ PACKAGED_OTOOL_OUTPUT="$(/usr/bin/otool -L "$PACKAGED_FFMPEG" "$PACKAGED_FFPROBE
 if grep -Eq '/(opt/homebrew|usr/local)/(Cellar|opt)/' <<<"$PACKAGED_OTOOL_OUTPUT"; then
   printf '%s\n' "$PACKAGED_OTOOL_OUTPUT" >&2
   die "Packaged FFmpeg/FFprobe still reference Homebrew paths outside the app bundle."
+fi
+
+# Audit the full collected Mach-O graph as well. A direct FFmpeg executable can
+# point at an in-app dylib whose own dependency still points back to Homebrew;
+# that would work on the build Mac but fail on a clean user's Mac.
+BAD_MACHO_REFS="$(
+  find "$DIST_APP/Contents/MacOS" "$DIST_APP/Contents/Frameworks" -type f -print0 2>/dev/null \
+    | while IFS= read -r -d '' macho; do
+        desc="$(/usr/bin/file "$macho" 2>/dev/null || true)"
+        [[ "$desc" == *"Mach-O"* ]] || continue
+        deps="$(/usr/bin/otool -L "$macho" 2>/dev/null || true)"
+        if grep -Eq '/(opt/homebrew|usr/local)/(Cellar|opt)/' <<<"$deps"; then
+          printf '%s\n%s\n' "$macho" "$deps"
+        fi
+      done
+)"
+if [[ -n "$BAD_MACHO_REFS" ]]; then
+  printf '%s\n' "$BAD_MACHO_REFS" >&2
+  die "The packaged app still contains Mach-O dependencies that point outside Cut.app into Homebrew."
 fi
 log "Packaged FFmpeg/FFprobe are self-contained and pass capability checks"
 

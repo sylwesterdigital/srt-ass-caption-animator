@@ -54,14 +54,18 @@ grep -F 'yt-dlp[default]' scripts/requirements-macos.txt >/dev/null || die "yt-d
 grep -F '"yt_dlp_ejs"' scripts/build_macos_release_v3.sh >/dev/null || die "yt_dlp_ejs is not collected by PyInstaller"
 grep -F 'f"deno:{deno_bin}"' app.py >/dev/null || die "app.py does not pin yt-dlp to the bundled Deno runtime"
 if grep -F 'ensure_formula ffmpeg ffmpeg' scripts/watch-update.sh >/dev/null; then
-  die "watcher still assumes the Homebrew core FFmpeg is suitable"
+  die "watcher still assumes an arbitrary PATH ffmpeg is suitable"
 fi
-grep -F 'homebrew-ffmpeg/ffmpeg/ffmpeg' scripts/watch-update.sh >/dev/null || die "watcher cannot provision a full FFmpeg build"
+grep -F 'ffmpeg@6' scripts/watch-update.sh >/dev/null || die "watcher cannot provision the pinned ffmpeg@6 build"
 grep -F 'if ! select_full_ffmpeg; then' scripts/watch-update.sh >/dev/null || die "watcher does not validate FFmpeg capabilities"
-grep -F 'encoders="$("$ffmpeg" -hide_banner -encoders 2>&1)"' scripts/watch-update.sh >/dev/null \
-  || die "watcher FFmpeg capability checks are not pipefail-safe"
-grep -F 'FFMPEG_ENCODERS_OUTPUT=' scripts/build_macos_release_v3.sh >/dev/null \
-  || die "builder FFmpeg capability checks are not pipefail-safe"
+grep -F 'buildconf="$("$ffmpeg" -hide_banner -buildconf 2>&1)"' scripts/watch-update.sh >/dev/null \
+  || die "watcher does not validate FFmpeg build configuration"
+grep -F 'FFMPEG_BUILDCONF_OUTPUT=' scripts/build_macos_release_v3.sh >/dev/null \
+  || die "builder does not validate FFmpeg build configuration"
+grep -F 'BAD_MACHO_REFS=' scripts/build_macos_release_v3.sh >/dev/null \
+  || die "builder does not audit the full packaged Mach-O dependency graph"
+grep -F 'PYTHON_BIN="${PYTHON_BIN:-$(command -v python3' scripts/watch-update.sh >/dev/null \
+  || die "watcher cannot ingest updates before release Python is provisioned"
 grep -F 'Auditing packaged media runtime' scripts/build_macos_release_v3.sh >/dev/null \
   || die "builder does not audit the packaged FFmpeg runtime"
 ok "yt-dlp, EJS, Deno and FFmpeg are app-owned in packaged builds"
